@@ -7,6 +7,8 @@ use std::{
 
 use crate::ast::{BinaryOp, Expression, Literal, Pattern};
 
+static mut MAX_VAR: u32 = 0;
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum MonoType {
     TyVar(TyVar),
@@ -217,17 +219,14 @@ impl MonoType {
 #[derive(Clone)]
 pub struct Context {
     pub m: HashMap<String, Forall>,
-    pub ty_var_count: Rc<u32>,
+    // pub ty_var_count: Rc<u32>,
 }
 
 pub struct Subst(pub HashMap<String, MonoType>);
 
 impl Context {
     pub fn new() -> Self {
-        Self {
-            m: HashMap::new(),
-            ty_var_count: Rc::new(0),
-        }
+        Self { m: HashMap::new() }
     }
 
     pub fn lookup(&self, name: &String) -> Option<Forall> {
@@ -235,8 +234,11 @@ impl Context {
     }
 
     pub fn new_type_var(&mut self) -> TyVar {
-        let id = *self.ty_var_count.as_ref();
-        unsafe { *Rc::get_mut_unchecked(&mut self.ty_var_count) = id + 1 };
+        let id = unsafe {
+            let id = MAX_VAR;
+            MAX_VAR += 1;
+            id
+        };
         TyVar {
             name: format!("'ty{id}"),
         }
