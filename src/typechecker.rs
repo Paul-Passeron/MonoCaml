@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     fmt::{self, Display},
     hash::Hash,
 };
@@ -111,7 +111,7 @@ impl Display for TyCon {
                 self.name_ref(),
                 self.args_ref()[1]
             )
-        } else if self.args_ref().len() == 0 {
+        } else if self.args_ref().is_empty() {
             write!(f, "{}", self.name)
         } else {
             write!(
@@ -213,12 +213,37 @@ impl MonoType {
             }
         }
     }
+
+    pub fn free_type_vars(&self) -> Vec<TyVar> {
+        use std::collections::HashSet;
+        let mut vars = HashSet::new();
+        self.collect_free_vars(&mut vars);
+        vars.into_iter().collect()
+    }
+
+    fn collect_free_vars(&self, vars: &mut std::collections::HashSet<TyVar>) {
+        match self {
+            MonoType::TyVar(ty_var) => {
+                vars.insert(ty_var.clone());
+            }
+            MonoType::TyCon(ty_con) => {
+                for arg in &ty_con.args {
+                    arg.collect_free_vars(vars);
+                }
+            }
+            MonoType::Forall(forall) => {
+                forall.ty.collect_free_vars(vars);
+                for bound_var in &forall.tyvars {
+                    vars.remove(bound_var);
+                }
+            }
+        }
+    }
 }
 
 #[derive(Clone)]
 pub struct Context {
     pub m: HashMap<String, Forall>,
-    // pub ty_var_count: Rc<u32>,
 }
 
 pub struct Subst(pub HashMap<String, MonoType>);
@@ -257,8 +282,41 @@ impl Context {
         res
     }
 
-    pub fn apply_subst(self, subst: Subst) -> Self {
-        self.with_bindings(subst.0)
+    pub fn apply_subst(self, subst: &Subst) -> Self {
+        let mut res = self.clone();
+        for (_key, forall) in res.m.iter_mut() {
+            let new_ty = forall.ty.as_ref().clone().apply_subst(subst);
+            forall.ty = Box::new(new_ty);
+        }
+        res
+    }
+
+    pub fn instantiate(&mut self, forall: &Forall) -> MonoType {
+        let mut subst = Subst::new();
+        for tyvar in &forall.tyvars {
+            let fresh = self.new_type_var();
+            subst = subst.extend(tyvar.name.clone(), fresh.as_mono());
+        }
+        forall.ty.as_ref().clone().apply_subst(&subst)
+    }
+
+    pub fn generalize(&self, ty: MonoType) -> Forall {
+        let ty_free_vars: HashSet<TyVar> = ty.free_type_vars().into_iter().collect();
+
+        let mut ctx_free_vars = HashSet::new();
+        for forall in self.m.values() {
+            for var in forall.ty.free_type_vars() {
+                ctx_free_vars.insert(var);
+            }
+        }
+
+        let generalized_vars: Vec<TyVar> =
+            ty_free_vars.difference(&ctx_free_vars).cloned().collect();
+
+        Forall {
+            tyvars: generalized_vars,
+            ty: Box::new(ty),
+        }
     }
 }
 
@@ -393,11 +451,16 @@ impl TypeChecker {
             Expression::IntLit(_) => Ok((Subst::new(), MonoType::int_type())),
             Expression::BoolLit(_) => Ok((Subst::new(), MonoType::bool_type())),
             Expression::Var(name) => {
-                let type_shceme = ctx
+                let type_scheme = ctx
                     .lookup(name)
                     .ok_or(TCError::UnboundVariable(name.clone()))?;
-                // .expect(format!("Unbound Variable {}", name).as_str());
-                return Ok((Subst::new(), type_shceme.ty.as_ref().clone()));
+
+                if !type_scheme.tyvars.is_empty() {
+                    let instantiated = ctx.instantiate(&type_scheme);
+                    return Ok((Subst::new(), instantiated));
+                }
+
+                return Ok((Subst::new(), type_scheme.ty.as_ref().clone()));
             }
             Expression::Tuple(expressions) => {
                 let (substs, tys) = expressions
@@ -426,13 +489,14 @@ impl TypeChecker {
             } => {
                 let (pat_ty, bindings) = Self::unfold_pattern_bindings(&binding.pat, ctx);
                 let (pat_ty2, bindings2) = Self::unfold_pattern_bindings(&binding.pat, ctx);
-                let mut new_ctx = ctx.with_bindings(bindings.clone());
-                let ctx_for_binding = if *recursive {
-                    &mut ctx.with_bindings(bindings2.clone())
+
+                let (subst, binding_ty) = if *recursive {
+                    let mut rec_ctx = ctx.with_bindings(bindings2.clone());
+                    Self::infer_w(&binding.expr, &mut rec_ctx)?
                 } else {
-                    ctx
+                    Self::infer_w(&binding.expr, ctx)?
                 };
-                let (subst, binding_ty) = Self::infer_w(&binding.expr, ctx_for_binding)?;
+
                 let subst = bindings2.iter().fold(Ok(subst), |acc, (k, x)| {
                     acc?.compose(Self::unify_w(x, &bindings[k])?)
                 })?;
@@ -440,8 +504,19 @@ impl TypeChecker {
                     .compose(Self::unify_w(&pat_ty, &binding_ty)?)?
                     .compose(Self::unify_w(&pat_ty2, &pat_ty)?)?;
 
+                let binding_ty_subst = binding_ty.apply_subst(&subst);
+                let ctx_subst = ctx.clone().apply_subst(&subst);
+                let generalized = ctx_subst.generalize(binding_ty_subst.clone());
+                let mut new_ctx = ctx_subst.clone();
+                for (key, _) in bindings.iter() {
+                    new_ctx.m.insert(key.clone(), generalized.clone());
+                }
+
                 let (in_subst, in_ty) = Self::infer_w(in_expr, &mut new_ctx)?;
-                Ok((subst.compose(in_subst)?, in_ty))
+
+                let final_subst = subst.compose(in_subst)?;
+
+                Ok((final_subst, in_ty))
             }
             Expression::Seq { fst, snd } => {
                 let (subst, _) = Self::infer_w(fst, ctx)?;
