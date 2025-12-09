@@ -1,2 +1,1 @@
-let a = 5 in let b = 6 in ()
-(* let b = 5 in () *)
+let x = (fun z -> 5) in if (x []) = 0 then x else x

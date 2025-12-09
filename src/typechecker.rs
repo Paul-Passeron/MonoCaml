@@ -2,7 +2,6 @@ use std::{
     collections::HashMap,
     fmt::{self, Display},
     hash::Hash,
-    rc::Rc,
 };
 
 use crate::ast::{BinaryOp, Expression, Literal, Pattern};
