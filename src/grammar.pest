@@ -1,0 +1,270 @@
+// MonoCaml Grammar for Pest
+
+WHITESPACE = _{ " " | "\t" | "\r" | "\n" }
+
+// Comments (optional, but useful)
+COMMENT = _{ "(*" ~ (!"*)" ~ ANY)* ~ "*)" }
+
+// Keywords
+let_kw   = @{ "let" ~ !ident_char }
+in_kw    = @{ "in" ~ !ident_char }
+fun_kw   = @{ "fun" ~ !ident_char }
+rec_kw   = @{ "rec" ~ !ident_char }
+true_kw  = @{ "true" ~ !ident_char }
+false_kw = @{ "false" ~ !ident_char }
+if_kw    = @{ "if" ~ !ident_char }
+then_kw  = @{ "then" ~ !ident_char }
+else_kw  = @{ "else" ~ !ident_char }
+
+// Operators (order matters for multi-char operators)
+and_op = @{ "&&" }
+or_op  = @{ "||" }
+arrow  = @{ "->" }
+dif    = @{ "<>" }
+cons   = @{ "::" }
+eq     = @{ "=" }
+colon  = @{ ":" }
+semi   = @{ ";" }
+dot    = @{ "." }
+minus  = @{ "-" }
+plus   = @{ "+" }
+mul    = @{ "*" }
+mod_op = @{ "%" }
+div    = @{ "/" }
+
+// Delimiters
+lparen     = @{ "(" }
+rparen     = @{ ")" }
+lsquare    = @{ "[" }
+rsquare    = @{ "]" }
+lcurly     = @{ "{" }
+rcurly     = @{ "}" }
+comma      = @{ "," }
+underscore = @{ "_" }
+
+// Literals
+int_lit = @{
+    ASCII_DIGIT+
+}
+
+float_lit = @{
+    ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT+
+}
+
+// String with escape sequences
+string_lit = @{
+    "\"" ~ inner_string ~ "\""
+}
+
+// Character literal
+char_lit = @{
+    "'" ~ inner ~ "'"
+}
+
+inner = @{ char* }
+char  =  {
+    !("\'" | "\\") ~ ANY
+  | "\\" ~ ("\"" | "\\" | "/" | "b" | "f" | "n" | "r" | "t")
+  | "\\" ~ ("u" ~ ASCII_HEX_DIGIT{4})
+}
+
+inner_string = @{ char_string* }
+char_string  =  {
+    !("\"" | "\\") ~ ANY
+  | "\\" ~ ("\"" | "\\" | "/" | "b" | "f" | "n" | "r" | "t")
+  | "\\" ~ ("u" ~ ASCII_HEX_DIGIT{4})
+}
+
+// Keywords (for exclusion in ident)
+keyword = @{
+    "let"
+  | "in"
+  | "fun"
+  | "rec"
+  | "if"
+  | "then"
+  | "else"
+  | "true"
+  | "false"
+}
+
+// Identifier
+ident_char = _{ ASCII_ALPHANUMERIC | "_" }
+ident      = @{
+    !keyword ~ (ASCII_ALPHA | "_") ~ ident_char*
+}
+
+// Main token rule
+token = _{
+    // Keywords (must come before ident)
+    let_kw
+  | in_kw
+  | fun_kw
+  | rec_kw
+  | true_kw
+  | false_kw
+  | if_kw
+  | then_kw
+  | else_kw
+  | // Literals (float before int to match the decimal point)
+  float_lit
+  | int_lit
+  | string_lit
+  | char_lit
+  | // Multi-character operators (must come before single-char)
+  and_op
+  | or_op
+  | arrow
+  | dif
+  | cons
+  | // Single character operators and punctuation
+  eq
+  | colon
+  | semi
+  | dot
+  | minus
+  | plus
+  | mul
+  | mod_op
+  | div
+  | lparen
+  | rparen
+  | lsquare
+  | rsquare
+  | comma
+  | underscore
+  | // Identifier (must come last after keywords)
+  ident
+}
+
+// Top-level rule for tokenization
+tokens = { SOI ~ token* ~ EOI }
+
+// ===== PARSER RULES =====
+
+// Program entry point
+program = { SOI ~ expr? ~ EOI }
+
+// Top-level expression (includes let, if, lambda, or infix expressions)
+expr = { let_expr | if_expr | lambda_expr | infix_expr }
+
+let_expr = {
+    let_kw ~ rec_kw? ~ pattern ~ pattern* ~ eq ~ expr ~ in_kw ~ expr
+}
+
+if_expr = {
+    if_kw ~ expr ~ then_kw ~ expr ~ else_kw ~ expr
+}
+
+lambda_expr = {
+    fun_kw ~ pattern ~ arrow ~ expr
+}
+
+// Infix expression for Pratt parser (handles all binary operators and sequences)
+infix_expr = { term ~ (infix_op ~ term)* }
+
+infix_op = _{
+    comma
+  | semi
+  | or_op
+  | and_op
+  | eq
+  | dif
+  | cons
+  | plus
+  | minus
+  | mul
+  | div
+  | mod_op
+}
+
+// Non-sequence infix expression (for use in lists where semicolon is a separator)
+non_seq_expr = { term ~ (non_seq_op ~ term)* }
+
+non_seq_op = _{
+    comma
+  | or_op
+  | and_op
+  | eq
+  | dif
+  | cons
+  | plus
+  | minus
+  | mul
+  | div
+  | mod_op
+}
+
+// Term is either function application or primary
+term = { primary ~ primary* }
+
+// Primary expressions
+primary = {
+    lparen ~ rparen // unit value
+
+  | lparen ~ expr ~ (comma ~ expr)+ ~ rparen // tuple (2 or more elements)
+
+  | lparen ~ expr ~ rparen // parenthesized expression
+
+  | list_expr
+  | literal
+  | ident
+}
+
+list_expr = {
+    lsquare ~ rsquare
+  | lsquare ~ list_item ~ (semi ~ list_item)* ~ rsquare
+}
+
+list_item = { let_expr | if_expr | lambda_expr | non_seq_expr }
+
+// Literals
+literal = {
+    int_lit
+  | float_lit
+  | string_lit
+  | char_lit
+  | true_kw
+  | false_kw
+}
+
+// Patterns
+pattern = {
+    wildcard_pattern
+  | unit_pattern
+  | symbol_pattern
+  | dict_pattern
+  | tuple_pattern
+  | list_pattern
+  | literal_pattern
+}
+
+unit_pattern = { lparen ~ rparen }
+
+wildcard_pattern = { underscore }
+
+symbol_pattern = { ident }
+
+dict_pattern = {
+    lcurly ~ dict_field ~ (comma ~ dict_field)* ~ rcurly
+}
+
+dict_field = { ident ~ colon ~ pattern }
+
+tuple_pattern = {
+    lparen ~ pattern ~ (comma ~ pattern)+ ~ rparen
+}
+
+list_pattern = {
+    lsquare ~ rsquare
+  | lsquare ~ pattern ~ (semi ~ pattern)* ~ rsquare
+}
+
+literal_pattern = {
+    int_lit
+  | float_lit
+  | string_lit
+  | char_lit
+  | true_kw
+  | false_kw
+}
