@@ -1,12 +1,14 @@
 use std::{
+    cell::Cell,
     collections::{HashMap, HashSet},
     fmt::{self, Display},
     hash::Hash,
+    rc::Rc,
 };
 
 use crate::ast::{BinaryOp, Expression, Literal, Pattern};
 
-static mut MAX_VAR: u32 = 0;
+const alphabet: &'static str = "abcdefghijklmnopqrstuvwxyz";
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum MonoType {
@@ -239,18 +241,72 @@ impl MonoType {
             }
         }
     }
+
+    pub fn get_alphabetic_name(id: u32) -> String {
+        if id > 25 {
+            format!("'a{}", id - 25)
+        } else {
+            format!("'{}", alphabet.chars().nth(id as usize).unwrap())
+        }
+    }
+
+    pub fn alphabetize(&self) -> MonoType {
+        fn aux(ty: &MonoType, map: &mut HashMap<String, String>) -> MonoType {
+            match ty {
+                MonoType::TyVar(ty_var) => {
+                    if !map.contains_key(&ty_var.name) {
+                        map.insert(
+                            ty_var.name.clone(),
+                            MonoType::get_alphabetic_name(map.len() as u32),
+                        );
+                    }
+                    MonoType::TyVar(TyVar {
+                        name: map[&ty_var.name].clone(),
+                    })
+                }
+                MonoType::TyCon(ty_con) => MonoType::TyCon(TyCon::new_pro(
+                    ty_con.name_ref().clone(),
+                    ty_con.args_ref().iter().map(|x| aux(x, map)).collect(),
+                    ty_con.infix(),
+                )),
+                MonoType::Forall(forall) => {
+                    for ty in &forall.tyvars {
+                        map.insert(
+                            ty.name.clone(),
+                            MonoType::get_alphabetic_name(map.len() as u32),
+                        );
+                    }
+                    MonoType::Forall(Forall {
+                        tyvars: forall
+                            .tyvars
+                            .iter()
+                            .map(|x| TyVar {
+                                name: map[&x.name].clone(),
+                            })
+                            .collect(),
+                        ty: Box::new(aux(&forall.ty, map)),
+                    })
+                }
+            }
+        }
+        aux(self, &mut HashMap::new())
+    }
 }
 
 #[derive(Clone)]
 pub struct Context {
     pub m: HashMap<String, Forall>,
+    ty_var_count: Rc<Cell<u32>>,
 }
 
 pub struct Subst(pub HashMap<String, MonoType>);
 
 impl Context {
     pub fn new() -> Self {
-        Self { m: HashMap::new() }
+        Self {
+            m: HashMap::new(),
+            ty_var_count: Rc::new(Cell::new(0)),
+        }
     }
 
     pub fn lookup(&self, name: &String) -> Option<Forall> {
@@ -258,18 +314,18 @@ impl Context {
     }
 
     pub fn new_type_var(&mut self) -> TyVar {
-        let id = unsafe {
-            let id = MAX_VAR;
-            MAX_VAR += 1;
-            id
-        };
+        let id = self.ty_var_count.get();
+        self.ty_var_count.set(id + 1);
         TyVar {
             name: format!("'ty{id}"),
         }
     }
 
     pub fn with_bindings(&self, bindings: HashMap<String, MonoType>) -> Self {
-        let mut res = self.clone();
+        let mut res = Self {
+            m: self.m.clone(),
+            ty_var_count: Rc::clone(&self.ty_var_count),
+        };
         for (key, val) in bindings {
             res.m.insert(
                 key,
@@ -488,28 +544,23 @@ impl TypeChecker {
                 in_expr,
             } => {
                 let (pat_ty, bindings) = Self::unfold_pattern_bindings(&binding.pat, ctx);
-                let (pat_ty2, bindings2) = Self::unfold_pattern_bindings(&binding.pat, ctx);
 
                 let (subst, binding_ty) = if *recursive {
-                    let mut rec_ctx = ctx.with_bindings(bindings2.clone());
+                    let mut rec_ctx = ctx.with_bindings(bindings.clone());
                     Self::infer_w(&binding.expr, &mut rec_ctx)?
                 } else {
                     Self::infer_w(&binding.expr, ctx)?
                 };
 
-                let subst = bindings2.iter().fold(Ok(subst), |acc, (k, x)| {
-                    acc?.compose(Self::unify_w(x, &bindings[k])?)
-                })?;
-                let subst = subst
-                    .compose(Self::unify_w(&pat_ty, &binding_ty)?)?
-                    .compose(Self::unify_w(&pat_ty2, &pat_ty)?)?;
+                let subst = subst.compose(Self::unify_w(&pat_ty, &binding_ty)?)?;
 
-                let binding_ty_subst = binding_ty.apply_subst(&subst);
+                // Apply substitution to the context and each binding individually
                 let ctx_subst = ctx.clone().apply_subst(&subst);
-                let generalized = ctx_subst.generalize(binding_ty_subst.clone());
                 let mut new_ctx = ctx_subst.clone();
-                for (key, _) in bindings.iter() {
-                    new_ctx.m.insert(key.clone(), generalized.clone());
+                for (key, ty) in bindings.iter() {
+                    let ty_subst = ty.clone().apply_subst(&subst);
+                    let generalized = ctx_subst.generalize(ty_subst);
+                    new_ctx.m.insert(key.clone(), generalized);
                 }
 
                 let (in_subst, in_ty) = Self::infer_w(in_expr, &mut new_ctx)?;
@@ -599,6 +650,6 @@ impl TypeChecker {
 
     pub fn type_of(e: &Expression, ctx: &mut Context) -> Result<MonoType, TCError> {
         let (s, t) = Self::infer_w(e, ctx)?;
-        Ok(t.apply_subst(&s))
+        Ok(t.apply_subst(&s).alphabetize())
     }
 }
