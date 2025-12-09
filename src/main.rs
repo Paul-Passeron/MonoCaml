@@ -1,3 +1,5 @@
+#![feature(get_mut_unchecked)]
+
 use std::{env, fs};
 
 use crate::typechecker::{Context, TypeChecker};
@@ -23,8 +25,8 @@ fn main() {
             println!("AST from file: {}", filename);
             println!("{:#?}", ast);
             println!(
-                "TYPE: {:#?}",
-                TypeChecker::type_of(&ast[0], &mut Context::new())
+                "TYPE: {}",
+                TypeChecker::type_of(&ast[0], &mut Context::new()).unwrap()
             );
         }
         Err(err) => {

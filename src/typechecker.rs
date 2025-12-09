@@ -1,4 +1,9 @@
-use std::{collections::HashMap, hash::Hash};
+use std::{
+    collections::HashMap,
+    fmt::{self, Display},
+    hash::Hash,
+    rc::Rc,
+};
 
 use crate::ast::{BinaryOp, Expression, Literal, Pattern};
 
@@ -29,13 +34,98 @@ impl TyVar {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct TyCon {
-    pub name: String,
-    pub args: Vec<MonoType>,
+    name: String,
+    args: Vec<MonoType>,
+    infix: bool,
 }
 
 impl TyCon {
     pub fn as_mono(self) -> MonoType {
         MonoType::TyCon(self)
+    }
+
+    pub fn name_ref(&self) -> &String {
+        &self.name
+    }
+
+    pub fn args_ref(&self) -> &Vec<MonoType> {
+        &self.args
+    }
+
+    pub fn name(self) -> String {
+        self.name
+    }
+
+    pub fn args(self) -> Vec<MonoType> {
+        self.args
+    }
+
+    pub fn infix(&self) -> bool {
+        self.infix
+    }
+
+    pub fn new(name: String, args: Vec<MonoType>) -> Self {
+        Self::new_pro(name, args, false)
+    }
+
+    pub fn new_infix(name: String, args: Vec<MonoType>) -> Self {
+        Self::new_pro(name, args, true)
+    }
+
+    pub fn new_pro(name: String, args: Vec<MonoType>, infix: bool) -> Self {
+        Self { name, args, infix }
+    }
+}
+
+impl Display for MonoType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self {
+            MonoType::TyVar(x) => write!(f, "{x}"),
+            MonoType::TyCon(x) => write!(f, "{x}"),
+            MonoType::Forall(x) => write!(f, "{x}"),
+        }
+    }
+}
+
+impl Display for Forall {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.ty)
+    }
+}
+
+impl Display for TyVar {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.name)
+    }
+}
+
+impl Display for TyCon {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        if self.infix() {
+            assert!(self.args_ref().len() == 2);
+            write!(
+                f,
+                "({} {} {})",
+                self.args_ref()[0],
+                self.name_ref(),
+                self.args_ref()[1]
+            )
+        } else if self.args_ref().len() == 0 {
+            write!(f, "{}", self.name)
+        } else {
+            write!(
+                f,
+                "({}{})",
+                self.args_ref()
+                    .iter()
+                    .rev()
+                    .map(|x| format!("{x}"))
+                    .collect::<Vec<_>>()
+                    .join(" ")
+                    + " ",
+                self.name_ref()
+            )
+        }
     }
 }
 
@@ -53,45 +143,27 @@ impl Forall {
 
 impl MonoType {
     pub fn list_type(ty: MonoType) -> MonoType {
-        Self::TyCon(TyCon {
-            name: "list".to_string(),
-            args: vec![ty],
-        })
+        Self::TyCon(TyCon::new("list".to_string(), vec![ty]))
     }
 
     pub fn func_type(arg: MonoType, ret: MonoType) -> MonoType {
-        Self::TyCon(TyCon {
-            name: "->".to_string(),
-            args: vec![arg, ret],
-        })
+        Self::TyCon(TyCon::new_infix("->".to_string(), vec![arg, ret]))
     }
 
-    pub fn tuple_type(arg: MonoType, ret: MonoType) -> MonoType {
-        Self::TyCon(TyCon {
-            name: "*".to_string(),
-            args: vec![arg, ret],
-        })
+    pub fn tuple_type(left: MonoType, right: MonoType) -> MonoType {
+        Self::TyCon(TyCon::new_infix("*".to_string(), vec![left, right]))
     }
 
     pub fn int_type() -> MonoType {
-        Self::TyCon(TyCon {
-            name: "int".to_string(),
-            args: vec![],
-        })
+        Self::TyCon(TyCon::new("int".to_string(), vec![]))
     }
 
     pub fn unit_type() -> MonoType {
-        Self::TyCon(TyCon {
-            name: "unit".to_string(),
-            args: vec![],
-        })
+        Self::TyCon(TyCon::new("unit".to_string(), vec![]))
     }
 
     pub fn bool_type() -> MonoType {
-        Self::TyCon(TyCon {
-            name: "bool".to_string(),
-            args: vec![],
-        })
+        Self::TyCon(TyCon::new("bool".to_string(), vec![]))
     }
 
     pub fn tuple_type_from_vec(tys: Vec<MonoType>) -> MonoType {
@@ -112,14 +184,16 @@ impl MonoType {
                     subst.0[&ty_var.name].clone()
                 }
             }
-            MonoType::TyCon(ty_con) => MonoType::TyCon(TyCon {
-                name: ty_con.name.clone(),
-                args: ty_con
-                    .args
+            MonoType::TyCon(ty_con) => MonoType::TyCon(TyCon::new_pro(
+                ty_con.name_ref().clone(),
+                ty_con
+                    .args_ref()
+                    .clone()
                     .into_iter()
                     .map(|x| x.apply_subst(subst))
                     .collect(),
-            }),
+                ty_con.infix(),
+            )),
             MonoType::Forall(forall) => MonoType::Forall(Forall {
                 tyvars: forall.tyvars,
                 ty: Box::new(forall.ty.apply_subst(subst)),
@@ -143,7 +217,7 @@ impl MonoType {
 #[derive(Clone)]
 pub struct Context {
     pub m: HashMap<String, Forall>,
-    pub ty_var_count: u32,
+    pub ty_var_count: Rc<u32>,
 }
 
 pub struct Subst(pub HashMap<String, MonoType>);
@@ -152,7 +226,7 @@ impl Context {
     pub fn new() -> Self {
         Self {
             m: HashMap::new(),
-            ty_var_count: 0,
+            ty_var_count: Rc::new(0),
         }
     }
 
@@ -161,8 +235,8 @@ impl Context {
     }
 
     pub fn new_type_var(&mut self) -> TyVar {
-        let id = self.ty_var_count;
-        self.ty_var_count += 1;
+        let id = *self.ty_var_count.as_ref();
+        unsafe { *Rc::get_mut_unchecked(&mut self.ty_var_count) = id + 1 };
         TyVar {
             name: format!("'ty{id}"),
         }
