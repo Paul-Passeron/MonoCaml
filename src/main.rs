@@ -22,6 +22,10 @@ fn main() {
         Ok(ast) => {
             println!("AST from file: {}", filename);
             println!("{:#?}", ast);
+            println!(
+                "TYPE: {:#?}",
+                TypeChecker::type_of(&ast[0], &mut Context::new())
+            );
         }
         Err(err) => {
             eprintln!("Parse error:\n{}", err);
