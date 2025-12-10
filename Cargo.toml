@@ -2,8 +2,13 @@
 name = "monocaml"
 version = "0.1.0"
 edition = "2021"
+build = "build.rs"
+
+[build-dependencies]
+lalrpop = "0.22.2"
 
 [dependencies]
 pest = "2.8.4"
 pest_derive = "2.8.4"
 lazy_static = "1.4"
+lalrpop-util = { version = "0.21.0", features = ["lexer", "unicode"] }

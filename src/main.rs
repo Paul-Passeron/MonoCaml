@@ -1,5 +1,6 @@
 #![feature(normalize_lexically)]
 #![feature(get_mut_unchecked)]
+#![allow(unused)]
 
 use std::{env, fs};
 
