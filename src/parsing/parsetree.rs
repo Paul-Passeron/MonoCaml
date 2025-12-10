@@ -557,3 +557,26 @@ pub struct ModuleBinding {
     attributes: Attributes,
     loc: Location,
 }
+
+pub enum TopLevelPhrase {
+    Def(Structure),
+    Dir(TopLevelDirective),
+}
+
+pub struct TopLevelDirective {
+    name: Loc<String>,
+    arg: Option<DirectiveArgument>,
+    loc: Location,
+}
+
+pub struct DirectiveArgument {
+    desc: DirectiveArgumentDesc,
+    loc: Location,
+}
+
+pub enum DirectiveArgumentDesc {
+    String(String),
+    Int(String, Option<char>),
+    Ident(LongIdent),
+    Bool(bool),
+}
