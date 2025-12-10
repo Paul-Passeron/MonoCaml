@@ -1,9 +1,6 @@
 use std::path::Path;
 
-use crate::{
-    parsing::location::Location,
-    utils::{self, misc},
-};
+use crate::utils::{self, misc};
 
 #[derive(Clone, Copy)]
 pub enum IntfOrImpl {
@@ -100,5 +97,37 @@ impl UnitInfo {
             eprintln!("TODO: report warning: Bad module name {}", modname)
             // (Location::in_file(self.source_file())).prerr_warning(Warnings::BadModuleName(modname))
         }
+    }
+
+    pub fn new(
+        check_modname: bool,
+        source_file: Filename,
+        kind: IntfOrImpl,
+        prefix: FilePrefix,
+    ) -> Result<Self, Error> {
+        let modname = Self::strict_modname_from_source(&prefix);
+        let modname = if check_modname {
+            modname.unwrap_or(prefix.clone())
+        } else {
+            modname?
+        };
+        let p = Self {
+            source_file,
+            kind,
+            prefix,
+            modname,
+        };
+        if check_modname {
+            Self::check_unit_name(&p);
+        }
+        Ok(p)
+    }
+
+    pub fn make(
+        source_file: Filename,
+        kind: IntfOrImpl,
+        prefix: FilePrefix,
+    ) -> Result<Self, Error> {
+        Self::new(true, source_file, kind, prefix)
     }
 }
