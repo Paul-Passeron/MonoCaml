@@ -1,3 +1,5 @@
+pub mod tokens;
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Position {
     fname: String,

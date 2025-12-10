@@ -1,6 +1,9 @@
 pub mod asttypes;
+pub mod docstring;
 pub mod location;
 pub mod longident;
+pub mod parser;
+pub mod parser_helper;
 pub mod parsetree;
 pub mod syntaxerr;
 pub mod unit_info;
