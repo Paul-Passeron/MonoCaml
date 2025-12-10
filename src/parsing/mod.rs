@@ -3,3 +3,4 @@ pub mod location;
 pub mod longident;
 pub mod parsetree;
 pub mod syntaxerr;
+pub mod unit_info;

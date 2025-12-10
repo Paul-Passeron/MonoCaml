@@ -1,7 +1,9 @@
-use crate::lexing::Position;
+use crate::utils::warnings;
 
-pub struct Location {
-    start: Position,
-    end: Position,
-    ghost: bool,
+pub type Location = warnings::Location;
+
+impl Location {
+    pub fn in_file<T: ToString>(file_name: T) -> Self {
+        warnings::Location::ghost_loc_in_file(file_name)
+    }
 }

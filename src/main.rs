@@ -1,9 +1,9 @@
+#![feature(normalize_lexically)]
 #![feature(get_mut_unchecked)]
 
 use std::{env, fs};
 
 use crate::typechecker::{Context, TypeChecker};
-
 pub mod ast;
 pub mod common;
 pub mod lexing;
@@ -11,6 +11,7 @@ pub mod parser;
 pub mod parsing;
 pub mod platform;
 pub mod typechecker;
+pub mod utils;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
