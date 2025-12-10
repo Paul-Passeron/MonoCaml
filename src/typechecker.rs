@@ -8,7 +8,7 @@ use std::{
 
 use crate::ast::{BinaryOp, Expression, Literal, Pattern};
 
-const alphabet: &'static str = "abcdefghijklmnopqrstuvwxyz";
+const ALPHABET: &'static str = "abcdefghijklmnopqrstuvwxyz";
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum MonoType {
@@ -246,7 +246,7 @@ impl MonoType {
         if id > 25 {
             format!("'a{}", id - 25)
         } else {
-            format!("'{}", alphabet.chars().nth(id as usize).unwrap())
+            format!("'{}", ALPHABET.chars().nth(id as usize).unwrap())
         }
     }
 
@@ -554,7 +554,6 @@ impl TypeChecker {
 
                 let subst = subst.compose(Self::unify_w(&pat_ty, &binding_ty)?)?;
 
-                // Apply substitution to the context and each binding individually
                 let ctx_subst = ctx.clone().apply_subst(&subst);
                 let mut new_ctx = ctx_subst.clone();
                 for (key, ty) in bindings.iter() {

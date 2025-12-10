@@ -6,7 +6,10 @@ use crate::typechecker::{Context, TypeChecker};
 
 pub mod ast;
 pub mod common;
+pub mod lexing;
 pub mod parser;
+pub mod parsing;
+pub mod platform;
 pub mod typechecker;
 
 fn main() {
@@ -24,10 +27,12 @@ fn main() {
         Ok(ast) => {
             println!("AST from file: {}", filename);
             println!("{:#?}", ast);
-            println!(
-                "TYPE: {}",
-                TypeChecker::type_of(&ast[0], &mut Context::new()).unwrap()
-            );
+
+            let mut ctx = Context::new();
+
+            for expr in ast {
+                println!("TYPE: {}", TypeChecker::type_of(&expr, &mut ctx).unwrap());
+            }
         }
         Err(err) => {
             eprintln!("Parse error:\n{}", err);
