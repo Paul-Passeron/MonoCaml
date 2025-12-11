@@ -8,8 +8,8 @@ use crate::parsing::{
 };
 
 pub struct Constant {
-    const_desc: ConstantDesc,
-    const_loc: Location,
+    pub const_desc: ConstantDesc,
+    pub const_loc: Location,
 }
 
 pub enum ConstantDesc {
@@ -22,9 +22,9 @@ pub enum ConstantDesc {
 pub type LocationStack = Vec<Location>;
 
 pub struct Attribute {
-    name: Loc<String>,
-    payload: Payload,
-    loc: Location,
+    pub name: Loc<String>,
+    pub payload: Payload,
+    pub loc: Location,
 }
 
 pub type Extension = (Loc<String>, Payload);
@@ -38,10 +38,10 @@ pub enum Payload {
 }
 
 pub struct CoreType {
-    type_desc: CoreTypeDesc,
-    loc: Location,
-    loc_stack: LocationStack,
-    attributes: Attributes,
+    pub type_desc: CoreTypeDesc,
+    pub loc: Location,
+    pub loc_stack: LocationStack,
+    pub attributes: Attributes,
 }
 
 pub enum CoreTypeDesc {
@@ -61,16 +61,16 @@ pub enum CoreTypeDesc {
 }
 
 pub struct PackageType {
-    path: Loc<LongIdent>,
-    constraints: Vec<(Loc<LongIdent>, CoreType)>,
-    loc: Location,
-    attrs: Attributes,
+    pub path: Loc<LongIdent>,
+    pub constraints: Vec<(Loc<LongIdent>, CoreType)>,
+    pub loc: Location,
+    pub attrs: Attributes,
 }
 
 pub struct RowField {
-    desc: RowFieldDesc,
-    loc: Location,
-    attributes: Attributes,
+    pub desc: RowFieldDesc,
+    pub loc: Location,
+    pub attributes: Attributes,
 }
 
 pub enum RowFieldDesc {
@@ -79,9 +79,9 @@ pub enum RowFieldDesc {
 }
 
 pub struct ObjectField {
-    desc: ObjectFieldDesc,
-    loc: Location,
-    attributes: Attributes,
+    pub desc: ObjectFieldDesc,
+    pub loc: Location,
+    pub attributes: Attributes,
 }
 
 pub enum ObjectFieldDesc {
@@ -90,10 +90,10 @@ pub enum ObjectFieldDesc {
 }
 
 pub struct Pattern {
-    desc: PatternDesc,
-    loc: Location,
-    loc_stack: LocationStack,
-    attributes: Attributes,
+    pub desc: PatternDesc,
+    pub loc: Location,
+    pub loc_stack: LocationStack,
+    pub attributes: Attributes,
 }
 
 pub enum PatternDesc {
@@ -120,10 +120,10 @@ pub enum PatternDesc {
 }
 
 pub struct Expression {
-    desc: ExpressionDesc,
-    loc: Location,
-    loc_stack: LocationStack,
-    attributes: Attributes,
+    pub desc: ExpressionDesc,
+    pub loc: Location,
+    pub loc_stack: LocationStack,
+    pub attributes: Attributes,
 }
 
 pub enum ExpressionDesc {
@@ -193,27 +193,27 @@ pub enum ExpressionDesc {
 }
 
 pub struct Case {
-    lhs: Pattern,
-    guard: Option<Box<Expression>>,
-    rhs: Box<Expression>,
+    pub lhs: Pattern,
+    pub guard: Option<Box<Expression>>,
+    pub rhs: Box<Expression>,
 }
 
 pub struct Letop {
-    let_: BindingOp,
-    ands: Vec<BindingOp>,
-    body: Box<Expression>,
+    pub let_: BindingOp,
+    pub ands: Vec<BindingOp>,
+    pub body: Box<Expression>,
 }
 
 pub struct BindingOp {
-    op: Loc<String>,
-    pat: Pattern,
-    exp: Box<Expression>,
-    loc: Location,
+    pub op: Loc<String>,
+    pub pat: Pattern,
+    pub exp: Box<Expression>,
+    pub loc: Location,
 }
 
 pub struct FunctionParam {
-    desc: FunctionParamDesc,
-    loc: Location,
+    pub desc: FunctionParamDesc,
+    pub loc: Location,
 }
 
 pub enum FunctionParamDesc {
@@ -232,22 +232,22 @@ pub enum TypeConstraint {
 }
 
 pub struct ValueDescription {
-    name: Loc<String>,
-    ty: CoreType,
-    prim: Vec<String>,
-    attributes: Attributes,
-    loc: Location,
+    pub name: Loc<String>,
+    pub ty: CoreType,
+    pub prim: Vec<String>,
+    pub attributes: Attributes,
+    pub loc: Location,
 }
 
 pub struct TypeDeclaration {
-    name: Loc<String>,
-    params: Vec<(CoreType, (Variance, Injectivity))>,
-    constraints: Vec<(CoreType, CoreType, Location)>,
-    kind: TypeKind,
-    private_flag: PrivateFlag,
-    manifest: Option<CoreType>,
-    attributes: Attributes,
-    loc: Location,
+    pub name: Loc<String>,
+    pub params: Vec<(CoreType, (Variance, Injectivity))>,
+    pub constraints: Vec<(CoreType, CoreType, Location)>,
+    pub kind: TypeKind,
+    pub private_flag: PrivateFlag,
+    pub manifest: Option<CoreType>,
+    pub attributes: Attributes,
+    pub loc: Location,
 }
 
 pub enum TypeKind {
@@ -259,20 +259,20 @@ pub enum TypeKind {
 }
 
 pub struct LabelDeclaration {
-    name: Loc<String>,
-    mutable: MutableFlag,
-    ty: CoreType,
-    attributes: Attributes,
-    loc: Location,
+    pub name: Loc<String>,
+    pub mutable: MutableFlag,
+    pub ty: CoreType,
+    pub attributes: Attributes,
+    pub loc: Location,
 }
 
 pub struct ConstructorDeclaration {
-    name: Loc<String>,
-    vars: Vec<Loc<String>>,
-    args: ConstructorArguments,
-    res: Option<CoreType>,
-    attributes: Attributes,
-    loc: Location,
+    pub name: Loc<String>,
+    pub vars: Vec<Loc<String>>,
+    pub args: ConstructorArguments,
+    pub res: Option<CoreType>,
+    pub attributes: Attributes,
+    pub loc: Location,
 }
 
 pub enum ConstructorArguments {
@@ -281,19 +281,19 @@ pub enum ConstructorArguments {
 }
 
 pub struct TypeExtension {
-    path: Loc<LongIdent>,
-    params: Vec<(CoreType, Vec<(Variance, Injectivity)>)>,
-    constructors: Vec<ExtensionConstructor>,
-    private: PrivateFlag,
-    attributes: Attributes,
-    loc: Location,
+    pub path: Loc<LongIdent>,
+    pub params: Vec<(CoreType, Vec<(Variance, Injectivity)>)>,
+    pub constructors: Vec<ExtensionConstructor>,
+    pub private: PrivateFlag,
+    pub attributes: Attributes,
+    pub loc: Location,
 }
 
 pub struct ExtensionConstructor {
-    name: Loc<String>,
-    kind: ExtensionConstructorKind,
-    attributes: Attributes,
-    loc: Location,
+    pub name: Loc<String>,
+    pub kind: ExtensionConstructorKind,
+    pub attributes: Attributes,
+    pub loc: Location,
 }
 
 pub enum ExtensionConstructorKind {
@@ -302,15 +302,15 @@ pub enum ExtensionConstructorKind {
 }
 
 pub struct TypeException {
-    constructor: ExtensionConstructor,
-    loc: Location,
-    attributes: Attributes,
+    pub constructor: ExtensionConstructor,
+    pub loc: Location,
+    pub attributes: Attributes,
 }
 
 pub struct ClassType {
-    desc: ClassTypeDesc,
-    loc: Location,
-    attributes: Attributes,
+    pub desc: ClassTypeDesc,
+    pub loc: Location,
+    pub attributes: Attributes,
 }
 
 pub enum ClassTypeDesc {
@@ -322,14 +322,14 @@ pub enum ClassTypeDesc {
 }
 
 pub struct ClassSignature {
-    this: CoreType,
-    fields: Vec<ClassTypeField>,
+    pub this: CoreType,
+    pub fields: Vec<ClassTypeField>,
 }
 
 pub struct ClassTypeField {
-    desc: ClassTypeFieldDesc,
-    loc: Location,
-    attributes: Attributes,
+    pub desc: ClassTypeFieldDesc,
+    pub loc: Location,
+    pub attributes: Attributes,
 }
 
 pub enum ClassTypeFieldDesc {
@@ -342,12 +342,12 @@ pub enum ClassTypeFieldDesc {
 }
 
 pub struct ClassInfos<T> {
-    name: Loc<String>,
-    virt: VirtualFlag,
-    params: Vec<(CoreType, (Variance, Injectivity))>,
-    expr: T,
-    loc: Location,
-    attributes: Attributes,
+    pub name: Loc<String>,
+    pub virt: VirtualFlag,
+    pub params: Vec<(CoreType, (Variance, Injectivity))>,
+    pub expr: T,
+    pub loc: Location,
+    pub attributes: Attributes,
 }
 
 pub type ClassDescription = ClassInfos<ClassType>;
@@ -355,9 +355,9 @@ pub type ClassDescription = ClassInfos<ClassType>;
 pub type ClassTypeDeclaration = ClassInfos<ClassType>;
 
 pub struct ClassExpr {
-    desc: ClassExprDesc,
-    loc: Location,
-    attributes: Attributes,
+    pub desc: ClassExprDesc,
+    pub loc: Location,
+    pub attributes: Attributes,
 }
 
 pub enum ClassExprDesc {
@@ -369,14 +369,14 @@ pub enum ClassExprDesc {
 }
 
 pub struct ClassStructure {
-    this: Pattern,
-    fields: Vec<ClassField>,
+    pub this: Pattern,
+    pub fields: Vec<ClassField>,
 }
 
 pub struct ClassField {
-    desc: ClassFieldDesc,
-    loc: Location,
-    attributes: Attributes,
+    pub desc: ClassFieldDesc,
+    pub loc: Location,
+    pub attributes: Attributes,
 }
 
 pub enum ClassFieldDesc {
@@ -397,9 +397,9 @@ pub enum ClassFieldKind {
 pub type ClassDeclaration = ClassInfos<ClassExpr>;
 
 pub struct ModuleType {
-    desc: ModuleTypeDesc,
-    loc: Location,
-    attributes: Attributes,
+    pub desc: ModuleTypeDesc,
+    pub loc: Location,
+    pub attributes: Attributes,
 }
 
 pub enum ModuleTypeDesc {
@@ -420,8 +420,8 @@ pub enum FunctorParameter {
 pub type Signature = Vec<SignatureItem>;
 
 pub struct SignatureItem {
-    desc: SignatureItemDesc,
-    loc: Location,
+    pub desc: SignatureItemDesc,
+    pub loc: Location,
 }
 
 pub enum SignatureItemDesc {
@@ -443,40 +443,40 @@ pub enum SignatureItemDesc {
 }
 
 pub struct ModuleDeclaration {
-    name: Loc<Option<String>>,
-    ty: ModuleType,
-    loc: Location,
-    attributes: Attributes,
+    pub name: Loc<Option<String>>,
+    pub ty: ModuleType,
+    pub loc: Location,
+    pub attributes: Attributes,
 }
 
 pub struct ModuleSubstitution {
-    name: Loc<String>,
-    manifest: Loc<LongIdent>,
-    loc: Location,
-    attributes: Attributes,
+    pub name: Loc<String>,
+    pub manifest: Loc<LongIdent>,
+    pub loc: Location,
+    pub attributes: Attributes,
 }
 
 pub struct ModuleTypeDeclaration {
-    name: Loc<String>,
-    ty: Option<ModuleType>,
-    loc: Location,
-    attributes: Attributes,
+    pub name: Loc<String>,
+    pub ty: Option<ModuleType>,
+    pub loc: Location,
+    pub attributes: Attributes,
 }
 
 pub struct OpenInfos<T> {
-    expr: T,
-    overr_flag: OverrideFlag,
-    loc: Location,
-    attributes: Attributes,
+    pub expr: T,
+    pub overr_flag: OverrideFlag,
+    pub loc: Location,
+    pub attributes: Attributes,
 }
 
 pub type OpenDescription = OpenInfos<Loc<LongIdent>>;
 pub type OpenDeclaration = OpenInfos<ModuleExpr>;
 
 pub struct IncludeInfos<T> {
-    modd: T,
-    attributes: Attributes,
-    loc: Location,
+    pub modd: T,
+    pub attributes: Attributes,
+    pub loc: Location,
 }
 
 pub type IncludeDescription = IncludeInfos<ModuleType>;
@@ -492,9 +492,9 @@ pub enum WithConstraint {
 }
 
 pub struct ModuleExpr {
-    desc: ModuleExprDesc,
-    loc: Location,
-    attributes: Attributes,
+    pub desc: ModuleExprDesc,
+    pub loc: Location,
+    pub attributes: Attributes,
 }
 
 pub enum ModuleExprDesc {
@@ -511,8 +511,8 @@ pub enum ModuleExprDesc {
 pub type Structure = Vec<StructureItem>;
 
 pub struct StructureItem {
-    desc: StructureItemDesc,
-    loc: Location,
+    pub desc: StructureItemDesc,
+    pub loc: Location,
 }
 
 pub enum StructureItemDesc {
@@ -544,18 +544,18 @@ pub enum ValueConstraint {
 }
 
 pub struct ValueBinding {
-    pat: Pattern,
-    expr: Expression,
-    constraint: Option<ValueConstraint>,
-    attributes: Attributes,
-    loc: Location,
+    pub pat: Pattern,
+    pub expr: Expression,
+    pub constraint: Option<ValueConstraint>,
+    pub attributes: Attributes,
+    pub loc: Location,
 }
 
 pub struct ModuleBinding {
-    pat: Pattern,
-    expr: ModuleExpr,
-    attributes: Attributes,
-    loc: Location,
+    pub pat: Pattern,
+    pub expr: ModuleExpr,
+    pub attributes: Attributes,
+    pub loc: Location,
 }
 
 pub enum TopLevelPhrase {
@@ -564,14 +564,14 @@ pub enum TopLevelPhrase {
 }
 
 pub struct TopLevelDirective {
-    name: Loc<String>,
-    arg: Option<DirectiveArgument>,
-    loc: Location,
+    pub name: Loc<String>,
+    pub arg: Option<DirectiveArgument>,
+    pub loc: Location,
 }
 
 pub struct DirectiveArgument {
-    desc: DirectiveArgumentDesc,
-    loc: Location,
+    pub desc: DirectiveArgumentDesc,
+    pub loc: Location,
 }
 
 pub enum DirectiveArgumentDesc {
