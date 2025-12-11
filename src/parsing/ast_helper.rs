@@ -42,9 +42,7 @@ where
     res
 }
 
-pub struct ConstHelper;
-
-impl ConstHelper {
+impl Constant {
     pub fn mk(loc: Option<Location>, d: ConstantDesc) -> Constant {
         Constant {
             const_desc: d,
@@ -86,9 +84,7 @@ impl ConstHelper {
     }
 }
 
-pub struct AttrHelper;
-
-impl AttrHelper {
+impl Attribute {
     pub fn mk(loc: Option<Location>, name: Str, payload: Payload) -> Attribute {
         Attribute {
             name,
@@ -98,9 +94,7 @@ impl AttrHelper {
     }
 }
 
-pub struct TypHelper;
-
-impl TypHelper {
+impl CoreType {
     pub fn mk(loc: Option<Location>, attrs: Option<Vec<Attribute>>, d: CoreTypeDesc) -> CoreType {
         let l = loc.unwrap_or(get_default_loc());
         CoreType {
@@ -225,5 +219,17 @@ impl TypHelper {
         t: CoreType,
     ) -> CoreType {
         Self::mk(loc, attrs, CoreTypeDesc::Open(mod_ident, Box::new(t)))
+    }
+
+    pub fn force_poly(self) -> Self {
+        match self.type_desc {
+            CoreTypeDesc::Poly(_, _) => self,
+            _ => Self::poly(
+                Some(self.loc.clone()),
+                Some(self.attributes.clone()),
+                vec![],
+                self,
+            ),
+        }
     }
 }
