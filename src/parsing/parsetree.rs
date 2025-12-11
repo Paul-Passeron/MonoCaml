@@ -583,6 +583,7 @@ pub enum StructureItemDesc {
     Primitive(ValueDescription),
     Type(RecFlag, Vec<TypeDeclaration>),
     TypeExt(TypeExtension),
+    Exception(TypeException),
     Module(ModuleBinding),
     RecModule(Vec<ModuleBinding>),
     ModType(Box<ModuleTypeDeclaration>),
