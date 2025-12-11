@@ -408,6 +408,9 @@ pub enum ClassExprDesc {
     Fun(ArgLabel, Option<Expression>, Pattern, Box<ClassExpr>),
     Apply(Box<ClassExpr>, Vec<(ArgLabel, Expression)>),
     Let(RecFlag, Vec<ValueBinding>, Box<ClassExpr>),
+    Constraint(Box<ClassExpr>, ClassType),
+    Extension(Extension),
+    Open(OpenDescription, Box<ClassExpr>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
