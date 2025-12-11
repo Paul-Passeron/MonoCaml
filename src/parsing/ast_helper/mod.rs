@@ -39,4 +39,5 @@ where
 pub mod attribute;
 pub mod constant;
 pub mod core_type;
+pub mod expression;
 pub mod pattern;
