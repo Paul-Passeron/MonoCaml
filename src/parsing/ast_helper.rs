@@ -2,10 +2,12 @@ use std::sync::Mutex;
 
 use crate::{
     parsing::{
-        asttypes::Loc,
+        asttypes::{ArgLabel, Loc},
         location::Location,
         longident::LongIdent,
-        parsetree::{Attribute, Constant, ConstantDesc},
+        parsetree::{
+            Attribute, Attributes, Constant, ConstantDesc, CoreType, CoreTypeDesc, Payload,
+        },
     },
     platform::NativeInt,
 };
@@ -80,5 +82,76 @@ impl ConstHelper {
     pub fn string(quotation_delim: Option<String>, loc: Option<Location>, s: String) -> Constant {
         let l = loc.unwrap_or(get_default_loc());
         Self::mk(Some(l.clone()), ConstantDesc::String(s, l, quotation_delim))
+    }
+}
+
+pub struct AttrHelper;
+
+impl AttrHelper {
+    pub fn mk(loc: Option<Location>, name: Str, payload: Payload) -> Attribute {
+        Attribute {
+            name,
+            payload,
+            loc: loc.unwrap_or(get_default_loc()),
+        }
+    }
+}
+
+pub struct TypHelper;
+
+impl TypHelper {
+    pub fn mk(loc: Option<Location>, attrs: Option<Vec<Attribute>>, d: CoreTypeDesc) -> CoreType {
+        let l = loc.unwrap_or(get_default_loc());
+        CoreType {
+            type_desc: d,
+            loc: l,
+            loc_stack: vec![],
+            attributes: attrs.unwrap_or_default(),
+        }
+    }
+
+    pub fn attr(d: CoreType, a: Attribute) -> CoreType {
+        let mut d = d;
+        d.attributes.push(a);
+        d
+    }
+
+    pub fn any(loc: Option<Location>, attrs: Option<Attributes>) -> CoreType {
+        Self::mk(loc, attrs, CoreTypeDesc::Any)
+    }
+
+    pub fn var(loc: Option<Location>, attrs: Option<Attributes>, a: String) -> CoreType {
+        Self::mk(loc, attrs, CoreTypeDesc::Var(a))
+    }
+
+    pub fn arrow(
+        loc: Option<Location>,
+        attrs: Option<Attributes>,
+        label: ArgLabel,
+        from: CoreType,
+        to: CoreType,
+    ) -> CoreType {
+        Self::mk(
+            loc,
+            attrs,
+            CoreTypeDesc::Arrow(label, Box::new(from), Box::new(to)),
+        )
+    }
+
+    pub fn tuple(
+        loc: Option<Location>,
+        attrs: Option<Attributes>,
+        tys: Vec<(Option<String>, CoreType)>,
+    ) -> CoreType {
+        Self::mk(loc, attrs, CoreTypeDesc::Tuple(tys))
+    }
+
+    pub fn constr(
+        loc: Option<Location>,
+        attrs: Option<Attributes>,
+        iden: LId,
+        tys: Vec<CoreType>,
+    ) -> CoreType {
+        Self::mk(loc, attrs, CoreTypeDesc::Constr(iden, tys))
     }
 }
