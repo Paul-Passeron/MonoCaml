@@ -9,7 +9,7 @@ pub struct Position {
 }
 
 impl Position {
-    pub fn dummy() -> Self {
+    pub const fn dummy() -> Self {
         Self {
             fname: String::new(),
             lnum: 0,
