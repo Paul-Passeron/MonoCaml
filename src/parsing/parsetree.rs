@@ -7,11 +7,13 @@ use crate::parsing::{
     longident::LongIdent,
 };
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Constant {
     pub const_desc: ConstantDesc,
     pub const_loc: Location,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ConstantDesc {
     Integer(String, Option<char>),
     Char(char),
@@ -21,6 +23,7 @@ pub enum ConstantDesc {
 
 pub type LocationStack = Vec<Location>;
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Attribute {
     pub name: Loc<String>,
     pub payload: Payload,
@@ -30,6 +33,7 @@ pub struct Attribute {
 pub type Extension = (Loc<String>, Payload);
 pub type Attributes = Vec<Attribute>;
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Payload {
     Str(Structure),
     Sig(Signature),
@@ -37,6 +41,7 @@ pub enum Payload {
     Pat(Pattern, Option<Expression>),
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct CoreType {
     pub type_desc: CoreTypeDesc,
     pub loc: Location,
@@ -44,6 +49,7 @@ pub struct CoreType {
     pub attributes: Attributes,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum CoreTypeDesc {
     Any,
     Var(String),
@@ -60,6 +66,7 @@ pub enum CoreTypeDesc {
     Extension(Box<Extension>),
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct PackageType {
     pub path: Loc<LongIdent>,
     pub constraints: Vec<(Loc<LongIdent>, CoreType)>,
@@ -67,28 +74,33 @@ pub struct PackageType {
     pub attrs: Attributes,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct RowField {
     pub desc: RowFieldDesc,
     pub loc: Location,
     pub attributes: Attributes,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum RowFieldDesc {
     Tag(Loc<Label>, bool, Vec<CoreType>),
     Inherit(CoreType),
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ObjectField {
     pub desc: ObjectFieldDesc,
     pub loc: Location,
     pub attributes: Attributes,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ObjectFieldDesc {
     Tag(Loc<Label>, CoreType),
     Inherit(CoreType),
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Pattern {
     pub desc: PatternDesc,
     pub loc: Location,
@@ -96,6 +108,7 @@ pub struct Pattern {
     pub attributes: Attributes,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum PatternDesc {
     Any,
     Var(Loc<String>),
@@ -119,6 +132,7 @@ pub enum PatternDesc {
     Open(Loc<LongIdent>, Box<Pattern>),
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Expression {
     pub desc: ExpressionDesc,
     pub loc: Location,
@@ -126,6 +140,7 @@ pub struct Expression {
     pub attributes: Attributes,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ExpressionDesc {
     Ident(Loc<LongIdent>),
     Constant(Constant),
@@ -192,18 +207,21 @@ pub enum ExpressionDesc {
     Unreachable,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Case {
     pub lhs: Pattern,
     pub guard: Option<Box<Expression>>,
     pub rhs: Box<Expression>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Letop {
     pub let_: BindingOp,
     pub ands: Vec<BindingOp>,
     pub body: Box<Expression>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct BindingOp {
     pub op: Loc<String>,
     pub pat: Pattern,
@@ -211,26 +229,31 @@ pub struct BindingOp {
     pub loc: Location,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct FunctionParam {
     pub desc: FunctionParamDesc,
     pub loc: Location,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum FunctionParamDesc {
     Val(ArgLabel, Option<Expression>, Pattern),
     NewType(Loc<String>),
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum FunctionBody {
     Body(Box<Expression>),
     Cases(Vec<Case>, Location, Attributes),
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum TypeConstraint {
     Constraint(CoreType),
     Coerce(Option<CoreType>, CoreType),
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ValueDescription {
     pub name: Loc<String>,
     pub ty: CoreType,
@@ -239,6 +262,7 @@ pub struct ValueDescription {
     pub loc: Location,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct TypeDeclaration {
     pub name: Loc<String>,
     pub params: Vec<(CoreType, (Variance, Injectivity))>,
@@ -250,6 +274,7 @@ pub struct TypeDeclaration {
     pub loc: Location,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum TypeKind {
     Abstract,
     Variant(Vec<ConstructorDeclaration>),
@@ -258,6 +283,7 @@ pub enum TypeKind {
     External(String),
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct LabelDeclaration {
     pub name: Loc<String>,
     pub mutable: MutableFlag,
@@ -266,6 +292,7 @@ pub struct LabelDeclaration {
     pub loc: Location,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ConstructorDeclaration {
     pub name: Loc<String>,
     pub vars: Vec<Loc<String>>,
@@ -275,11 +302,13 @@ pub struct ConstructorDeclaration {
     pub loc: Location,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ConstructorArguments {
     Tuple(Vec<CoreType>),
     Record(Vec<LabelDeclaration>),
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct TypeExtension {
     pub path: Loc<LongIdent>,
     pub params: Vec<(CoreType, Vec<(Variance, Injectivity)>)>,
@@ -289,6 +318,7 @@ pub struct TypeExtension {
     pub loc: Location,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ExtensionConstructor {
     pub name: Loc<String>,
     pub kind: ExtensionConstructorKind,
@@ -296,23 +326,27 @@ pub struct ExtensionConstructor {
     pub loc: Location,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ExtensionConstructorKind {
     Decl(Vec<Loc<String>>, ConstructorArguments, Option<CoreType>),
     Rebind(Loc<LongIdent>),
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct TypeException {
     pub constructor: ExtensionConstructor,
     pub loc: Location,
     pub attributes: Attributes,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ClassType {
     pub desc: ClassTypeDesc,
     pub loc: Location,
     pub attributes: Attributes,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ClassTypeDesc {
     Constr(Loc<LongIdent>, Vec<CoreType>),
     Signature(ClassSignature),
@@ -321,17 +355,20 @@ pub enum ClassTypeDesc {
     Open(OpenDescription, Box<ClassType>),
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ClassSignature {
     pub this: CoreType,
     pub fields: Vec<ClassTypeField>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ClassTypeField {
     pub desc: ClassTypeFieldDesc,
     pub loc: Location,
     pub attributes: Attributes,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ClassTypeFieldDesc {
     Inherit(ClassType),
     Val(Loc<Label>, MutableFlag, VirtualFlag, CoreType),
@@ -341,6 +378,7 @@ pub enum ClassTypeFieldDesc {
     Extension(Extension),
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ClassInfos<T> {
     pub name: Loc<String>,
     pub virt: VirtualFlag,
@@ -354,12 +392,14 @@ pub type ClassDescription = ClassInfos<ClassType>;
 
 pub type ClassTypeDeclaration = ClassInfos<ClassType>;
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ClassExpr {
     pub desc: ClassExprDesc,
     pub loc: Location,
     pub attributes: Attributes,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ClassExprDesc {
     Constr(Loc<LongIdent>, Vec<CoreType>),
     Structure(ClassStructure),
@@ -368,17 +408,20 @@ pub enum ClassExprDesc {
     Let(RecFlag, Vec<ValueBinding>, Box<ClassExpr>),
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ClassStructure {
     pub this: Pattern,
     pub fields: Vec<ClassField>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ClassField {
     pub desc: ClassFieldDesc,
     pub loc: Location,
     pub attributes: Attributes,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ClassFieldDesc {
     Inherit(OverrideFlag, ClassExpr, Loc<String>),
     Val(Loc<Label>, MutableFlag, ClassFieldKind),
@@ -389,6 +432,7 @@ pub enum ClassFieldDesc {
     Extension(Extension),
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ClassFieldKind {
     Virtual(CoreType),
     Concrete(OverrideFlag, Expression),
@@ -396,12 +440,14 @@ pub enum ClassFieldKind {
 
 pub type ClassDeclaration = ClassInfos<ClassExpr>;
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ModuleType {
     pub desc: ModuleTypeDesc,
     pub loc: Location,
     pub attributes: Attributes,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ModuleTypeDesc {
     Ident(Loc<LongIdent>),
     Signature(Signature),
@@ -412,6 +458,7 @@ pub enum ModuleTypeDesc {
     Extension(Extension),
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum FunctorParameter {
     Unit,
     Named(Loc<Option<String>>, Box<ModuleType>),
@@ -419,11 +466,13 @@ pub enum FunctorParameter {
 
 pub type Signature = Vec<SignatureItem>;
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SignatureItem {
     pub desc: SignatureItemDesc,
     pub loc: Location,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum SignatureItemDesc {
     Value(ValueDescription),
     Type(RecFlag, Vec<TypeDeclaration>),
@@ -442,6 +491,7 @@ pub enum SignatureItemDesc {
     Extension(Extension),
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ModuleDeclaration {
     pub name: Loc<Option<String>>,
     pub ty: ModuleType,
@@ -449,6 +499,7 @@ pub struct ModuleDeclaration {
     pub attributes: Attributes,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ModuleSubstitution {
     pub name: Loc<String>,
     pub manifest: Loc<LongIdent>,
@@ -456,6 +507,7 @@ pub struct ModuleSubstitution {
     pub attributes: Attributes,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ModuleTypeDeclaration {
     pub name: Loc<String>,
     pub ty: Option<ModuleType>,
@@ -463,6 +515,7 @@ pub struct ModuleTypeDeclaration {
     pub attributes: Attributes,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct OpenInfos<T> {
     pub expr: T,
     pub overr_flag: OverrideFlag,
@@ -473,6 +526,7 @@ pub struct OpenInfos<T> {
 pub type OpenDescription = OpenInfos<Loc<LongIdent>>;
 pub type OpenDeclaration = OpenInfos<ModuleExpr>;
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct IncludeInfos<T> {
     pub modd: T,
     pub attributes: Attributes,
@@ -482,6 +536,7 @@ pub struct IncludeInfos<T> {
 pub type IncludeDescription = IncludeInfos<ModuleType>;
 pub type IncludeDeclaration = IncludeInfos<ModuleExpr>;
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum WithConstraint {
     Type(Loc<LongIdent>, TypeDeclaration),
     Module(Loc<LongIdent>, Loc<LongIdent>),
@@ -491,12 +546,14 @@ pub enum WithConstraint {
     ModSubst(Loc<LongIdent>, Loc<LongIdent>),
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ModuleExpr {
     pub desc: ModuleExprDesc,
     pub loc: Location,
     pub attributes: Attributes,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ModuleExprDesc {
     Ident(Loc<LongIdent>),
     Structure(Structure),
@@ -510,11 +567,13 @@ pub enum ModuleExprDesc {
 
 pub type Structure = Vec<StructureItem>;
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct StructureItem {
     pub desc: StructureItemDesc,
     pub loc: Location,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum StructureItemDesc {
     Eval(Box<Expression>, Attributes),
     Value(RecFlag, Vec<ValueBinding>),
@@ -532,6 +591,7 @@ pub enum StructureItemDesc {
     Extension(Box<Extension>, Attributes),
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ValueConstraint {
     Constraint {
         locally_abstract_univars: Vec<Loc<String>>,
@@ -543,6 +603,7 @@ pub enum ValueConstraint {
     },
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ValueBinding {
     pub pat: Pattern,
     pub expr: Expression,
@@ -551,6 +612,7 @@ pub struct ValueBinding {
     pub loc: Location,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ModuleBinding {
     pub pat: Pattern,
     pub expr: ModuleExpr,
@@ -558,22 +620,26 @@ pub struct ModuleBinding {
     pub loc: Location,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum TopLevelPhrase {
     Def(Structure),
     Dir(TopLevelDirective),
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct TopLevelDirective {
     pub name: Loc<String>,
     pub arg: Option<DirectiveArgument>,
     pub loc: Location,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct DirectiveArgument {
     pub desc: DirectiveArgumentDesc,
     pub loc: Location,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum DirectiveArgumentDesc {
     String(String),
     Int(String, Option<char>),
