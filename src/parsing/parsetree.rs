@@ -200,7 +200,7 @@ pub enum ExpressionDesc {
     StructItem(Box<StructureItem>, Box<Expression>),
     Assert(Box<Expression>),
     Lazy(Box<Expression>),
-    Poly(Box<Expression>, Option<Box<CoreType>>),
+    Poly(Box<Expression>, Option<CoreType>),
     Object(ClassStructure),
     NewType(Loc<String>, Box<Expression>),
     Pack(ModuleExpr, Option<PackageType>),
