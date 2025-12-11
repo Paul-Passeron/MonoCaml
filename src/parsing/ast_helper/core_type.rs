@@ -1,101 +1,14 @@
-use std::sync::Mutex;
-
-use crate::{
-    parsing::{
-        asttypes::{ArgLabel, ClosedFlag, Loc},
-        location::Location,
-        longident::LongIdent,
-        parsetree::{
-            Attribute, Attributes, Constant, ConstantDesc, CoreType, CoreTypeDesc, Extension,
-            ObjectField, PackageType, Payload, RowField,
-        },
-        syntaxerr,
+use crate::parsing::{
+    ast_helper::{get_default_loc, Attrs, LId, Str},
+    asttypes::{ArgLabel, ClosedFlag, Loc},
+    location::Location,
+    longident::LongIdent,
+    parsetree::{
+        Attribute, Attributes, CoreType, CoreTypeDesc, Extension, ObjectField, ObjectFieldDesc,
+        PackageType, RowField, RowFieldDesc,
     },
-    platform::NativeInt,
+    syntaxerr,
 };
-use lazy_static::lazy_static;
-
-use super::parsetree::{ObjectFieldDesc, RowFieldDesc};
-
-pub type LId = Loc<LongIdent>;
-pub type Str = Loc<String>;
-pub type StrOpt = Loc<Option<String>>;
-pub type Attrs = Vec<Attribute>;
-
-lazy_static! {
-    static ref DEFAULT_LOC: Mutex<Location> = { Mutex::new(Location::none()) };
-}
-
-pub fn get_default_loc() -> Location {
-    DEFAULT_LOC.lock().unwrap().clone()
-}
-
-pub fn with_default_loc<F, T>(l: Location, f: F) -> T
-where
-    F: Fn() -> T,
-{
-    let old = {
-        let mut lock = DEFAULT_LOC.lock().unwrap();
-        let old = lock.clone();
-        *lock = l;
-        old
-    };
-    let res = f();
-    *DEFAULT_LOC.lock().unwrap() = old;
-    res
-}
-
-impl Constant {
-    pub fn mk(loc: Option<Location>, d: ConstantDesc) -> Constant {
-        Constant {
-            const_desc: d,
-            const_loc: loc.unwrap_or(get_default_loc()),
-        }
-    }
-
-    pub fn integer(loc: Option<Location>, suffix: Option<char>, i: String) -> Constant {
-        Self::mk(loc, ConstantDesc::Integer(i, suffix))
-    }
-
-    pub fn int(loc: Option<Location>, suffix: Option<char>, i: i64) -> Constant {
-        Self::integer(loc, suffix, i.to_string())
-    }
-
-    pub fn int32(loc: Option<Location>, suffix: Option<char>, i: i32) -> Constant {
-        Self::integer(loc, Some(suffix.unwrap_or('l')), i.to_string())
-    }
-
-    pub fn int64(loc: Option<Location>, suffix: Option<char>, i: i64) -> Constant {
-        Self::integer(loc, Some(suffix.unwrap_or('L')), i.to_string())
-    }
-
-    pub fn nativeint<N: NativeInt>(loc: Option<Location>, suffix: Option<char>, i: N) -> Constant {
-        Self::integer(loc, Some(suffix.unwrap_or('n')), i.to_string())
-    }
-
-    pub fn float(loc: Option<Location>, suffix: Option<char>, f: String) -> Constant {
-        Self::mk(loc, ConstantDesc::Float(f, suffix))
-    }
-
-    pub fn char(loc: Option<Location>, c: char) -> Constant {
-        Self::mk(loc, ConstantDesc::Char(c))
-    }
-
-    pub fn string(quotation_delim: Option<String>, loc: Option<Location>, s: String) -> Constant {
-        let l = loc.unwrap_or(get_default_loc());
-        Self::mk(Some(l.clone()), ConstantDesc::String(s, l, quotation_delim))
-    }
-}
-
-impl Attribute {
-    pub fn mk(loc: Option<Location>, name: Str, payload: Payload) -> Attribute {
-        Attribute {
-            name,
-            payload,
-            loc: loc.unwrap_or(get_default_loc()),
-        }
-    }
-}
 
 impl CoreType {
     pub fn mk(loc: Option<Location>, attrs: Option<Vec<Attribute>>, d: CoreTypeDesc) -> CoreType {
