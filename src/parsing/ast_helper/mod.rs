@@ -1,25 +1,12 @@
 use std::sync::Mutex;
 
-use crate::{
-    parsing::{
-        asttypes::{ArgLabel, ClosedFlag, Loc},
-        location::Location,
-        longident::LongIdent,
-        parsetree::{
-            Attribute, Attributes, Constant, ConstantDesc, CoreType, CoreTypeDesc, Extension,
-            ObjectField, PackageType, Payload, RowField,
-        },
-        syntaxerr,
-    },
-    platform::NativeInt,
-};
 use lazy_static::lazy_static;
 
-use super::parsetree::{ObjectFieldDesc, RowFieldDesc};
+use crate::parsing::{
+    asttypes::Loc, location::Location, longident::LongIdent, parsetree::Attribute,
+};
 
-pub mod attribute;
-pub mod constant;
-pub mod core_type;
+use super::parsetree::{ObjectFieldDesc, RowFieldDesc};
 
 type LId = Loc<LongIdent>;
 type Str = Loc<String>;
@@ -48,3 +35,8 @@ where
     *DEFAULT_LOC.lock().unwrap() = old;
     res
 }
+
+pub mod attribute;
+pub mod constant;
+pub mod core_type;
+pub mod pattern;
