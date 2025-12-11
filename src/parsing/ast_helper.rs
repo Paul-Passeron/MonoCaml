@@ -2,11 +2,12 @@ use std::sync::Mutex;
 
 use crate::{
     parsing::{
-        asttypes::{ArgLabel, Loc},
+        asttypes::{ArgLabel, ClosedFlag, Loc},
         location::Location,
         longident::LongIdent,
         parsetree::{
-            Attribute, Attributes, Constant, ConstantDesc, CoreType, CoreTypeDesc, Payload,
+            Attribute, Attributes, Constant, ConstantDesc, CoreType, CoreTypeDesc, Extension,
+            ObjectField, PackageType, Payload, RowField,
         },
     },
     platform::NativeInt,
@@ -153,5 +154,76 @@ impl TypHelper {
         tys: Vec<CoreType>,
     ) -> CoreType {
         Self::mk(loc, attrs, CoreTypeDesc::Constr(iden, tys))
+    }
+
+    pub fn object(
+        loc: Option<Location>,
+        attrs: Option<Attributes>,
+        fields: Vec<ObjectField>,
+        closed: ClosedFlag,
+    ) -> CoreType {
+        Self::mk(loc, attrs, CoreTypeDesc::Object(fields, closed))
+    }
+
+    pub fn class(
+        loc: Option<Location>,
+        attrs: Option<Attributes>,
+        iden: LId,
+        tys: Vec<CoreType>,
+    ) -> CoreType {
+        Self::mk(loc, attrs, CoreTypeDesc::Class(iden, tys))
+    }
+
+    pub fn alias(
+        loc: Option<Location>,
+        attrs: Option<Attributes>,
+        ty: CoreType,
+        iden: Str,
+    ) -> CoreType {
+        Self::mk(loc, attrs, CoreTypeDesc::Alias(Box::new(ty), iden))
+    }
+
+    pub fn variant(
+        loc: Option<Location>,
+        attrs: Option<Attributes>,
+        row_fields: Vec<RowField>,
+        closed: ClosedFlag,
+        labels: Option<Vec<String>>,
+    ) -> CoreType {
+        Self::mk(
+            loc,
+            attrs,
+            CoreTypeDesc::Variant(row_fields, closed, labels),
+        )
+    }
+
+    pub fn poly(
+        loc: Option<Location>,
+        attrs: Option<Attributes>,
+        labels: Vec<Str>,
+        ty: CoreType,
+    ) -> CoreType {
+        Self::mk(loc, attrs, CoreTypeDesc::Poly(labels, Box::new(ty)))
+    }
+
+    pub fn package(
+        loc: Option<Location>,
+        attrs: Option<Attributes>,
+        package_type: PackageType,
+    ) -> CoreType {
+        Self::mk(loc, attrs, CoreTypeDesc::Package(package_type))
+    }
+
+    pub fn extension(loc: Option<Location>, attrs: Option<Attributes>, ext: Extension) -> CoreType {
+        Self::mk(loc, attrs, CoreTypeDesc::Extension(Box::new(ext)))
+    }
+
+    pub fn open(
+        loc: Option<Location>,
+        attrs: Option<Attributes>,
+        mod_ident: LId,
+        t: CoreType,
+    ) -> CoreType {
+        Self::mk(loc, attrs, CoreTypeDesc::Open(mod_ident, Box::new(t)))
     }
 }

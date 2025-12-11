@@ -56,7 +56,7 @@ pub enum CoreTypeDesc {
     Variant(Vec<RowField>, ClosedFlag, Option<Vec<Label>>),
     Poly(Vec<Loc<String>>, Box<CoreType>),
     Package(PackageType),
-    Open(Vec<(Loc<LongIdent>, CoreType)>),
+    Open(Loc<LongIdent>, Box<CoreType>),
     Extension(Box<Extension>),
 }
 
