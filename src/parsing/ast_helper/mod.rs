@@ -43,3 +43,4 @@ pub mod expression;
 pub mod module_expr;
 pub mod module_type;
 pub mod pattern;
+pub mod signature_item;
