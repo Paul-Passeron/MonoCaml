@@ -40,4 +40,5 @@ pub mod attribute;
 pub mod constant;
 pub mod core_type;
 pub mod expression;
+pub mod module_type;
 pub mod pattern;
