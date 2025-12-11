@@ -485,12 +485,13 @@ pub enum SignatureItemDesc {
     ModSubst(ModuleSubstitution),
     RecModule(Vec<ModuleDeclaration>),
     ModType(ModuleTypeDeclaration),
+    ModTypeSubst(ModuleTypeDeclaration),
     Open(OpenDescription),
     Include(IncludeDescription),
     Class(Vec<ClassDescription>),
     ClassType(Vec<ClassTypeDeclaration>),
     Attribute(Attribute),
-    Extension(Extension),
+    Extension(Extension, Attributes),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
