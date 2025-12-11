@@ -38,10 +38,7 @@ impl DocString<'_> {
         let loc = self.loc.clone();
         let c = Constant::string(None, Some(loc.clone()), self.body.into());
         let exp = Expression::constant(Some(loc.clone()), None, c);
-        let item = StructureItem {
-            desc: StructureItemDesc::Eval(Box::new(exp), vec![]),
-            loc: loc.clone(),
-        };
+        let item = StructureItem::eval(Some(loc.clone()), None, exp);
 
         Attribute::mk(Some(loc), TEXT_LOC.clone(), Payload::Str(vec![item]))
     }
