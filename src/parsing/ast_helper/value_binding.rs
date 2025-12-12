@@ -1,6 +1,6 @@
 use crate::parsing::{
     ast_helper::get_default_loc,
-    docstring::{get_empty_docs, DocString, Docs},
+    docstring::{get_empty_docs, DocString, DocStringImpl, Docs},
     location::Location,
     parsetree::{Attributes, Expression, Pattern, ValueBinding, ValueConstraint},
 };
@@ -17,7 +17,7 @@ impl ValueBinding {
     ) -> Self {
         let mut attrs = attrs.unwrap_or_default();
         docs.unwrap_or_else(get_empty_docs).add_attrs(&mut attrs);
-        DocString::add_attrs(text.unwrap_or_default(), &mut attrs);
+        DocStringImpl::add_attrs(text.unwrap_or_default(), &mut attrs);
 
         Self {
             attributes: attrs,

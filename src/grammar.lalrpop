@@ -1,10 +1,28 @@
 use std::str::FromStr;
+use crate::parsing::parser_prelude::*;
 
 grammar;
+
+Iloption<T>: Vec<T> = {
+    <v: T> => v,
+    => vec![]
+}
+
+Num: i32 = <s:r"[0-9]+"> => i32::from_str(s).unwrap();
 
 pub Term: i32 = {
     <n:Num> => n,
     "(" <t:Term> ")" => t,
 };
 
-Num: i32 = <s:r"[0-9]+"> => i32::from_str(s).unwrap();
+// TopLevelPhrase: TopLevelPhrase = {
+//     <e: ExtraStr<TextStr<StrExp>>> ";;" => TopLevelPhrase::Def(e),
+// };
+
+ExtraStr<T>: Vec<T> =  {
+    <l:@L> <symb: T> <r: @R> => {
+        extra_str(l, r, symb)
+    }
+};
+
+TextStr<T>: 

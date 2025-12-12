@@ -1,6 +1,6 @@
 use crate::parsing::{
     ast_helper::{get_default_loc, StrOpt},
-    docstring::{get_empty_docs, DocString, Docs},
+    docstring::{get_empty_docs, DocString, DocStringImpl, Docs},
     location::Location,
     parsetree::{Attributes, ModuleDeclaration, ModuleType},
 };
@@ -16,7 +16,7 @@ impl ModuleDeclaration {
     ) -> Self {
         let mut attrs = attrs.unwrap_or_default();
         docs.unwrap_or_else(get_empty_docs).add_attrs(&mut attrs);
-        DocString::add_attrs(text.unwrap_or_default(), &mut attrs);
+        DocStringImpl::add_attrs(text.unwrap_or_default(), &mut attrs);
         Self {
             name,
             ty,

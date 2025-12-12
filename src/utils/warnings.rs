@@ -16,4 +16,20 @@ impl Location {
             ghost: true,
         }
     }
+
+    pub fn make(start: Position, end: Position) -> Self {
+        Self {
+            start,
+            end,
+            ghost: false,
+        }
+    }
+
+    pub fn ghost(start: Position, end: Position) -> Self {
+        Self {
+            start,
+            end,
+            ghost: true,
+        }
+    }
 }

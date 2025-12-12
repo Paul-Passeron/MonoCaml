@@ -1,7 +1,9 @@
 use crate::parsing::{
     ast_helper::{get_default_loc, Str},
     asttypes::{Injectivity, MutableFlag, PrivateFlag, Variance},
-    docstring::{add_info_attrs, get_empty_docs, get_empty_info, DocString, Docs, Info},
+    docstring::{
+        add_info_attrs, get_empty_docs, get_empty_info, DocString, DocStringImpl, Docs, Info,
+    },
     location::Location,
     parsetree::{
         Attributes, ConstructorArguments, ConstructorDeclaration, CoreType, LabelDeclaration,
@@ -24,7 +26,7 @@ impl TypeDeclaration {
     ) -> Self {
         let mut attrs = attrs.unwrap_or_default();
         docs.unwrap_or_else(get_empty_docs).add_attrs(&mut attrs);
-        DocString::add_attrs(text.unwrap_or_default(), &mut attrs);
+        DocStringImpl::add_attrs(text.unwrap_or_default(), &mut attrs);
         Self {
             name,
             params: params.unwrap_or_default(),

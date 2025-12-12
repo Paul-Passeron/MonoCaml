@@ -6,10 +6,10 @@ use crate::parsing::{
     asttypes::Loc, location::Location, longident::LongIdent, parsetree::Attribute,
 };
 
-type LId = Loc<LongIdent>;
-type Str = Loc<String>;
-type StrOpt = Loc<Option<String>>;
-type Attrs = Vec<Attribute>;
+pub type LId = Loc<LongIdent>;
+pub type Str = Loc<String>;
+pub type StrOpt = Loc<Option<String>>;
+pub type Attrs = Vec<Attribute>;
 
 lazy_static! {
     static ref DEFAULT_LOC: Mutex<Location> = Mutex::new(Location::none());
