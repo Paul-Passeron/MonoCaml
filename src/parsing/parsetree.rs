@@ -428,7 +428,7 @@ pub struct ClassField {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ClassFieldDesc {
-    Inherit(OverrideFlag, ClassExpr, Loc<String>),
+    Inherit(OverrideFlag, ClassExpr, Option<Loc<String>>),
     Val(Loc<Label>, MutableFlag, ClassFieldKind),
     Method(Loc<Label>, PrivateFlag, ClassFieldKind),
     Constraint(CoreType, CoreType),
