@@ -47,6 +47,7 @@ pub mod constant;
 pub mod core_type;
 pub mod decl_utils;
 pub mod expression;
+pub mod extension_constructor;
 pub mod include_infos;
 pub mod module_binding;
 pub mod module_description;
