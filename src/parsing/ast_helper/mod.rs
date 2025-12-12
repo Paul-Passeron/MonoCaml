@@ -3,10 +3,11 @@ use std::sync::Mutex;
 use lazy_static::lazy_static;
 
 use crate::parsing::{
-    asttypes::Loc, location::Location, longident::LongIdent, parsetree::Attribute,
+    asttypes::Loc,
+    location::Location,
+    longident::LongIdent,
+    parsetree::{Attribute, ObjectFieldDesc, RowFieldDesc},
 };
-
-use super::parsetree::{ObjectFieldDesc, RowFieldDesc};
 
 type LId = Loc<LongIdent>;
 type Str = Loc<String>;
@@ -44,6 +45,7 @@ pub mod class_type_field;
 pub mod constant;
 pub mod core_type;
 pub mod expression;
+pub mod module_binding;
 pub mod module_description;
 pub mod module_expr;
 pub mod module_substitution;

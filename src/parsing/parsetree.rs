@@ -621,7 +621,7 @@ pub struct ValueBinding {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ModuleBinding {
-    pub pat: Pattern,
+    pub name: Loc<Option<String>>,
     pub expr: ModuleExpr,
     pub attributes: Attributes,
     pub loc: Location,
