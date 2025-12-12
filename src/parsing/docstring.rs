@@ -56,6 +56,12 @@ impl DocString {
         Attribute::mk(Some(loc), DOC_LOC.clone(), Payload::Str(vec![item]))
     }
 
+    pub fn add_attrs(lst: Vec<Self>, attrs: &mut Attributes) {
+        lst.into_iter()
+            .filter_map(|x| (!x.body.is_empty()).then_some(x.docs_attr()))
+            .for_each(|x| attrs.push(x));
+    }
+
     pub fn register(self) {
         DOCSTRINGS.lock().unwrap().push(self);
     }
