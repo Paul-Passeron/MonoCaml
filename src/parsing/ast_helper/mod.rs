@@ -45,6 +45,7 @@ pub mod class_type;
 pub mod class_type_field;
 pub mod constant;
 pub mod core_type;
+pub mod decl_utils;
 pub mod expression;
 pub mod include_infos;
 pub mod module_binding;
