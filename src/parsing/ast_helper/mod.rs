@@ -3,10 +3,7 @@ use std::sync::Mutex;
 use lazy_static::lazy_static;
 
 use crate::parsing::{
-    asttypes::Loc,
-    location::Location,
-    longident::LongIdent,
-    parsetree::{Attribute, ObjectFieldDesc, RowFieldDesc},
+    asttypes::Loc, location::Location, longident::LongIdent, parsetree::Attribute,
 };
 
 type LId = Loc<LongIdent>;
@@ -15,7 +12,7 @@ type StrOpt = Loc<Option<String>>;
 type Attrs = Vec<Attribute>;
 
 lazy_static! {
-    static ref DEFAULT_LOC: Mutex<Location> = { Mutex::new(Location::none()) };
+    static ref DEFAULT_LOC: Mutex<Location> = Mutex::new(Location::none());
 }
 
 pub fn get_default_loc() -> Location {

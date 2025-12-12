@@ -1,9 +1,9 @@
 use crate::parsing::{
-    ast_helper::get_default_loc,
+    ast_helper::{get_default_loc, Str},
     asttypes::{Injectivity, Variance, VirtualFlag},
     docstring::{get_empty_docs, DocString, Docs},
     location::Location,
-    parsetree::{Attributes, ClassInfos, CoreType, IncludeInfos},
+    parsetree::{Attributes, ClassInfos, CoreType},
 };
 
 impl<T> ClassInfos<T> {
@@ -14,6 +14,7 @@ impl<T> ClassInfos<T> {
         text: Option<Vec<DocString>>,
         virt: Option<VirtualFlag>,
         params: Option<Vec<(CoreType, (Variance, Injectivity))>>,
+        name: Str,
         expr: T,
     ) -> Self {
         let mut attrs = attrs.unwrap_or_default();
@@ -24,7 +25,7 @@ impl<T> ClassInfos<T> {
             params: params.unwrap_or_default(),
             attributes: attrs,
             loc: loc.unwrap_or_else(get_default_loc),
-            name: todo!(),
+            name,
             virt: virt.unwrap_or(VirtualFlag::Concrete),
         }
     }

@@ -1,5 +1,3 @@
-use std::f64::NAN;
-
 use crate::parsing::{
     ast_helper::{get_default_loc, LId, Str},
     asttypes::{ArgLabel, DirectionFlag, RecFlag},

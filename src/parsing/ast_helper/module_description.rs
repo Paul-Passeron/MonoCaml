@@ -1,5 +1,5 @@
 use crate::parsing::{
-    ast_helper::{get_default_loc, Str, StrOpt},
+    ast_helper::{get_default_loc, StrOpt},
     docstring::{get_empty_docs, DocString, Docs},
     location::Location,
     parsetree::{Attributes, ModuleDeclaration, ModuleType},

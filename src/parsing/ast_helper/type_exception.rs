@@ -1,12 +1,8 @@
 use crate::parsing::{
-    ast_helper::{get_default_loc, LId},
-    asttypes::{Injectivity, PrivateFlag, Variance, VirtualFlag},
-    docstring::{get_empty_docs, DocString, Docs},
+    ast_helper::get_default_loc,
+    docstring::{get_empty_docs, Docs},
     location::Location,
-    parsetree::{
-        Attributes, ClassInfos, CoreType, ExtensionConstructor, IncludeInfos, TypeException,
-        TypeExtension,
-    },
+    parsetree::{Attributes, ExtensionConstructor, TypeException},
 };
 
 impl TypeException {

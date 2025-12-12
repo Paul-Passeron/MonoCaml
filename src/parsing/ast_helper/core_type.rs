@@ -186,7 +186,7 @@ impl<'a> CoreTypeHelper<'a> {
     }
 
     pub fn mem(&self, v: &String) -> bool {
-        self.vars.iter().find(|Loc { txt, loc }| txt == v).is_some()
+        self.vars.iter().find(|Loc { txt, .. }| txt == v).is_some()
     }
 }
 

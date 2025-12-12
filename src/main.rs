@@ -1,5 +1,5 @@
 #![feature(normalize_lexically)]
-#![allow(unused)]
+// #![allow(unused)]
 
 use std::{env, fs};
 

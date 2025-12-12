@@ -5,9 +5,9 @@ use crate::parsing::{
     location::Location,
     parsetree::{
         Attribute, Attributes, ClassDeclaration, ClassTypeDeclaration, Expression, Extension,
-        IncludeDeclaration, ModuleBinding, ModuleTypeDeclaration, OpenDeclaration, PatternDesc,
-        StructureItem, StructureItemDesc, TypeDeclaration, TypeException, TypeExtension,
-        ValueBinding, ValueDescription,
+        IncludeDeclaration, ModuleBinding, ModuleTypeDeclaration, OpenDeclaration, StructureItem,
+        StructureItemDesc, TypeDeclaration, TypeException, TypeExtension, ValueBinding,
+        ValueDescription,
     },
 };
 

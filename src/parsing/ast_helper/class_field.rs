@@ -4,8 +4,8 @@ use crate::parsing::{
     docstring::DocString,
     location::Location,
     parsetree::{
-        Attribute, Attributes, ClassExpr, ClassExprDesc, ClassField, ClassFieldDesc,
-        ClassFieldKind, CoreType, Expression, Extension,
+        Attribute, Attributes, ClassExpr, ClassField, ClassFieldDesc, ClassFieldKind, CoreType,
+        Expression, Extension,
     },
 };
 

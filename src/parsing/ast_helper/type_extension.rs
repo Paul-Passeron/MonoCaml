@@ -1,11 +1,9 @@
 use crate::parsing::{
     ast_helper::{get_default_loc, LId},
-    asttypes::{Injectivity, PrivateFlag, Variance, VirtualFlag},
-    docstring::{get_empty_docs, DocString, Docs},
+    asttypes::{Injectivity, PrivateFlag, Variance},
+    docstring::{get_empty_docs, Docs},
     location::Location,
-    parsetree::{
-        Attributes, ClassInfos, CoreType, ExtensionConstructor, IncludeInfos, TypeExtension,
-    },
+    parsetree::{Attributes, CoreType, ExtensionConstructor, TypeExtension},
 };
 
 impl TypeExtension {

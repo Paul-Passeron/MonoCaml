@@ -3,9 +3,7 @@ use std::sync::Mutex;
 use crate::parsing::{
     asttypes::Loc,
     location::Location,
-    parsetree::{
-        Attribute, Attributes, Constant, Expression, Payload, StructureItem, StructureItemDesc,
-    },
+    parsetree::{Attribute, Attributes, Constant, Expression, Payload, StructureItem},
 };
 use lazy_static::lazy_static;
 
@@ -29,7 +27,7 @@ pub struct DocString {
     pub associated: DSAssociated,
 }
 lazy_static! {
-    static ref DOCSTRINGS: Mutex<Vec<DocString>> = { Mutex::new(Vec::new()) };
+    static ref DOCSTRINGS: Mutex<Vec<DocString>> = Mutex::new(Vec::new());
     static ref TEXT_LOC: Loc<String> = {
         Loc {
             txt: format!("monocaml.text"),
@@ -117,7 +115,7 @@ impl Docs {
 pub type Info = Option<DocString>;
 
 lazy_static! {
-    static ref EMPTY_INFO: Info = { None };
+    static ref EMPTY_INFO: Info = None;
 }
 
 pub fn add_info_attrs(info: Info, attrs: &mut Attributes) {
