@@ -3,22 +3,25 @@ use std::sync::Mutex;
 use crate::parsing::{
     asttypes::Loc,
     location::Location,
-    parsetree::{Attribute, Constant, Expression, Payload, StructureItem, StructureItemDesc},
+    parsetree::{
+        Attribute, Attributes, Constant, Expression, Payload, StructureItem, StructureItemDesc,
+    },
 };
 use lazy_static::lazy_static;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum DSAttached {
     Unattached,
     Info,
     Docs,
 }
-
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum DSAssociated {
     Zero,
     One,
     Many,
 }
-
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct DocString {
     pub body: String,
     pub loc: Location,
@@ -58,6 +61,7 @@ impl DocString {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Docs {
     pub docs_pre: Option<DocString>,
     pub docs_post: Option<DocString>,
@@ -76,4 +80,30 @@ lazy_static! {
             loc: Location::none(),
         }
     };
+}
+
+pub fn get_empty_docs() -> Docs {
+    EMPTY_DOCS.clone()
+}
+
+impl Docs {
+    pub fn add_attrs(self, attrs: &mut Attributes) {
+        let mut new_attrs = match &self.docs_pre {
+            None => vec![],
+            Some(DocString { body, .. }) if body.is_empty() => {
+                vec![]
+            }
+            Some(ds) => vec![ds.docs_attr()],
+        };
+
+        match &self.docs_post {
+            Some(DocString { body, .. }) if body.is_empty() => (),
+            Some(ds) => new_attrs.push(ds.docs_attr()),
+            _ => (),
+        };
+
+        for attr in new_attrs {
+            attrs.push(attr);
+        }
+    }
 }
