@@ -58,6 +58,7 @@ pub mod open_infos;
 pub mod pattern;
 pub mod signature_item;
 pub mod structure_item;
+pub mod type_exception;
 pub mod type_extension;
 pub mod value_binding;
 pub mod value_description;
