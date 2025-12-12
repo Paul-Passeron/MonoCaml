@@ -49,3 +49,4 @@ pub mod module_type;
 pub mod pattern;
 pub mod signature_item;
 pub mod structure_item;
+pub mod value_description;
