@@ -113,3 +113,19 @@ impl Docs {
         }
     }
 }
+
+pub type Info = Option<DocString>;
+
+lazy_static! {
+    static ref EMPTY_INFO: Info = { None };
+}
+
+pub fn add_info_attrs(info: Info, attrs: &mut Attributes) {
+    if let Some(info) = info {
+        attrs.push(info.docs_attr());
+    }
+}
+
+pub fn get_empty_info() -> Info {
+    EMPTY_INFO.clone()
+}
