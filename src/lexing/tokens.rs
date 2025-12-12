@@ -121,6 +121,6 @@ pub enum Token<'a> {
     While,                             // while
     With,                              // with
     Comment(Box<(&'a str, Location)>), // (*  This is a comment *)
-    DocString(DocString<'a>),          // (** Documentation *)
+    DocString(DocString),          // (** Documentation *)
     Eol,                               // \\n
 }
