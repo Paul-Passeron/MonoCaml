@@ -46,6 +46,7 @@ pub mod core_type;
 pub mod expression;
 pub mod module_description;
 pub mod module_expr;
+pub mod module_substitution;
 pub mod module_type;
 pub mod pattern;
 pub mod signature_item;
