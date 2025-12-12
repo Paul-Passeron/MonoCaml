@@ -4,6 +4,7 @@ use std::{
     fmt::{self, Display},
     hash::Hash,
     rc::Rc,
+    sync::Mutex,
 };
 
 use crate::ast::{BinaryOp, Expression, Literal, Pattern};
@@ -296,7 +297,7 @@ impl MonoType {
 #[derive(Clone)]
 pub struct Context {
     pub m: HashMap<String, Forall>,
-    ty_var_count: Rc<Cell<u32>>,
+    ty_var_count: Rc<Mutex<u32>>,
 }
 
 pub struct Subst(pub HashMap<String, MonoType>);
@@ -305,7 +306,7 @@ impl Context {
     pub fn new() -> Self {
         Self {
             m: HashMap::new(),
-            ty_var_count: Rc::new(Cell::new(0)),
+            ty_var_count: Rc::new(Mutex::new(0)),
         }
     }
 
@@ -314,8 +315,8 @@ impl Context {
     }
 
     pub fn new_type_var(&mut self) -> TyVar {
-        let id = self.ty_var_count.get();
-        self.ty_var_count.set(id + 1);
+        let id = { *self.ty_var_count.lock().unwrap() };
+        *self.ty_var_count.lock().unwrap() = id + 1;
         TyVar {
             name: format!("'ty{id}"),
         }
