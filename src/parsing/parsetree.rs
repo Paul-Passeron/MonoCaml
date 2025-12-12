@@ -313,7 +313,7 @@ pub enum ConstructorArguments {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct TypeExtension {
     pub path: Loc<LongIdent>,
-    pub params: Vec<(CoreType, Vec<(Variance, Injectivity)>)>,
+    pub params: Vec<(CoreType, (Variance, Injectivity))>,
     pub constructors: Vec<ExtensionConstructor>,
     pub private: PrivateFlag,
     pub attributes: Attributes,
