@@ -53,6 +53,7 @@ pub mod module_expr;
 pub mod module_substitution;
 pub mod module_type;
 pub mod module_type_declaration;
+pub mod object_fields;
 pub mod open_infos;
 pub mod pattern;
 pub mod row_fields;
