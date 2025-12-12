@@ -38,6 +38,7 @@ where
 
 pub mod attribute;
 pub mod class_expr;
+pub mod class_type;
 pub mod constant;
 pub mod core_type;
 pub mod expression;
