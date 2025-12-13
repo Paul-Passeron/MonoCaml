@@ -27,20 +27,20 @@ pub struct ArrayFamily<D, I> {
 }
 impl<D, I> ArrayFamily<D, I> {
     pub fn name(
-        start: Position,
-        end: Position,
-        dot: D,
-        assign: bool,
-        paren_kind: ParenKind,
-        dim: IndexDim,
+        _start: Position,
+        _end: Position,
+        _dot: D,
+        _assign: bool,
+        _paren_kind: ParenKind,
+        _dim: IndexDim,
     ) -> Loc<LongIdent> {
         todo!()
     }
 
     pub fn index(
-        start: Position,
-        end: Position,
-        paren_kind: ParenKind,
+        _start: Position,
+        _end: Position,
+        _paren_kind: ParenKind,
     ) -> (I, Vec<(ArgLabel, Expression)>) {
         todo!()
     }

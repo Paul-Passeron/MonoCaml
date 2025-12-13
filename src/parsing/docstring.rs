@@ -238,3 +238,37 @@ pub fn get_post_extra_text(pos: &Position) -> Vec<DocString> {
         .cloned()
         .unwrap_or_default()
 }
+
+pub fn rhs_text(pos: &Position) -> Vec<DocString> {
+    get_text(pos)
+}
+
+pub fn rhs_post_text(pos: &Position) -> Vec<DocString> {
+    get_post_text(pos)
+}
+
+pub fn rhs_pre_extra_text(pos: &Position) -> Vec<DocString> {
+    get_pre_extra_text(pos)
+}
+
+pub fn rhs_post_extra_text(pos: &Position) -> Vec<DocString> {
+    get_post_extra_text(pos)
+}
+
+pub fn get_info(pos: &Position) -> Option<DocString> {
+    let mut mutex = POST_TABLE.lock().ok()?;
+    let dsl = mutex.get_mut(pos)?;
+    get_docstring(true, dsl)
+}
+
+pub fn symbol_info(endpos: &Position) -> Option<DocString> {
+    get_info(endpos)
+}
+
+pub fn rhs_info(endpos: &Position) -> Option<DocString> {
+    get_info(endpos)
+}
+
+pub fn symbol_text(endpos: &Position) -> Vec<DocString> {
+    get_text(endpos)
+}
