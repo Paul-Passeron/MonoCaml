@@ -1,6 +1,6 @@
 use std::str::FromStr;
 use crate::parsing::parser_prelude::*;
-
+use crate::parsing::parsetree::*;
 grammar;
 
 Iloption<T>: Vec<T> = {
@@ -15,14 +15,56 @@ pub Term: i32 = {
     "(" <t:Term> ")" => t,
 };
 
-// TopLevelPhrase: TopLevelPhrase = {
-//     <e: ExtraStr<TextStr<StrExp>>> ";;" => TopLevelPhrase::Def(e),
-// };
+TopLevelPhrase: TopLevelPhrase = {
+    <e: ExtraStr<TextStr<StrExp>>> ";;" => TopLevelPhrase::Def(e),
+    <e: ExtraStr<FlattenTextStrs>> ";;" =>  TopLevelPhrase::Def(e),
+    <TopLevelDirective> ";;" => <>
+};
 
-ExtraStr<T>: Vec<T> =  {
-    <l:@L> <symb: T> <r: @R> => {
-        extra_str(l, r, symb)
+TopLevelDirective: TopLevelPhrase = {};
+
+FlattenTextStrs: Vec<StructureItem> = {
+    <e: TextStr<StructureItem>*> => {
+        e.into_iter().flatten().collect()
+    }
+}
+
+ExtraStr<T>: T = {
+    <l:@L> <symb: StrExp*> <r: @R> => {
+        extra_str(&pos(l), &pos(r), symb)
     }
 };
 
-TextStr<T>: 
+TextStr<T>: Vec<T> = {
+    <start_pos: @L> <symb: T> => {
+        let mut res = text_str(&pos(start_pos));
+        res.push(symb);
+        res
+    }
+};
+
+StrExp: StructureItem = {};
+
+StructureItem: StructureItem = {};
+
+Flatten<T>: Vec<T> = {
+    <vecs: Vec<Vec<T>>> => {
+        let mut res = vec![];
+        for vec in vecs {
+            res.extend(vec);
+        }
+        res
+    }
+};
+
+Vec<T>: Vec<T> = {
+    <mut elems: Vec<T>> <e: T?> => {
+        match e {
+            None => elems,
+            Some(x) => {
+                elems.push(x);
+                elems
+            }
+        }
+    }
+};
