@@ -2,10 +2,10 @@ pub mod tokens;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Position {
-    fname: String,
-    lnum: u32,
-    bol: usize,
-    cnum: u32,
+    pub fname: String,
+    pub lnum: u32,
+    pub bol: usize,
+    pub cnum: u32,
 }
 
 impl Position {

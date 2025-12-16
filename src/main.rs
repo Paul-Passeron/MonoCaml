@@ -3,7 +3,10 @@
 
 use std::{env, fs};
 
-use crate::typechecker::{Context, TypeChecker};
+use crate::{
+    // parsing::parser::test_example,
+    typechecker::{Context, TypeChecker},
+};
 pub mod ast;
 pub mod common;
 pub mod lexing;

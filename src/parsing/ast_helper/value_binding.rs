@@ -27,4 +27,8 @@ impl ValueBinding {
             constraint,
         }
     }
+
+    pub fn simple(pat: Pattern, expr: Expression) -> Self {
+        Self::mk(None, None, None, None, None, pat, expr)
+    }
 }

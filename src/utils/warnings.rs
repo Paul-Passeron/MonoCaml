@@ -2,9 +2,9 @@ use crate::lexing::Position;
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Location {
-    start: Position,
-    end: Position,
-    ghost: bool,
+    pub start: Position,
+    pub end: Position,
+    pub ghost: bool,
 }
 
 impl Location {

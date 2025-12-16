@@ -146,7 +146,20 @@ tokens = { SOI ~ token* ~ EOI }
 program = { SOI ~ expr? ~ EOI }
 
 // Top-level expression (includes let, if, lambda, or infix expressions)
-expr = { let_expr | if_expr | lambda_expr | infix_expr }
+expr = { let_expr | if_expr | lambda_expr | infix_expr | match_expr }
+
+match_expr = {
+    "match" ~ expr ~ "with" ~ case_lst
+}
+
+case_lst = {
+    ("|" ~ case)+
+  | case ~ ("|" ~ case)*
+}
+
+case = {
+    pattern ~ ("|" ~ pattern)* ~ "->" ~ expr
+}
 
 let_expr = {
     let_kw ~ rec_kw? ~ pattern ~ pattern* ~ eq ~ expr ~ in_kw ~ expr

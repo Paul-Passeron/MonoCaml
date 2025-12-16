@@ -2,6 +2,7 @@ pub mod ast_helper;
 pub mod asttypes;
 pub mod docstring;
 pub mod location;
+pub mod location_test;
 pub mod longident;
 pub mod parser;
 pub mod parser_helper;

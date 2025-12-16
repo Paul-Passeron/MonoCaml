@@ -74,6 +74,12 @@ pub struct Loc<T> {
     pub loc: Location,
 }
 
+impl<T> Loc<T> {
+    pub fn new(txt: T, loc: Location) -> Self {
+        Self { txt, loc }
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Variance {
     Covariant,
