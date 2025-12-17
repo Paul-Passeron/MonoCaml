@@ -93,13 +93,3 @@ pub enum Injectivity {
     Injective,
     NoInjectivity,
 }
-
-impl ToString for ArgLabel {
-    fn to_string(&self) -> String {
-        match self {
-            ArgLabel::NoLabel => String::new(),
-            ArgLabel::Labelled(s) => format!("{s}"),
-            ArgLabel::Optional(s) => format!("?{s}"),
-        }
-    }
-}
