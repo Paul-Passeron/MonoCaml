@@ -16,6 +16,9 @@ pub mod platform;
 pub mod typechecker;
 pub mod utils;
 
+#[cfg(test)]
+pub mod test;
+
 fn main() {
     let args: Vec<String> = env::args().collect();
 
