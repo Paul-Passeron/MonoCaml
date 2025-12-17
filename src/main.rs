@@ -6,7 +6,6 @@ use std::{env, fs};
 use crate::{
     // parsing::parser::test_example,
     parsing::parser::MonoCamlParser,
-    typechecker::{Context, TypeChecker},
 };
 pub mod ast;
 pub mod common;

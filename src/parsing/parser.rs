@@ -3,13 +3,13 @@ use tree_sitter::{Node, Parser, Tree};
 use crate::{
     lexing::Position,
     parsing::{
-        ast_helper::pattern,
+        ast_helper::LId,
         asttypes::{ArgLabel, ClosedFlag, Loc, RecFlag},
         location::Location,
         longident::LongIdent,
         parsetree::{
-            Case, Constant, CoreType, Expression, Pattern, Structure, StructureItem,
-            TopLevelPhrase, ValueBinding, ValueConstraint,
+            Case, Constant, CoreType, Expression, FunctionBody, FunctionParam, FunctionParamDesc,
+            Pattern, StructureItem, TopLevelPhrase, TypeConstraint, ValueBinding, ValueConstraint,
         },
     },
 };
@@ -135,20 +135,6 @@ impl<'a, 'b> MonoCamlParser<'a, 'b> {
         }
     }
 
-    fn parse_structure(&self, node: Node) -> Result<Vec<TopLevelPhrase>, ParsingError> {
-        match node.kind() {
-            //     "value_definition" => {
-            //         let def = parse_value_definitio(node, source)?;
-            //         Ok(vec![TopLevelPhrase::Def(def)])
-            //     }
-            unknown_kind => todo!("unknown_kind {unknown_kind}"),
-        }
-    }
-
-    fn parse_constant(&self, node: Node) -> Result<Constant, ParsingError> {
-        todo!()
-    }
-
     fn parse_application(&self, node: Node) -> Result<Expression, ParsingError> {
         let loc = Location::from_node(&node, self.source_name);
         let fun = self.parse_expression(node.child_by_field_name("function").unwrap())?;
@@ -175,22 +161,90 @@ impl<'a, 'b> MonoCamlParser<'a, 'b> {
                     Some(tuple_expr),
                 ))
             }
-            "@" => {
+            op => {
                 let value =
-                    Expression::ident(Some(loc.clone()), None, LongIdent::ident("@", loc.clone()));
+                    Expression::ident(Some(loc.clone()), None, LongIdent::ident(op, loc.clone()));
                 let args = vec![(ArgLabel::NoLabel, lhs), (ArgLabel::NoLabel, rhs)];
                 Ok(value.apply(Some(loc.clone()), None, args))
             }
-            _ => todo!("unknown operator {op_txt}"),
+        }
+    }
+
+    fn parse_parameter(&self, node: Node) -> Result<FunctionParam, ParsingError> {
+        let loc = Location::from_node(&node, self.source_name);
+        let node = node.child(0).unwrap();
+        match node.kind() {
+            "typed_pattern" => {
+                let pat = self.parse_pattern(node.child_by_field_name("pattern").unwrap())?;
+                let ty = self.parse_type_expression(node.child_by_field_name("type").unwrap())?;
+
+                let pat = pat.constraint(Some(loc.clone()), None, ty);
+
+                Ok(FunctionParam {
+                    desc: FunctionParamDesc::Val(ArgLabel::NoLabel, None, pat),
+                    loc,
+                })
+            }
+            _ => {
+                let pattern = self.parse_pattern(node)?;
+                Ok(FunctionParam {
+                    desc: FunctionParamDesc::Val(ArgLabel::NoLabel, None, pattern),
+                    loc,
+                })
+            }
         }
     }
 
     fn parse_fun_expression(&self, node: Node) -> Result<Expression, ParsingError> {
-        todo!()
+        let loc = Location::from_node(&node, self.source_name);
+        let params = node
+            .children(&mut node.walk())
+            .filter(|x| x.kind() == "parameter")
+            .map(|x| self.parse_parameter(x))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let constraint = node
+            .children(&mut node.walk())
+            .find(|x| &self.source[x.byte_range()] == ":")
+            .map(|x| x.next_sibling().unwrap())
+            .map(|x| self.parse_type_expression(x))
+            .transpose()?
+            .map(|x| TypeConstraint::Constraint(x));
+
+        let body = FunctionBody::Body(Box::new(
+            self.parse_expression(node.child_by_field_name("body").unwrap())?,
+        ));
+
+        Ok(Expression::function(
+            Some(loc.clone()),
+            None,
+            params,
+            constraint,
+            body,
+        ))
     }
 
     fn parse_if_expression(&self, node: Node) -> Result<Expression, ParsingError> {
-        todo!()
+        let loc = Location::from_node(&node, self.source_name);
+        let cond = node.child_by_field_name("condition").unwrap();
+
+        let then_clause = node
+            .children(&mut node.walk())
+            .find(|x| x.kind() == "then_clause")
+            .unwrap();
+        let else_clause = node
+            .children(&mut node.walk())
+            .find(|x| x.kind() == "else_clause");
+
+        Ok(Expression::ifthenelse(
+            Some(loc.clone()),
+            None,
+            self.parse_expression(cond)?,
+            self.parse_expression(then_clause)?,
+            else_clause.map(|x| self.parse_expression(x)).transpose()?,
+        ))
+
+        // let then_clause = node.children(&mut node.walk()).find(|x| x.kind() == then_clas)
     }
 
     fn parse_match_expression(&self, node: Node) -> Result<Expression, ParsingError> {
@@ -233,7 +287,22 @@ impl<'a, 'b> MonoCamlParser<'a, 'b> {
     }
 
     fn parse_let_in_expression(&self, node: Node) -> Result<Expression, ParsingError> {
-        todo!()
+        let StructureItem { desc, loc } = self.parse_value_definition(node.child(0).unwrap())?;
+        let (rec_flag, bindings) = match desc {
+            super::parsetree::StructureItemDesc::Value(rec_flag, value_bindings) => {
+                (rec_flag, value_bindings)
+            }
+            _ => unreachable!(),
+        };
+        let in_expr = self.parse_expression(node.child_by_field_name("body").unwrap())?;
+
+        Ok(Expression::let_(
+            Some(loc),
+            None,
+            rec_flag,
+            bindings,
+            in_expr,
+        ))
     }
 
     fn parse_list_expression(&self, node: Node) -> Result<Expression, ParsingError> {
@@ -264,15 +333,39 @@ impl<'a, 'b> MonoCamlParser<'a, 'b> {
         Ok(expr)
     }
 
+    fn parse_string(&self, node: Node) -> Result<Expression, ParsingError> {
+        let loc = Location::from_node(&node, self.source_name);
+        let as_str = &self.source[node.byte_range()];
+        let cte = Constant::string(None, Some(loc.clone()), as_str.into());
+        Ok(Expression::constant(Some(loc), None, cte))
+    }
+
+    fn parse_number(&self, node: Node) -> Result<Expression, ParsingError> {
+        let loc = Location::from_node(&node, self.source_name);
+        let as_str = &self.source[node.byte_range()];
+        let cte = Constant::int(Some(loc.clone()), None, as_str.parse::<i64>().unwrap());
+        Ok(Expression::constant(Some(loc), None, cte))
+    }
+
+    fn parse_cons_expression(&self, node: Node) -> Result<Expression, ParsingError> {
+        let loc = Location::from_node(&node, self.source_name);
+        let lhs = self.parse_expression(node.child_by_field_name("left").unwrap())?;
+        let rhs = self.parse_expression(node.child_by_field_name("right").unwrap())?;
+
+        let tuple_expr = Expression::tuple(Some(loc.clone()), None, vec![(None, lhs), (None, rhs)]);
+
+        Ok(Expression::construct(
+            Some(loc.clone()),
+            None,
+            LongIdent::ident("Cons", loc.clone()),
+            Some(tuple_expr),
+        ))
+    }
+
     fn parse_expression(&self, node: Node) -> Result<Expression, ParsingError> {
         let loc = Location::from_node(&node, self.source_name);
 
         match node.kind() {
-            "constant" => {
-                // Parse constants (integers, strings, etc.)
-                let cte = self.parse_constant(node)?;
-                Ok(Expression::constant(None, None, cte))
-            }
             "value_path" | "value_name" => {
                 // Parse variable references
                 let ident = self.source[node.byte_range()].to_string();
@@ -314,16 +407,32 @@ impl<'a, 'b> MonoCamlParser<'a, 'b> {
                     Err(ParsingError::Txt("Empty parenthesized expression".into()))
                 }
             }
-            "expression_item" => {
-                todo!()
-            }
+            "expression_item" => self.parse_sequence_expression(node),
             "list_expression" => self.parse_list_expression(node),
+            "string" => self.parse_string(node),
+            "number" => self.parse_number(node),
+            "unit" => Ok(Expression::tuple(Some(loc), None, vec![])),
+            "then_clause" | "else_clause" => {
+                self.parse_expression(node.child_by_field_name("expression").unwrap())
+            }
+            "cons_expression" => self.parse_cons_expression(node),
             // Add more expression types as needed
             unknown_kind => Err(ParsingError::Txt(format!(
                 "Unknown expression kind: {}",
                 unknown_kind
             ))),
         }
+    }
+
+    fn parse_sequence_expression(&self, node: Node) -> Result<Expression, ParsingError> {
+        let loc = Location::from_node(&node, self.source_name);
+        let mut cursor = node.walk();
+        let mut it = node.children(&mut cursor);
+        let fst = self.parse_expression(it.next().unwrap())?;
+        it.try_fold(fst, |acc, node| {
+            let e = self.parse_application(node)?;
+            Ok(Expression::sequence(Some(loc.clone()), None, acc, e))
+        })
     }
 
     fn parse_value_constraint(&self, node: Node) -> Result<ValueConstraint, ParsingError> {
@@ -417,6 +526,7 @@ impl<'a, 'b> MonoCamlParser<'a, 'b> {
                 self.parse_constructor_pattern(node)
             }
             "cons_pattern" => self.parse_cons_pattern(node),
+            "unit" => Ok(Pattern::tuple(Some(loc), None, vec![], ClosedFlag::Closed)),
             // Add more pattern types as needed
             unknown_kind => Err(ParsingError::Txt(format!(
                 "Unknown pattern kind: {}",
@@ -425,11 +535,58 @@ impl<'a, 'b> MonoCamlParser<'a, 'b> {
         }
     }
 
-    fn parse_type_expression(&self, node: Node) -> Result<CoreType, ParsingError> {
-        todo!()
+    fn parse_path(&self, node: Node) -> Result<LId, ParsingError> {
+        let loc = Location::from_node(&node, self.source_name);
+        let start_pos = loc.start.clone();
+        let mut cursor = node.walk();
+        let mut atoms = node
+            .children(&mut cursor)
+            .filter(|x| &self.source[x.byte_range()] != ".");
+        let fst = LongIdent::Ident(self.source[atoms.next().unwrap().byte_range()].to_string());
+        let mut end_pos = loc.end.clone();
+        let lid = atoms.try_fold(fst, |acc, node| {
+            let loc = Location::from_node(&node, self.source_name);
+            let ident = Loc::new(self.source[node.byte_range()].to_string(), loc.clone());
+            let res = Ok(LongIdent::Dot(
+                Loc::new(
+                    Box::new(acc),
+                    Location {
+                        start: start_pos.clone(),
+                        end: end_pos.clone(),
+                        ghost: false,
+                    },
+                ),
+                ident,
+            ));
+            end_pos = loc.end.clone();
+            res
+        })?;
+
+        Ok(Loc::new(
+            lid,
+            Location {
+                start: start_pos,
+                end: end_pos,
+                ghost: false,
+            },
+        ))
     }
 
-    fn parse_constructor_pattern(&self, node: Node) -> Result<Pattern, ParsingError> {
+    fn parse_type_expression(&self, node: Node) -> Result<CoreType, ParsingError> {
+        match node.kind() {
+            "type_constructor_path" => {
+                let loc = Location::from_node(&node, self.source_name);
+                let path = self.parse_path(node)?;
+                Ok(CoreType::constr(Some(loc), None, path, vec![]))
+            }
+            _ => Err(ParsingError::Txt(format!(
+                "Unknown type expression kind: {}",
+                node.kind()
+            ))),
+        }
+    }
+
+    fn parse_constructor_pattern(&self, _node: Node) -> Result<Pattern, ParsingError> {
         todo!()
     }
 
@@ -471,7 +628,6 @@ impl<'a, 'b> MonoCamlParser<'a, 'b> {
 
         assert!(node.kind() == "let_binding");
         let pattern = self.parse_pattern(node.child_by_field_name("pattern").unwrap())?;
-        let mut cursor = node.walk();
 
         let expr = self.parse_expression(
             node.child_by_field_name("body")
@@ -516,7 +672,7 @@ impl<'a, 'b> MonoCamlParser<'a, 'b> {
         let res = node
             .children(&mut cursor)
             .map(|x| {
-                if x.kind() == "shebang" {
+                if x.kind() == "shebang" || x.kind() == "comment" {
                     Ok(vec![])
                 } else {
                     Ok(vec![self.parse_structure_item(x)?])
