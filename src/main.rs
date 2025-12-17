@@ -31,6 +31,9 @@ fn main() {
     let src = fs::read_to_string(filename).expect("Failed to read file");
 
     let p = MonoCamlParser::new(filename, &src);
-    let parse_tree = p.parse_ocaml_source();
-    let _ = dbg!(parse_tree);
+    let parse_tree = p.parse_ocaml_source().unwrap();
+    for p in parse_tree {
+        println!("{}", p);
+    }
+    // let _ = dbg!(parse_tree);
 }
