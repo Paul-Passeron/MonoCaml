@@ -347,6 +347,18 @@ impl<'a, 'b> MonoCamlParser<'a, 'b> {
         Ok(Expression::constant(Some(loc), None, cte))
     }
 
+    fn parse_tuple_expression(&self, node: Node) -> Result<Expression, ParsingError> {
+        let loc = Location::from_node(&node, self.source_name);
+        let mut cursor = node.walk();
+        let exprs = node
+            .children(&mut cursor)
+            .filter(|x| &self.source[x.byte_range()] != ",")
+            .map(|x| Ok((None, self.parse_expression(x)?)))
+            .collect::<Result<Vec<_>, _>>()?;
+
+        Ok(Expression::tuple(Some(loc), None, exprs))
+    }
+
     fn parse_cons_expression(&self, node: Node) -> Result<Expression, ParsingError> {
         let loc = Location::from_node(&node, self.source_name);
         let lhs = self.parse_expression(node.child_by_field_name("left").unwrap())?;
@@ -416,6 +428,7 @@ impl<'a, 'b> MonoCamlParser<'a, 'b> {
                 self.parse_expression(node.child_by_field_name("expression").unwrap())
             }
             "cons_expression" => self.parse_cons_expression(node),
+            "tuple_expression" => self.parse_tuple_expression(node),
             // Add more expression types as needed
             unknown_kind => Err(ParsingError::Txt(format!(
                 "Unknown expression kind: {}",
