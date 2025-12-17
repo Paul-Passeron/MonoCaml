@@ -92,7 +92,6 @@ impl Expression {
     }
 
     pub fn tuple(
-        self,
         loc: Option<Location>,
         attrs: Option<Attributes>,
         exprs: Vec<(Option<String>, Expression)>,

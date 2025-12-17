@@ -1,0 +1,727 @@
+
+    Def(
+        [
+            StructureItem {
+                desc: Value(
+                    Recursive,
+                    [
+                        ValueBinding {
+                            pat: Pattern {
+                                desc: Var(
+                                    Loc {
+                                        txt: "rev",
+                                        loc: Location {
+                                            start: Position {
+                                                fname: "examples/let_test.ml",
+                                                lnum: 0,
+                                                bol: 8,
+                                                cnum: 8,
+                                            },
+                                            end: Position {
+                                                fname: "examples/let_test.ml",
+                                                lnum: 0,
+                                                bol: 11,
+                                                cnum: 11,
+                                            },
+                                            ghost: false,
+                                        },
+                                    },
+                                ),
+                                loc: Location {
+                                    start: Position {
+                                        fname: "examples/let_test.ml",
+                                        lnum: 0,
+                                        bol: 8,
+                                        cnum: 8,
+                                    },
+                                    end: Position {
+                                        fname: "examples/let_test.ml",
+                                        lnum: 0,
+                                        bol: 11,
+                                        cnum: 11,
+                                    },
+                                    ghost: false,
+                                },
+                                loc_stack: [],
+                                attributes: [],
+                            },
+                            expr: Expression {
+                                desc: Match(
+                                    Expression {
+                                        desc: Ident(
+                                            Loc {
+                                                txt: Ident(
+                                                    "l",
+                                                ),
+                                                loc: Location {
+                                                    start: Position {
+                                                        fname: "examples/let_test.ml",
+                                                        lnum: 1,
+                                                        bol: 22,
+                                                        cnum: 6,
+                                                    },
+                                                    end: Position {
+                                                        fname: "examples/let_test.ml",
+                                                        lnum: 1,
+                                                        bol: 23,
+                                                        cnum: 7,
+                                                    },
+                                                    ghost: false,
+                                                },
+                                            },
+                                        ),
+                                        loc: Location {
+                                            start: Position {
+                                                fname: "examples/let_test.ml",
+                                                lnum: 1,
+                                                bol: 22,
+                                                cnum: 6,
+                                            },
+                                            end: Position {
+                                                fname: "examples/let_test.ml",
+                                                lnum: 1,
+                                                bol: 23,
+                                                cnum: 7,
+                                            },
+                                            ghost: false,
+                                        },
+                                        loc_stack: [],
+                                        attributes: [],
+                                    },
+                                    [
+                                        Case {
+                                            lhs: Pattern {
+                                                desc: Construct {
+                                                    c: Loc {
+                                                        txt: Ident(
+                                                            "Nil",
+                                                        ),
+                                                        loc: Location {
+                                                            start: Position {
+                                                                fname: "examples/let_test.ml",
+                                                                lnum: 2,
+                                                                bol: 33,
+                                                                cnum: 4,
+                                                            },
+                                                            end: Position {
+                                                                fname: "examples/let_test.ml",
+                                                                lnum: 2,
+                                                                bol: 35,
+                                                                cnum: 6,
+                                                            },
+                                                            ghost: false,
+                                                        },
+                                                    },
+                                                    args: None,
+                                                },
+                                                loc: Location {
+                                                    start: Position {
+                                                        fname: "examples/let_test.ml",
+                                                        lnum: 2,
+                                                        bol: 33,
+                                                        cnum: 4,
+                                                    },
+                                                    end: Position {
+                                                        fname: "examples/let_test.ml",
+                                                        lnum: 2,
+                                                        bol: 35,
+                                                        cnum: 6,
+                                                    },
+                                                    ghost: false,
+                                                },
+                                                loc_stack: [],
+                                                attributes: [],
+                                            },
+                                            guard: None,
+                                            rhs: Expression {
+                                                desc: Construct(
+                                                    Loc {
+                                                        txt: Ident(
+                                                            "Nil",
+                                                        ),
+                                                        loc: Location {
+                                                            start: Position {
+                                                                fname: "examples/let_test.ml",
+                                                                lnum: 2,
+                                                                bol: 39,
+                                                                cnum: 10,
+                                                            },
+                                                            end: Position {
+                                                                fname: "examples/let_test.ml",
+                                                                lnum: 2,
+                                                                bol: 41,
+                                                                cnum: 12,
+                                                            },
+                                                            ghost: false,
+                                                        },
+                                                    },
+                                                    None,
+                                                ),
+                                                loc: Location {
+                                                    start: Position {
+                                                        fname: "examples/let_test.ml",
+                                                        lnum: 2,
+                                                        bol: 39,
+                                                        cnum: 10,
+                                                    },
+                                                    end: Position {
+                                                        fname: "examples/let_test.ml",
+                                                        lnum: 2,
+                                                        bol: 41,
+                                                        cnum: 12,
+                                                    },
+                                                    ghost: false,
+                                                },
+                                                loc_stack: [],
+                                                attributes: [],
+                                            },
+                                        },
+                                        Case {
+                                            lhs: Pattern {
+                                                desc: Construct {
+                                                    c: Loc {
+                                                        txt: Ident(
+                                                            "Cons",
+                                                        ),
+                                                        loc: Location {
+                                                            start: Position {
+                                                                fname: "examples/let_test.ml",
+                                                                lnum: 3,
+                                                                bol: 46,
+                                                                cnum: 4,
+                                                            },
+                                                            end: Position {
+                                                                fname: "examples/let_test.ml",
+                                                                lnum: 3,
+                                                                bol: 52,
+                                                                cnum: 10,
+                                                            },
+                                                            ghost: false,
+                                                        },
+                                                    },
+                                                    args: Some(
+                                                        (
+                                                            [],
+                                                            Pattern {
+                                                                desc: Tuple(
+                                                                    [
+                                                                        (
+                                                                            None,
+                                                                            Pattern {
+                                                                                desc: Var(
+                                                                                    Loc {
+                                                                                        txt: "h",
+                                                                                        loc: Location {
+                                                                                            start: Position {
+                                                                                                fname: "examples/let_test.ml",
+                                                                                                lnum: 3,
+                                                                                                bol: 46,
+                                                                                                cnum: 4,
+                                                                                            },
+                                                                                            end: Position {
+                                                                                                fname: "examples/let_test.ml",
+                                                                                                lnum: 3,
+                                                                                                bol: 47,
+                                                                                                cnum: 5,
+                                                                                            },
+                                                                                            ghost: false,
+                                                                                        },
+                                                                                    },
+                                                                                ),
+                                                                                loc: Location {
+                                                                                    start: Position {
+                                                                                        fname: "examples/let_test.ml",
+                                                                                        lnum: 3,
+                                                                                        bol: 46,
+                                                                                        cnum: 4,
+                                                                                    },
+                                                                                    end: Position {
+                                                                                        fname: "examples/let_test.ml",
+                                                                                        lnum: 3,
+                                                                                        bol: 47,
+                                                                                        cnum: 5,
+                                                                                    },
+                                                                                    ghost: false,
+                                                                                },
+                                                                                loc_stack: [],
+                                                                                attributes: [],
+                                                                            },
+                                                                        ),
+                                                                        (
+                                                                            None,
+                                                                            Pattern {
+                                                                                desc: Var(
+                                                                                    Loc {
+                                                                                        txt: "q",
+                                                                                        loc: Location {
+                                                                                            start: Position {
+                                                                                                fname: "examples/let_test.ml",
+                                                                                                lnum: 3,
+                                                                                                bol: 51,
+                                                                                                cnum: 9,
+                                                                                            },
+                                                                                            end: Position {
+                                                                                                fname: "examples/let_test.ml",
+                                                                                                lnum: 3,
+                                                                                                bol: 52,
+                                                                                                cnum: 10,
+                                                                                            },
+                                                                                            ghost: false,
+                                                                                        },
+                                                                                    },
+                                                                                ),
+                                                                                loc: Location {
+                                                                                    start: Position {
+                                                                                        fname: "examples/let_test.ml",
+                                                                                        lnum: 3,
+                                                                                        bol: 51,
+                                                                                        cnum: 9,
+                                                                                    },
+                                                                                    end: Position {
+                                                                                        fname: "examples/let_test.ml",
+                                                                                        lnum: 3,
+                                                                                        bol: 52,
+                                                                                        cnum: 10,
+                                                                                    },
+                                                                                    ghost: false,
+                                                                                },
+                                                                                loc_stack: [],
+                                                                                attributes: [],
+                                                                            },
+                                                                        ),
+                                                                    ],
+                                                                    Closed,
+                                                                ),
+                                                                loc: Location {
+                                                                    start: Position {
+                                                                        fname: "examples/let_test.ml",
+                                                                        lnum: 3,
+                                                                        bol: 46,
+                                                                        cnum: 4,
+                                                                    },
+                                                                    end: Position {
+                                                                        fname: "examples/let_test.ml",
+                                                                        lnum: 3,
+                                                                        bol: 52,
+                                                                        cnum: 10,
+                                                                    },
+                                                                    ghost: false,
+                                                                },
+                                                                loc_stack: [],
+                                                                attributes: [],
+                                                            },
+                                                        ),
+                                                    ),
+                                                },
+                                                loc: Location {
+                                                    start: Position {
+                                                        fname: "examples/let_test.ml",
+                                                        lnum: 3,
+                                                        bol: 46,
+                                                        cnum: 4,
+                                                    },
+                                                    end: Position {
+                                                        fname: "examples/let_test.ml",
+                                                        lnum: 3,
+                                                        bol: 52,
+                                                        cnum: 10,
+                                                    },
+                                                    ghost: false,
+                                                },
+                                                loc_stack: [],
+                                                attributes: [],
+                                            },
+                                            guard: None,
+                                            rhs: Expression {
+                                                desc: Apply(
+                                                    Expression {
+                                                        desc: Ident(
+                                                            Loc {
+                                                                txt: Ident(
+                                                                    "@",
+                                                                ),
+                                                                loc: Location {
+                                                                    start: Position {
+                                                                        fname: "examples/let_test.ml",
+                                                                        lnum: 3,
+                                                                        bol: 56,
+                                                                        cnum: 14,
+                                                                    },
+                                                                    end: Position {
+                                                                        fname: "examples/let_test.ml",
+                                                                        lnum: 3,
+                                                                        bol: 69,
+                                                                        cnum: 27,
+                                                                    },
+                                                                    ghost: false,
+                                                                },
+                                                            },
+                                                        ),
+                                                        loc: Location {
+                                                            start: Position {
+                                                                fname: "examples/let_test.ml",
+                                                                lnum: 3,
+                                                                bol: 56,
+                                                                cnum: 14,
+                                                            },
+                                                            end: Position {
+                                                                fname: "examples/let_test.ml",
+                                                                lnum: 3,
+                                                                bol: 69,
+                                                                cnum: 27,
+                                                            },
+                                                            ghost: false,
+                                                        },
+                                                        loc_stack: [],
+                                                        attributes: [],
+                                                    },
+                                                    [
+                                                        (
+                                                            NoLabel,
+                                                            Expression {
+                                                                desc: Apply(
+                                                                    Expression {
+                                                                        desc: Ident(
+                                                                            Loc {
+                                                                                txt: Ident(
+                                                                                    "rev",
+                                                                                ),
+                                                                                loc: Location {
+                                                                                    start: Position {
+                                                                                        fname: "examples/let_test.ml",
+                                                                                        lnum: 3,
+                                                                                        bol: 57,
+                                                                                        cnum: 15,
+                                                                                    },
+                                                                                    end: Position {
+                                                                                        fname: "examples/let_test.ml",
+                                                                                        lnum: 3,
+                                                                                        bol: 60,
+                                                                                        cnum: 18,
+                                                                                    },
+                                                                                    ghost: false,
+                                                                                },
+                                                                            },
+                                                                        ),
+                                                                        loc: Location {
+                                                                            start: Position {
+                                                                                fname: "examples/let_test.ml",
+                                                                                lnum: 3,
+                                                                                bol: 57,
+                                                                                cnum: 15,
+                                                                            },
+                                                                            end: Position {
+                                                                                fname: "examples/let_test.ml",
+                                                                                lnum: 3,
+                                                                                bol: 60,
+                                                                                cnum: 18,
+                                                                            },
+                                                                            ghost: false,
+                                                                        },
+                                                                        loc_stack: [],
+                                                                        attributes: [],
+                                                                    },
+                                                                    [
+                                                                        (
+                                                                            NoLabel,
+                                                                            Expression {
+                                                                                desc: Ident(
+                                                                                    Loc {
+                                                                                        txt: Ident(
+                                                                                            "q",
+                                                                                        ),
+                                                                                        loc: Location {
+                                                                                            start: Position {
+                                                                                                fname: "examples/let_test.ml",
+                                                                                                lnum: 3,
+                                                                                                bol: 61,
+                                                                                                cnum: 19,
+                                                                                            },
+                                                                                            end: Position {
+                                                                                                fname: "examples/let_test.ml",
+                                                                                                lnum: 3,
+                                                                                                bol: 62,
+                                                                                                cnum: 20,
+                                                                                            },
+                                                                                            ghost: false,
+                                                                                        },
+                                                                                    },
+                                                                                ),
+                                                                                loc: Location {
+                                                                                    start: Position {
+                                                                                        fname: "examples/let_test.ml",
+                                                                                        lnum: 3,
+                                                                                        bol: 61,
+                                                                                        cnum: 19,
+                                                                                    },
+                                                                                    end: Position {
+                                                                                        fname: "examples/let_test.ml",
+                                                                                        lnum: 3,
+                                                                                        bol: 62,
+                                                                                        cnum: 20,
+                                                                                    },
+                                                                                    ghost: false,
+                                                                                },
+                                                                                loc_stack: [],
+                                                                                attributes: [],
+                                                                            },
+                                                                        ),
+                                                                    ],
+                                                                ),
+                                                                loc: Location {
+                                                                    start: Position {
+                                                                        fname: "examples/let_test.ml",
+                                                                        lnum: 3,
+                                                                        bol: 57,
+                                                                        cnum: 15,
+                                                                    },
+                                                                    end: Position {
+                                                                        fname: "examples/let_test.ml",
+                                                                        lnum: 3,
+                                                                        bol: 62,
+                                                                        cnum: 20,
+                                                                    },
+                                                                    ghost: false,
+                                                                },
+                                                                loc_stack: [],
+                                                                attributes: [],
+                                                            },
+                                                        ),
+                                                        (
+                                                            NoLabel,
+                                                            Expression {
+                                                                desc: Construct(
+                                                                    Loc {
+                                                                        txt: Ident(
+                                                                            "Cons",
+                                                                        ),
+                                                                        loc: Location {
+                                                                            start: Position {
+                                                                                fname: "examples/let_test.ml",
+                                                                                lnum: 3,
+                                                                                bol: 66,
+                                                                                cnum: 24,
+                                                                            },
+                                                                            end: Position {
+                                                                                fname: "examples/let_test.ml",
+                                                                                lnum: 3,
+                                                                                bol: 69,
+                                                                                cnum: 27,
+                                                                            },
+                                                                            ghost: false,
+                                                                        },
+                                                                    },
+                                                                    Some(
+                                                                        Expression {
+                                                                            desc: Tuple(
+                                                                                [
+                                                                                    (
+                                                                                        None,
+                                                                                        Expression {
+                                                                                            desc: Ident(
+                                                                                                Loc {
+                                                                                                    txt: Ident(
+                                                                                                        "h",
+                                                                                                    ),
+                                                                                                    loc: Location {
+                                                                                                        start: Position {
+                                                                                                            fname: "examples/let_test.ml",
+                                                                                                            lnum: 3,
+                                                                                                            bol: 67,
+                                                                                                            cnum: 25,
+                                                                                                        },
+                                                                                                        end: Position {
+                                                                                                            fname: "examples/let_test.ml",
+                                                                                                            lnum: 3,
+                                                                                                            bol: 68,
+                                                                                                            cnum: 26,
+                                                                                                        },
+                                                                                                        ghost: false,
+                                                                                                    },
+                                                                                                },
+                                                                                            ),
+                                                                                            loc: Location {
+                                                                                                start: Position {
+                                                                                                    fname: "examples/let_test.ml",
+                                                                                                    lnum: 3,
+                                                                                                    bol: 67,
+                                                                                                    cnum: 25,
+                                                                                                },
+                                                                                                end: Position {
+                                                                                                    fname: "examples/let_test.ml",
+                                                                                                    lnum: 3,
+                                                                                                    bol: 68,
+                                                                                                    cnum: 26,
+                                                                                                },
+                                                                                                ghost: false,
+                                                                                            },
+                                                                                            loc_stack: [],
+                                                                                            attributes: [],
+                                                                                        },
+                                                                                    ),
+                                                                                    (
+                                                                                        None,
+                                                                                        Expression {
+                                                                                            desc: Construct(
+                                                                                                Loc {
+                                                                                                    txt: Ident(
+                                                                                                        "Nil",
+                                                                                                    ),
+                                                                                                    loc: Location {
+                                                                                                        start: Position {
+                                                                                                            fname: "examples/let_test.ml",
+                                                                                                            lnum: 3,
+                                                                                                            bol: 66,
+                                                                                                            cnum: 24,
+                                                                                                        },
+                                                                                                        end: Position {
+                                                                                                            fname: "examples/let_test.ml",
+                                                                                                            lnum: 3,
+                                                                                                            bol: 69,
+                                                                                                            cnum: 27,
+                                                                                                        },
+                                                                                                        ghost: false,
+                                                                                                    },
+                                                                                                },
+                                                                                                None,
+                                                                                            ),
+                                                                                            loc: Location {
+                                                                                                start: Position {
+                                                                                                    fname: "examples/let_test.ml",
+                                                                                                    lnum: 3,
+                                                                                                    bol: 66,
+                                                                                                    cnum: 24,
+                                                                                                },
+                                                                                                end: Position {
+                                                                                                    fname: "examples/let_test.ml",
+                                                                                                    lnum: 3,
+                                                                                                    bol: 69,
+                                                                                                    cnum: 27,
+                                                                                                },
+                                                                                                ghost: false,
+                                                                                            },
+                                                                                            loc_stack: [],
+                                                                                            attributes: [],
+                                                                                        },
+                                                                                    ),
+                                                                                ],
+                                                                            ),
+                                                                            loc: Location {
+                                                                                start: Position {
+                                                                                    fname: "examples/let_test.ml",
+                                                                                    lnum: 3,
+                                                                                    bol: 66,
+                                                                                    cnum: 24,
+                                                                                },
+                                                                                end: Position {
+                                                                                    fname: "examples/let_test.ml",
+                                                                                    lnum: 3,
+                                                                                    bol: 69,
+                                                                                    cnum: 27,
+                                                                                },
+                                                                                ghost: false,
+                                                                            },
+                                                                            loc_stack: [],
+                                                                            attributes: [],
+                                                                        },
+                                                                    ),
+                                                                ),
+                                                                loc: Location {
+                                                                    start: Position {
+                                                                        fname: "examples/let_test.ml",
+                                                                        lnum: 3,
+                                                                        bol: 66,
+                                                                        cnum: 24,
+                                                                    },
+                                                                    end: Position {
+                                                                        fname: "examples/let_test.ml",
+                                                                        lnum: 3,
+                                                                        bol: 69,
+                                                                        cnum: 27,
+                                                                    },
+                                                                    ghost: false,
+                                                                },
+                                                                loc_stack: [],
+                                                                attributes: [],
+                                                            },
+                                                        ),
+                                                    ],
+                                                ),
+                                                loc: Location {
+                                                    start: Position {
+                                                        fname: "examples/let_test.ml",
+                                                        lnum: 3,
+                                                        bol: 56,
+                                                        cnum: 14,
+                                                    },
+                                                    end: Position {
+                                                        fname: "examples/let_test.ml",
+                                                        lnum: 3,
+                                                        bol: 69,
+                                                        cnum: 27,
+                                                    },
+                                                    ghost: false,
+                                                },
+                                                loc_stack: [],
+                                                attributes: [],
+                                            },
+                                        },
+                                    ],
+                                ),
+                                loc: Location {
+                                    start: Position {
+                                        fname: "examples/let_test.ml",
+                                        lnum: 1,
+                                        bol: 16,
+                                        cnum: 0,
+                                    },
+                                    end: Position {
+                                        fname: "examples/let_test.ml",
+                                        lnum: 3,
+                                        bol: 69,
+                                        cnum: 27,
+                                    },
+                                    ghost: false,
+                                },
+                                loc_stack: [],
+                                attributes: [],
+                            },
+                            constraint: None,
+                            attributes: [],
+                            loc: Location {
+                                start: Position {
+                                    fname: "examples/let_test.ml",
+                                    lnum: 0,
+                                    bol: 8,
+                                    cnum: 8,
+                                },
+                                end: Position {
+                                    fname: "examples/let_test.ml",
+                                    lnum: 3,
+                                    bol: 69,
+                                    cnum: 27,
+                                },
+                                ghost: false,
+                            },
+                        },
+                    ],
+                ),
+                loc: Location {
+                    start: Position {
+                        fname: "examples/let_test.ml",
+                        lnum: 0,
+                        bol: 0,
+                        cnum: 0,
+                    },
+                    end: Position {
+                        fname: "examples/let_test.ml",
+                        lnum: 3,
+                        bol: 69,
+                        cnum: 27,
+                    },
+                    ghost: false,
+                },
+            },
+        ],
+    ),
+],

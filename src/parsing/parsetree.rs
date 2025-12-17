@@ -123,6 +123,8 @@ pub enum PatternDesc {
     Variant(Label, Option<Box<Pattern>>),
     Record(Vec<(Loc<LongIdent>, Pattern)>, ClosedFlag),
     Array(Vec<Pattern>),
+    List(Vec<Pattern>),
+    Cons(Box<Pattern>, Box<Pattern>),
     Or(Box<Pattern>, Box<Pattern>),
     Constraint(Box<Pattern>, CoreType),
     Type(Loc<LongIdent>),

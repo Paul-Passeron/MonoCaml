@@ -5,6 +5,7 @@ use std::{env, fs};
 
 use crate::{
     // parsing::parser::test_example,
+    parsing::parser::MonoCamlParser,
     typechecker::{Context, TypeChecker},
 };
 pub mod ast;
@@ -27,20 +28,8 @@ fn main() {
     let filename = &args[1];
 
     let src = fs::read_to_string(filename).expect("Failed to read file");
-    match parser::parse(&src) {
-        Ok(ast) => {
-            println!("AST from file: {}", filename);
-            println!("{:#?}", ast);
 
-            let mut ctx = Context::new();
-
-            for expr in ast {
-                println!("TYPE: {}", TypeChecker::type_of(&expr, &mut ctx).unwrap());
-            }
-        }
-        Err(err) => {
-            eprintln!("Parse error:\n{}", err);
-            std::process::exit(1);
-        }
-    }
+    let p = MonoCamlParser::new(filename, &src);
+    let parse_tree = p.parse_ocaml_source();
+    let _ = dbg!(parse_tree);
 }

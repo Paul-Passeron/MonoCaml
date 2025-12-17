@@ -820,8 +820,8 @@ operator = {
 }
 
 expression_element = {
-    simple_expression
-  | prefix_operator
+    simple_expression // | prefix_operator
+
   | operator
 }
 

@@ -1,2 +1,4 @@
-let a = 2
-let b = 6
+let rec rev l =
+match l with
+  | [] -> []
+  | h :: q -> (rev q) @ [h]
