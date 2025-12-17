@@ -8,5 +8,6 @@ pub mod parser;
 pub mod parser_helper;
 pub mod parser_prelude;
 pub mod parsetree;
+pub mod parsetree_display;
 pub mod syntaxerr;
 pub mod unit_info;
