@@ -10,7 +10,6 @@ use crate::{
 pub mod ast;
 pub mod common;
 pub mod lexing;
-pub mod parser;
 pub mod parsing;
 pub mod platform;
 pub mod typechecker;
