@@ -75,7 +75,7 @@ pub trait Extractable<T = usize> {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Use<T: Extractable<S>, S = usize>(pub S, PhantomData<T>);
+pub struct Use<T: Extractable<S>, S = usize>(S, PhantomData<T>);
 
 impl<T, S> From<T> for Use<T, S>
 where
