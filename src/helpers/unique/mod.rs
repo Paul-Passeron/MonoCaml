@@ -74,8 +74,28 @@ pub trait Extractable<T = usize> {
     fn extract(&self) -> T;
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Use<T: Extractable<S>, S = usize>(S, PhantomData<T>);
+
+impl<T, S> Extractable<S> for Use<T, S>
+where
+    T: Extractable<S>,
+    S: Clone,
+{
+    fn extract(&self) -> S {
+        self.0.clone()
+    }
+}
+
+impl<T, S> Clone for Use<T, S>
+where
+    T: Extractable<S>,
+    S: Clone,
+{
+    fn clone(&self) -> Self {
+        Self(self.0.clone(), PhantomData)
+    }
+}
 
 impl<T, S> From<T> for Use<T, S>
 where
@@ -93,4 +113,8 @@ where
     fn from(value: &T) -> Self {
         Self(value.extract(), PhantomData)
     }
+}
+
+pub trait UniqueDisplayer<S = usize>: Extractable<S> {
+    fn unique_displayer(x: S) -> String;
 }
