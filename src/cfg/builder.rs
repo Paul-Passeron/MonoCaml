@@ -2,7 +2,7 @@ use std::{collections::HashMap, mem};
 
 use crate::{
     cfg::{
-        BasicBlock, Cfg, FunName, FunNameUse, Func, Instr, Label, LabelUse, Program, Sig,
+        BasicBlock, Cfg, Const, FunName, FunNameUse, Func, Instr, Label, LabelUse, Program, Sig,
         Terminator, Ty, TyCtx, Value,
         expr::Expr,
         var::{CfgVar, CfgVarUse},
@@ -127,7 +127,7 @@ impl Builder {
         }
     }
 
-    pub fn assign(&mut self, expr: Expr, ctx: &mut TyCtx) -> CfgVarUse {
+    pub fn assign(&mut self, ctx: &mut TyCtx, expr: Expr) -> CfgVarUse {
         let ty = expr.get_type(ctx);
         let var = ctx.new_var(ty);
         let res = (&var).into();
@@ -135,13 +135,90 @@ impl Builder {
         res
     }
 
-    pub fn store(&mut self, ptr: Value, value: Value, ctx: &TyCtx) {
+    pub fn store(&mut self, ctx: &TyCtx, ptr: Value, value: Value) {
         let _ = ptr.get_type(ctx).into_inner(); // Asserts ptr is really a pointer
         self.instrs.push(Instr::Store { ptr, value })
     }
 
     pub fn get_params(&self) -> Vec<CfgVarUse> {
         self.params.iter().map(|(x, _)| x.into()).collect()
+    }
+
+    pub fn constant(&mut self, ctx: &mut TyCtx, c: Const) -> CfgVarUse {
+        self.assign(ctx, Expr::Value(c.into()))
+    }
+
+    pub fn var(&mut self, ctx: &mut TyCtx, v: CfgVarUse) -> CfgVarUse {
+        self.assign(ctx, Expr::Value(v.into()))
+    }
+
+    pub fn add(&mut self, ctx: &mut TyCtx, lhs: Value, rhs: Value) -> Value {
+        match (&lhs, &rhs) {
+            (Value::Const(Const::Int(l)), Value::Const(Const::Int(r))) => {
+                Value::Const(Const::Int(l + r))
+            }
+            _ => self.assign(ctx, Expr::add(ctx, lhs, rhs)).into(),
+        }
+    }
+
+    pub fn mul(&mut self, ctx: &mut TyCtx, lhs: Value, rhs: Value) -> Value {
+        match (&lhs, &rhs) {
+            (Value::Const(Const::Int(l)), Value::Const(Const::Int(r))) => {
+                Value::Const(Const::Int(l * r))
+            }
+            _ => self.assign(ctx, Expr::mul(ctx, lhs, rhs)).into(),
+        }
+    }
+
+    pub fn sub(&mut self, ctx: &mut TyCtx, lhs: Value, rhs: Value) -> Value {
+        match (&lhs, &rhs) {
+            (Value::Const(Const::Int(l)), Value::Const(Const::Int(r))) => {
+                Value::Const(Const::Int(l - r))
+            }
+            _ => self.assign(ctx, Expr::sub(ctx, lhs, rhs)).into(),
+        }
+    }
+
+    pub fn div(&mut self, ctx: &mut TyCtx, lhs: Value, rhs: Value) -> Value {
+        match (&lhs, &rhs) {
+            (Value::Const(Const::Int(l)), Value::Const(Const::Int(r))) => {
+                Value::Const(Const::Int(l / r))
+            }
+            _ => self.assign(ctx, Expr::div(ctx, lhs, rhs)).into(),
+        }
+    }
+
+    pub fn call(&mut self, ctx: &mut TyCtx, closure: Value, arg: Value) -> CfgVarUse {
+        self.assign(ctx, Expr::call(ctx, closure, arg))
+    }
+
+    pub fn native_call<S: ToString>(
+        &mut self,
+        ctx: &mut TyCtx,
+        fun: S,
+        args: Vec<Value>,
+    ) -> CfgVarUse {
+        self.assign(ctx, Expr::native_call(ctx, fun, args))
+    }
+
+    pub fn get_element_ptr(&mut self, ctx: &mut TyCtx, ptr: Value, index: usize) -> CfgVarUse {
+        self.assign(ctx, Expr::get_element_ptr(ctx, ptr, index))
+    }
+
+    pub fn extract(&mut self, ctx: &mut TyCtx, value: Value, index: usize) -> CfgVarUse {
+        self.assign(ctx, Expr::extract(ctx, value, index))
+    }
+
+    pub fn load(&mut self, ctx: &mut TyCtx, ptr: Value, ty: Ty) -> CfgVarUse {
+        self.assign(ctx, Expr::load(ctx, ptr, ty))
+    }
+
+    pub fn aggregate(&mut self, ctx: &mut TyCtx, values: Vec<Value>) -> CfgVarUse {
+        self.assign(ctx, Expr::aggregate(values))
+    }
+
+    pub fn value(&mut self, ctx: &mut TyCtx, value: Value) -> CfgVarUse {
+        self.assign(ctx, Expr::value(value))
     }
 }
 
