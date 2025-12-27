@@ -53,10 +53,6 @@ impl Extractable for CfgGlobal {
     }
 }
 
-pub trait GlobalKind {}
-impl GlobalKind for CfgGlobal {}
-impl GlobalKind for CfgGlobalUse {}
-
 impl From<Token<CfgGlobal, usize>> for CfgGlobal {
     fn from(token: Token<CfgGlobal, usize>) -> Self {
         Self(token.inner)
