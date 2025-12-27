@@ -4,7 +4,12 @@ use std::{
 };
 
 use crate::{
-    cfg::var::{CfgGlobal, CfgGlobalUse, CfgVar, CfgVarUse, VarKind},
+    cfg::var::{
+        // CfgGlobal, CfgGlobalUse,
+        CfgVar,
+        CfgVarUse,
+        VarKind,
+    },
     helpers::unique::{Unique, Use},
 };
 pub mod builder;
@@ -55,12 +60,14 @@ pub enum Const {
 }
 
 pub enum Value {
-    Global(CfgGlobalUse),
+    // Global(CfgGlobalUse),
     Var(CfgVarUse),
     Const(Const),
 }
 
 pub enum Expr {
+    Value(Value),
+
     // Those expects two integer values
     Add(Value, Value),
     Mul(Value, Value),
@@ -161,14 +168,14 @@ impl Hash for Func {
 }
 
 pub struct Program {
-    globals: HashMap<CfgGlobal, Const>,
+    // globals: HashMap<CfgGlobal, Const>,
     natives: HashMap<String, FunNameUse>,
     funcs: HashSet<Func>,
 }
 
 pub struct TyCtx {
     pub sigs: HashMap<FunNameUse, Sig>,
-    pub globals: HashMap<CfgGlobalUse, Ty>,
+    // pub globals: HashMap<CfgGlobalUse, Ty>,
     pub vars: HashMap<CfgVarUse, Ty>,
     pub natives: HashMap<String, FunNameUse>,
 }

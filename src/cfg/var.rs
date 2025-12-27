@@ -31,30 +31,30 @@ impl From<Token<CfgVar, usize>> for CfgVar {
     }
 }
 
-#[allow(unused)]
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct CfgGlobal(usize);
+// #[allow(unused)]
+// #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+// pub struct CfgGlobal(usize);
 
-impl CfgGlobal {
-    pub fn fresh() -> Self {
-        Unique::<Self>::fresh()
-    }
+// impl CfgGlobal {
+//     pub fn fresh() -> Self {
+//         Unique::<Self>::fresh()
+//     }
 
-    pub fn reset() {
-        Unique::<Self>::reset();
-    }
-}
+//     pub fn reset() {
+//         Unique::<Self>::reset();
+//     }
+// }
 
-pub type CfgGlobalUse = Use<CfgGlobal>;
+// pub type CfgGlobalUse = Use<CfgGlobal>;
 
-impl Extractable for CfgGlobal {
-    fn extract(&self) -> usize {
-        self.0
-    }
-}
+// impl Extractable for CfgGlobal {
+//     fn extract(&self) -> usize {
+//         self.0
+//     }
+// }
 
-impl From<Token<CfgGlobal, usize>> for CfgGlobal {
-    fn from(token: Token<CfgGlobal, usize>) -> Self {
-        Self(token.inner)
-    }
-}
+// impl From<Token<CfgGlobal, usize>> for CfgGlobal {
+//     fn from(token: Token<CfgGlobal, usize>) -> Self {
+//         Self(token.inner)
+//     }
+// }

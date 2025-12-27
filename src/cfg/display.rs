@@ -4,7 +4,11 @@ use crate::{
     cfg::{
         BasicBlock, Cfg, Const, Expr, FunName, Func, Instr, Label, Program, Sig, Terminator, Ty,
         Value,
-        var::{CfgGlobal, CfgVar, VarKind},
+        var::{
+            // CfgGlobal,
+            CfgVar,
+            VarKind,
+        },
     },
     helpers::unique::{Extractable, UniqueDisplayer, Use},
 };
@@ -61,11 +65,11 @@ impl UniqueDisplayer for CfgVar {
     }
 }
 
-impl UniqueDisplayer for CfgGlobal {
-    fn unique_displayer(x: usize) -> String {
-        format!("@{x}")
-    }
-}
+// impl UniqueDisplayer for CfgGlobal {
+//     fn unique_displayer(x: usize) -> String {
+//         format!("@{x}")
+//     }
+// }
 
 impl UniqueDisplayer for Label {
     fn unique_displayer(x: usize) -> String {
@@ -104,7 +108,7 @@ impl fmt::Display for Const {
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Value::Global(x) => write!(f, "{x}"),
+            // Value::Global(x) => write!(f, "{x}"),
             Value::Var(x) => write!(f, "{x}"),
             Value::Const(x) => write!(f, "{x}"),
         }
@@ -114,6 +118,7 @@ impl fmt::Display for Value {
 impl fmt::Display for Expr {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Expr::Value(v) => write!(f, "{v}"),
             Expr::Add(a, b) => write!(f, "add {a} {b}"),
             Expr::Mul(a, b) => write!(f, "mul {a} {b}"),
             Expr::Sub(a, b) => write!(f, "sub {a} {b}"),
@@ -244,11 +249,11 @@ impl fmt::Display for Func {
 
 impl fmt::Display for Program {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for (glob, cte) in &self.globals {
-            let g: Use<_> = glob.into();
-            writeln!(f, "{} = {}", g, cte)?;
-        }
-        writeln!(f, "")?;
+        // for (glob, cte) in &self.globals {
+        //     let g: Use<_> = glob.into();
+        //     writeln!(f, "{} = {}", g, cte)?;
+        // }
+        // writeln!(f, "")?;
 
         let mut funcs = self.funcs.iter().collect::<Vec<_>>();
         funcs.sort_by(|a, b| a.name.cmp(&b.name));

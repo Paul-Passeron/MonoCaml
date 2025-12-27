@@ -158,7 +158,7 @@ impl TyCtx {
     pub fn new() -> Self {
         Self {
             sigs: HashMap::new(),
-            globals: HashMap::new(),
+            // globals: HashMap::new(),
             vars: HashMap::new(),
             natives: HashMap::new(),
         }
@@ -282,4 +282,10 @@ impl Expr {
     pub fn aggregate(values: Vec<Value>) -> Self {
         Self::Struct(values)
     }
+
+    pub fn value(v: Value) -> Self {
+        Self::Value(v)
+    }
 }
+
+impl Value {}

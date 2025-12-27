@@ -1,6 +1,9 @@
 use crate::cfg::{
     Const, Expr, FunNameUse, Sig, Ty, TyCtx, Value,
-    var::{CfgGlobalUse, CfgVarUse},
+    var::{
+        // CfgGlobalUse ,
+        CfgVarUse,
+    },
 };
 
 impl Ty {
@@ -106,7 +109,7 @@ impl Ty {
 impl Value {
     pub fn get_type(&self, ctx: &TyCtx) -> Ty {
         match self {
-            Value::Global(x) => x.get_type(ctx),
+            // Value::Global(x) => x.get_type(ctx),
             Value::Var(x) => x.get_type(ctx),
             Value::Const(x) => x.get_type(ctx),
         }
@@ -135,11 +138,11 @@ impl CfgVarUse {
     }
 }
 
-impl CfgGlobalUse {
-    pub fn get_type(&self, ctx: &TyCtx) -> Ty {
-        ctx.globals[self].clone()
-    }
-}
+// impl CfgGlobalUse {
+//     pub fn get_type(&self, ctx: &TyCtx) -> Ty {
+//         // ctx.globals[self].clone()
+//     }
+// }
 
 impl FunNameUse {
     pub fn get_return_type(&self, ctx: &TyCtx) -> Ty {
@@ -156,6 +159,7 @@ impl FunNameUse {
 impl Expr {
     pub fn get_type(&self, ctx: &TyCtx) -> Ty {
         match self {
+            Expr::Value(v) => v.get_type(ctx),
             Expr::Add(_, _) | Expr::Mul(_, _) | Expr::Sub(_, _) | Expr::Div(_, _) => Ty::Int,
             Expr::Call { closure, .. } => closure.get_ret_type_as_closure(ctx),
             Expr::NativeCall { fun, .. } => ctx.natives[fun].get_return_type(ctx),
