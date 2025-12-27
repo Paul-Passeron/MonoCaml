@@ -1,6 +1,7 @@
 use crate::ast::{Ast, Ty, Typed, Var};
 
 pub mod ast;
+pub mod cfg;
 pub mod helpers;
 
 fn test_ast() -> Ast {

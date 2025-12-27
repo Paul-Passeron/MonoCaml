@@ -69,3 +69,28 @@ where
         let _ = m.remove(&id);
     }
 }
+
+pub trait Extractable<T = usize> {
+    fn extract(&self) -> T;
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Use<T: Extractable<S>, S = usize>(pub S, PhantomData<T>);
+
+impl<T, S> From<T> for Use<T, S>
+where
+    T: Extractable<S>,
+{
+    fn from(value: T) -> Self {
+        Self::from(&value)
+    }
+}
+
+impl<T, S> From<&T> for Use<T, S>
+where
+    T: Extractable<S>,
+{
+    fn from(value: &T) -> Self {
+        Self(value.extract(), PhantomData)
+    }
+}
