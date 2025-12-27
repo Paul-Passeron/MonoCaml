@@ -4,16 +4,20 @@ use std::{
 };
 
 use crate::{
-    cfg::var::{
-        // CfgGlobal, CfgGlobalUse,
-        CfgVar,
-        CfgVarUse,
-        VarKind,
+    cfg::{
+        expr::Expr,
+        var::{
+            // CfgGlobal, CfgGlobalUse,
+            CfgVar,
+            CfgVarUse,
+            VarKind,
+        },
     },
     helpers::unique::{Unique, Use},
 };
 pub mod builder;
 mod display;
+pub mod expr;
 mod extract;
 mod get_type;
 mod token;
@@ -65,27 +69,26 @@ pub enum Value {
     Const(Const),
 }
 
-pub enum Expr {
-    Value(Value),
+impl Value {
+    pub fn constant(c: Const) -> Self {
+        Self::Const(c)
+    }
 
-    // Those expects two integer values
-    Add(Value, Value),
-    Mul(Value, Value),
-    Sub(Value, Value),
-    Div(Value, Value),
+    pub fn variable(v: CfgVarUse) -> Self {
+        Self::Var(v)
+    }
+}
 
-    // This expects a closure as first arg
-    Call { closure: Value, arg: Value },
+impl Into<Value> for Const {
+    fn into(self) -> Value {
+        Value::Const(self)
+    }
+}
 
-    NativeCall { fun: String, args: Vec<Value> },
-
-    GetElementPtr { ptr: Value, index: usize },
-
-    Extract { value: Value, index: usize },
-
-    Load { ptr: Value, ty: Ty },
-
-    Struct(Vec<Value>),
+impl Into<Value> for CfgVarUse {
+    fn into(self) -> Value {
+        Value::Var(self)
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, PartialOrd)]

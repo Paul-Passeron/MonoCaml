@@ -1,10 +1,4 @@
-use crate::cfg::{
-    Const, Expr, FunNameUse, Sig, Ty, TyCtx, Value,
-    var::{
-        // CfgGlobalUse ,
-        CfgVarUse,
-    },
-};
+use crate::cfg::{Const, FunNameUse, Sig, Ty, TyCtx, Value, expr::Expr, var::CfgVarUse};
 
 impl Ty {
     pub fn into_inner(&self) -> Ty {
@@ -104,6 +98,20 @@ impl Ty {
 
         params[n].clone()
     }
+
+    pub fn choose_arith(a: Ty, b: Ty) -> Ty {
+        if !a.is_arith() {
+            panic!("Expected arithmetic type but got {}", a);
+        } else if !b.is_arith() {
+            panic!("Expected arithmetic type but got {}", b);
+        } else if a.is_ptr() {
+            a
+        } else if b.is_ptr() {
+            b
+        } else {
+            Ty::Int
+        }
+    }
 }
 
 impl Value {
@@ -160,7 +168,9 @@ impl Expr {
     pub fn get_type(&self, ctx: &TyCtx) -> Ty {
         match self {
             Expr::Value(v) => v.get_type(ctx),
-            Expr::Add(_, _) | Expr::Mul(_, _) | Expr::Sub(_, _) | Expr::Div(_, _) => Ty::Int,
+            Expr::Add(a, b) | Expr::Mul(a, b) | Expr::Sub(a, b) | Expr::Div(a, b) => {
+                Ty::choose_arith(a.get_type(ctx), b.get_type(ctx))
+            }
             Expr::Call { closure, .. } => closure.get_ret_type_as_closure(ctx),
             Expr::NativeCall { fun, .. } => ctx.natives[fun].get_return_type(ctx),
             Expr::GetElementPtr { ptr, index } => {

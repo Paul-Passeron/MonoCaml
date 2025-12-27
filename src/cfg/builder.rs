@@ -2,8 +2,9 @@ use std::{collections::HashMap, mem};
 
 use crate::{
     cfg::{
-        BasicBlock, Cfg, Expr, FunName, FunNameUse, Func, Instr, Label, LabelUse, Program, Sig,
+        BasicBlock, Cfg, FunName, FunNameUse, Func, Instr, Label, LabelUse, Program, Sig,
         Terminator, Ty, TyCtx, Value,
+        expr::Expr,
         var::{CfgVar, CfgVarUse},
     },
     helpers::unique::Use,
@@ -184,108 +185,3 @@ impl TyCtx {
         }
     }
 }
-
-impl Expr {
-    fn check_arith(ctx: &TyCtx, lhs: &Value, rhs: &Value, str: &str) {
-        if !lhs.get_type(ctx).is_arith() || !rhs.get_type(ctx).is_arith() {
-            panic!("Cannot {str} non arith")
-        }
-    }
-
-    pub fn add(ctx: &TyCtx, lhs: Value, rhs: Value) -> Self {
-        Self::check_arith(ctx, &lhs, &rhs, "add");
-        Self::Add(lhs, rhs)
-    }
-
-    pub fn mul(ctx: &TyCtx, lhs: Value, rhs: Value) -> Self {
-        Self::check_arith(ctx, &lhs, &rhs, "mul");
-        Self::Mul(lhs, rhs)
-    }
-
-    pub fn sub(ctx: &TyCtx, lhs: Value, rhs: Value) -> Self {
-        Self::check_arith(ctx, &lhs, &rhs, "sub");
-        Self::Sub(lhs, rhs)
-    }
-
-    pub fn div(ctx: &TyCtx, lhs: Value, rhs: Value) -> Self {
-        Self::check_arith(ctx, &lhs, &rhs, "div");
-        Self::Div(lhs, rhs)
-    }
-
-    pub fn call(ctx: &TyCtx, closure: Value, arg: Value) -> Self {
-        let ty = closure.get_type(ctx);
-        if !ty.repr_closure() {
-            panic!("Cannot use call on non-closure")
-        }
-        // We assume the closure env is always passed as first arg
-        if ty.param_count() != 2 {
-            panic!("Closure expects 2 arguments")
-        }
-
-        let expected_ty = ty.param(1);
-
-        if expected_ty != arg.get_type(ctx) {
-            panic!("Closure expects argument of type {expected_ty}")
-        }
-
-        Self::Call { closure, arg }
-    }
-
-    pub fn native_call<S: ToString>(ctx: &TyCtx, fun: S, args: Vec<Value>) -> Self {
-        let name = fun.to_string();
-        if !ctx.natives.contains_key(&name) {
-            panic!("Native function {name} not found")
-        }
-
-        let fname = &ctx.natives[&name];
-        let params = &ctx.sigs[fname].params;
-
-        if params.len() != args.len() {
-            panic!("Native function {name} expects {} arguments", params.len())
-        }
-
-        for (i, (arg, expected_ty)) in args.iter().zip(params).enumerate() {
-            let got_ty = arg.get_type(ctx);
-            if got_ty != *expected_ty {
-                panic!(
-                    "Native function {name} expects argument {i} of type {expected_ty} but got {got_ty}"
-                )
-            }
-        }
-
-        Self::NativeCall { fun: name, args }
-    }
-
-    pub fn get_element_ptr(ctx: &TyCtx, ptr: Value, index: usize) -> Self {
-        let ty = ptr.get_type(ctx);
-        if !ty.is_ptr() {
-            panic!("Cannot use getelementptr on non-pointer type")
-        }
-        let _ = ty.into_inner().field(index);
-
-        Self::GetElementPtr { ptr, index }
-    }
-
-    pub fn extract(ctx: &TyCtx, value: Value, index: usize) -> Self {
-        let _ = value.get_type(ctx).field(index);
-        Self::Extract { value, index }
-    }
-
-    pub fn load(ctx: &TyCtx, ptr: Value, ty: Ty) -> Self {
-        if !ptr.get_type(ctx).is_ptr() {
-            panic!("Cannot load from non-pointer type")
-        }
-
-        Self::Load { ptr, ty }
-    }
-
-    pub fn aggregate(values: Vec<Value>) -> Self {
-        Self::Struct(values)
-    }
-
-    pub fn value(v: Value) -> Self {
-        Self::Value(v)
-    }
-}
-
-impl Value {}

@@ -2,8 +2,8 @@ use std::fmt;
 
 use crate::{
     cfg::{
-        BasicBlock, Cfg, Const, Expr, FunName, Func, Instr, Label, Program, Sig, Terminator, Ty,
-        Value,
+        BasicBlock, Cfg, Const, FunName, Func, Instr, Label, Program, Sig, Terminator, Ty, Value,
+        expr::Expr,
         var::{
             // CfgGlobal,
             CfgVar,
