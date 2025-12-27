@@ -127,6 +127,7 @@ pub struct BasicBlock {
     terminator: Terminator,
 }
 
+#[allow(unused)]
 pub struct Cfg {
     locals: HashMap<CfgVar, Ty>,
     blocks: Vec<BasicBlock>,
