@@ -23,4 +23,6 @@ fn test_ast() -> Ast {
 
 fn main() {
     println!("{}", test_ast());
+    Var::reset();
+    println!("{}", test_ast());
 }
