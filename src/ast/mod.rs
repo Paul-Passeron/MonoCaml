@@ -15,6 +15,10 @@ impl Var {
     pub fn extract(&self) -> usize {
         self.0
     }
+
+    pub fn reset() {
+        Unique::<Self>::reset();
+    }
 }
 
 pub enum Ty {

@@ -44,11 +44,13 @@ where
     S: Zero + Clone,
     Token<T, S>: Into<T>,
 {
+    fn id() -> TypeId {
+        TypeId::of::<(T, S)>()
+    }
+
     pub fn fresh() -> T {
-        let id = TypeId::of::<(T, S)>();
-
+        let id = Self::id();
         let mut m = UNIQUE_MAP.lock().unwrap();
-
         let value = if m.contains_key(&id) {
             let r = m.get_mut(&id).unwrap();
             r.incr();
@@ -58,7 +60,12 @@ where
             m.insert(id, GenInt::from(z.clone()));
             z
         };
-
         Token::from(value).into()
+    }
+
+    pub fn reset() {
+        let id = Self::id();
+        let mut m = UNIQUE_MAP.lock().unwrap();
+        let _ = m.remove(&id);
     }
 }
