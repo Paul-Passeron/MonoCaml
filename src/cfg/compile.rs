@@ -1,5 +1,6 @@
 use std::{
     collections::{HashMap, HashSet},
+    iter::{empty, once},
     mem,
 };
 
@@ -283,6 +284,61 @@ impl Compiler {
     }
 
     fn create_native_closure(&mut self, name: String, b: &mut Builder) -> Value {
+        let funname = self.ctx.natives[&name].clone();
+        println!("Found native {name} as {funname}");
+        // Create the closure tree (all intermediate functions taking a single arg as well as the closure env) of the native function and return the wrapper as a closure
+        //
+
+        // Create innermost closure because it calls the native function with the unfolded closure args and the last argument
+
+        let innermost_name = FunName::fresh();
+        let innermost_use = Use::from(&innermost_name);
+        let sig = self.ctx.sigs[&funname].clone();
+        assert!(sig.params.len() > 0);
+        let last_arg = sig.params.last().unwrap();
+        let ret_ty = sig.ret.as_ref();
+
+        let params = self
+            .ctx
+            .make_params([Ty::Ptr(Box::new(Ty::Void)), last_arg.clone()].into_iter());
+        let use_params = params.iter().map(|(x, _)| Use::from(x)).collect::<Vec<_>>();
+        let mut innermost_builder =
+            Builder::new(innermost_name, params, ret_ty.clone(), &mut self.ctx);
+
+        let mut args = if sig.params.len() > 1 {
+            let env_iter = sig.params.iter().rev().skip(1).rev();
+            let env_ty = Ty::Struct(env_iter.clone().cloned().collect::<Vec<_>>());
+            let env_ptr = use_params[0].clone();
+            let loaded_env: Value = innermost_builder
+                .load(&mut self.ctx, env_ptr.into(), env_ty)
+                .into();
+            env_iter
+                .enumerate()
+                .map(|(i, _)| {
+                    innermost_builder
+                        .extract(&mut self.ctx, loaded_env.clone(), i)
+                        .into()
+                })
+                .collect::<Vec<_>>()
+        } else {
+            vec![]
+        };
+        args.push(use_params[1].clone().into());
+
+        let res = innermost_builder.native_call(&mut self.ctx, name, args);
+
+        if res.get_type(&self.ctx) == Ty::Void {
+            innermost_builder.ret_void(&self.ctx);
+        } else {
+            innermost_builder.ret(&self.ctx, res.into());
+        }
+
+        let func = innermost_builder.finalize();
+
+        println!("Native func:\n{func}");
+
+        self.add_func(func);
+
         todo!()
     }
 }

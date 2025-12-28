@@ -163,7 +163,7 @@ impl FunNameUse {
     pub fn get_return_type(&self, ctx: &TyCtx) -> Ty {
         match Const::FunPtr(self.clone()).get_type(ctx) {
             Ty::FunPtr(sig) => {
-                assert!(sig.params.len() == 1);
+                // assert!(sig.params.len() == 1);
                 sig.ret.as_ref().clone()
             }
             _ => unreachable!(),

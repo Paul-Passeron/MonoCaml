@@ -56,6 +56,7 @@ impl Label {
 
 pub type LabelUse = Use<Label>;
 
+#[derive(Clone)]
 pub enum Const {
     Int(i32),
     String(String),
@@ -64,6 +65,7 @@ pub enum Const {
     NullPtr,
 }
 
+#[derive(Clone)]
 pub enum Value {
     Var(CfgVarUse),
     Const(Const),
