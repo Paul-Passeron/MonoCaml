@@ -250,7 +250,10 @@ impl Compiler {
 
         let ret_ty = self.get_type_of_ast(&body);
 
-        let mut fun_builder = Builder::new(function_name, params, ret_ty, &mut self.ctx);
+        if ret_ty.is_void() {
+            println!("Return type of {body} is void")
+        }
+        let mut fun_builder = Builder::new(function_name, params, ret_ty.clone(), &mut self.ctx);
         if new_vars_len > 0 {
             let loaded_env =
                 fun_builder.load(&mut self.ctx, env_arg_use.into(), closure_struct.clone());
@@ -263,12 +266,10 @@ impl Compiler {
 
         let ret_value = self.aux(body, &mut fun_builder);
 
-        let ty = ret_value.get_type(&self.ctx);
-
-        if ty != Ty::Void {
-            fun_builder.ret(&mut self.ctx, ret_value);
-        } else {
+        if ret_ty.is_void() {
             fun_builder.ret_void(&mut self.ctx);
+        } else {
+            fun_builder.ret(&mut self.ctx, ret_value);
         }
 
         let func = fun_builder.finalize();
@@ -418,7 +419,7 @@ impl Compiler {
         };
         args.push(use_params[1].clone().into());
         let res = innermost_builder.native_call(&mut self.ctx, name, args);
-        if res.get_type(&self.ctx) == Ty::Void {
+        if res.get_type(&self.ctx).is_void() {
             innermost_builder.ret_void(&self.ctx);
         } else {
             innermost_builder.ret(&self.ctx, res.into());
