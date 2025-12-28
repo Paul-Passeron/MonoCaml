@@ -64,9 +64,9 @@ impl Expr {
         }
 
         let expected_ty = ty.param(1);
-
-        if expected_ty != arg.get_type(ctx) {
-            panic!("Closure expects argument of type {expected_ty}")
+        let arg_ty = arg.get_type(ctx);
+        if !expected_ty.matches(&arg_ty) {
+            panic!("Closure expects argument of type {expected_ty} but got {arg_ty}")
         }
 
         Self::Call { closure, arg }
@@ -87,7 +87,7 @@ impl Expr {
 
         for (i, (arg, expected_ty)) in args.iter().zip(params).enumerate() {
             let got_ty = arg.get_type(ctx);
-            if got_ty != *expected_ty {
+            if !got_ty.matches(expected_ty) {
                 panic!(
                     "Native function {name} expects argument {i} of type {expected_ty} but got {got_ty}"
                 )

@@ -93,7 +93,7 @@ impl Into<Value> for CfgVarUse {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, PartialOrd)]
+#[derive(Debug, Clone)]
 pub enum Ty {
     Int,
     String,
@@ -146,7 +146,7 @@ pub struct Cfg {
     blocks: Vec<BasicBlock>,
 }
 
-#[derive(Debug, Clone, PartialEq, PartialOrd)]
+#[derive(Debug, Clone)]
 pub struct Sig {
     params: Vec<Ty>,
     ret: Box<Ty>,
