@@ -21,14 +21,15 @@ impl Var {
     }
 }
 
-pub enum Ty {
+#[derive(Clone)]
+pub enum AstTy {
     Int,
     String,
-    Tuple(Vec<Ty>),
-    Fun { arg: Box<Ty>, ret: Box<Ty> },
+    Tuple(Vec<AstTy>),
+    Fun { arg: Box<AstTy>, ret: Box<AstTy> },
 }
 
-impl Ty {
+impl AstTy {
     pub fn int() -> Self {
         Self::Int
     }
@@ -45,17 +46,17 @@ impl Ty {
     }
 }
 
-pub struct Typed<T> {
+pub struct AstTyped<T> {
     expr: T,
-    ty: Ty,
+    ty: AstTy,
 }
 
-impl<T> Typed<T> {
-    pub fn new(expr: T, ty: Ty) -> Self {
+impl<T> AstTyped<T> {
+    pub fn new(expr: T, ty: AstTy) -> Self {
         Self { expr, ty }
     }
 
-    pub fn ty<'a>(&'a self) -> &'a Ty {
+    pub fn ty<'a>(&'a self) -> &'a AstTy {
         &self.ty
     }
 
@@ -69,7 +70,7 @@ pub enum Ast {
     Int(i32),
     Var(Var),
     Lambda {
-        arg: Box<Typed<Var>>,
+        arg: Box<AstTyped<Var>>,
         body: Box<Ast>,
     },
     App {
@@ -101,7 +102,7 @@ impl Ast {
         Self::Var(v)
     }
 
-    pub fn lambda(arg: Typed<Var>, body: Self) -> Self {
+    pub fn lambda(arg: AstTyped<Var>, body: Self) -> Self {
         Self::Lambda {
             arg: Box::new(arg),
             body: Box::new(body),

@@ -1,4 +1,4 @@
-use crate::ast::{Ast, Ty, Typed, Var};
+use crate::ast::{Ast, AstTy, AstTyped, Var};
 
 pub mod ast;
 pub mod cfg;
@@ -8,9 +8,9 @@ fn test_ast() -> Ast {
     let x = Var::fresh();
     let y = Var::fresh();
     Ast::lambda(
-        Typed::new(x, Ty::int()),
+        AstTyped::new(x, AstTy::int()),
         Ast::lambda(
-            Typed::new(y, Ty::int()),
+            AstTyped::new(y, AstTy::int()),
             Ast::app(
                 Ast::app(
                     Ast::native("add"),

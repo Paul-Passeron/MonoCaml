@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::ast::{Ast, Ty, Typed, Var};
+use crate::ast::{Ast, AstTy, AstTyped, Var};
 
 impl fmt::Display for Var {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -8,12 +8,12 @@ impl fmt::Display for Var {
     }
 }
 
-impl fmt::Display for Ty {
+impl fmt::Display for AstTy {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Ty::Int => write!(f, "int"),
-            Ty::String => write!(f, "string"),
-            Ty::Tuple(items) => write!(
+            AstTy::Int => write!(f, "int"),
+            AstTy::String => write!(f, "string"),
+            AstTy::Tuple(items) => write!(
                 f,
                 "({})",
                 items
@@ -22,12 +22,12 @@ impl fmt::Display for Ty {
                     .collect::<Vec<_>>()
                     .join(", ")
             ),
-            Ty::Fun { arg, ret } => write!(f, "({} -> {})", arg, ret),
+            AstTy::Fun { arg, ret } => write!(f, "({} -> {})", arg, ret),
         }
     }
 }
 
-impl<T: fmt::Display> fmt::Display for Typed<T> {
+impl<T: fmt::Display> fmt::Display for AstTyped<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "({}:{})", self.expr, self.ty)
     }
