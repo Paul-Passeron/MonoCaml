@@ -71,10 +71,6 @@ impl Ty {
             return false;
         }
 
-        if !closure_env.into_inner().is_struct() {
-            return false;
-        }
-
         true
     }
 
@@ -119,6 +115,14 @@ impl Ty {
             Ty::Int
         }
     }
+
+    pub fn is_zero_sized(&self) -> bool {
+        match self {
+            Ty::Void => true,
+            Ty::Struct(items) => items.is_empty(),
+            _ => false,
+        }
+    }
 }
 
 impl Value {
@@ -136,7 +140,7 @@ impl Value {
                 let fst = &items[0];
                 match fst {
                     Ty::FunPtr(sig) => {
-                        assert!(sig.params.len() == 1);
+                        // assert!(sig.params.len() == 1);
                         sig.ret.as_ref().clone()
                     }
                     _ => unreachable!(),
