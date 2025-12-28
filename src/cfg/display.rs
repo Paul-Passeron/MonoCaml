@@ -136,7 +136,7 @@ impl fmt::Display for Expr {
             Expr::GetElementPtr { ptr, ty, index } => {
                 write!(f, "getelementptr {} {} {}", ptr, ty, index)
             }
-            Expr::Extract { value, index } => write!(f, "getelementptr {} {}", value, index),
+            Expr::Extract { value, index } => write!(f, "extract {} {}", value, index),
             Expr::Load { ptr, ty } => write!(f, "load {} as {}", ptr, ty),
             Expr::Struct(values) => write!(
                 f,
@@ -219,8 +219,8 @@ impl fmt::Display for Func {
         match &self.cfg {
             Some(cfg) => writeln!(
                 f,
-                "func {} ({}) -> {} {{\n{}\n}}",
-                self.name.0,
+                "{} ({}) -> {} {{\n{}\n}}",
+                Use::from(&self.name),
                 self.params
                     .iter()
                     .map(|(a, b)| {
