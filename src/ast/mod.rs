@@ -1,6 +1,8 @@
 pub mod display;
 mod vars;
 
+use std::collections::HashSet;
+
 use crate::helpers::unique::Unique;
 
 #[allow(unused)]
@@ -136,5 +138,34 @@ impl Ast {
 
     pub fn native<S: Into<String>>(s: S) -> Self {
         Self::Native(s.into())
+    }
+
+    pub fn free_vars(&self) -> HashSet<Var> {
+        let mut s = HashSet::new();
+        self.free_vars_aux(&mut s);
+        s
+    }
+
+    fn free_vars_aux(&self, s: &mut HashSet<Var>) {
+        match self {
+            Ast::Str(_) | Ast::Int(_) | Ast::Native(_) => (),
+            Ast::Var(var) => {
+                s.insert(var.clone());
+            }
+            Ast::Lambda { arg, body } => {
+                body.free_vars_aux(s);
+                s.remove(&arg.expr());
+            }
+            Ast::App { fun, arg } => {
+                fun.free_vars_aux(s);
+                arg.free_vars_aux(s);
+            }
+            Ast::Seq { fst, snd } => {
+                fst.free_vars_aux(s);
+                snd.free_vars_aux(s);
+            }
+            Ast::Tuple(asts) => asts.iter().for_each(|x| x.free_vars_aux(s)),
+            Ast::Get { from, .. } => from.free_vars_aux(s),
+        }
     }
 }

@@ -147,6 +147,7 @@ impl fmt::Display for Expr {
                     .collect::<Vec<_>>()
                     .join(", ")
             ),
+            Expr::Malloc(ty, count) => write!(f, "malloc {count} {ty}"),
         }
     }
 }

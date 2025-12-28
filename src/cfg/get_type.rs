@@ -177,6 +177,7 @@ impl Expr {
             Expr::Extract { value, index } => value.get_type(ctx).field(*index),
             Expr::Load { ty, .. } => ty.clone(),
             Expr::Struct(values) => Ty::Struct(values.iter().map(|x| x.get_type(ctx)).collect()),
+            Expr::Malloc(ty, _) => Ty::Ptr(Box::new(ty.clone())),
         }
     }
 }

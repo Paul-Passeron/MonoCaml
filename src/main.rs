@@ -1,4 +1,7 @@
-use crate::ast::{Ast, AstTy, AstTyped, Var};
+use crate::{
+    ast::{Ast, AstTy, AstTyped, Var},
+    cfg::compile::Compiler,
+};
 
 pub mod ast;
 pub mod cfg;
@@ -23,7 +26,8 @@ fn test_ast() -> Ast {
 }
 
 fn main() {
-    println!("{}", test_ast());
-    Var::reset();
-    println!("{}", test_ast());
+    let ast = test_ast();
+    println!("{ast}\n");
+    let prog = Compiler::compile(ast);
+    println!("{prog}\n");
 }

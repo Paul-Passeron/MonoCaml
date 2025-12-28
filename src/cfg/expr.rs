@@ -1,4 +1,4 @@
-use crate::cfg::{Ty, TyCtx, Value};
+use crate::cfg::{Const, Ty, TyCtx, Value};
 
 pub enum Expr {
     Value(Value),
@@ -21,6 +21,8 @@ pub enum Expr {
     Load { ptr: Value, ty: Ty },
 
     Struct(Vec<Value>),
+
+    Malloc(Ty, Value),
 }
 
 impl Expr {
@@ -122,5 +124,13 @@ impl Expr {
 
     pub fn value(v: Value) -> Self {
         Self::Value(v)
+    }
+
+    pub fn malloc_single(ty: Ty) -> Self {
+        Self::Malloc(ty, Const::Int(1).into())
+    }
+
+    pub fn malloc(ty: Ty, v: Value) -> Self {
+        Self::Malloc(ty, v)
     }
 }

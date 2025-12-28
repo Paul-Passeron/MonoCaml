@@ -65,7 +65,6 @@ pub enum Const {
 }
 
 pub enum Value {
-    // Global(CfgGlobalUse),
     Var(CfgVarUse),
     Const(Const),
 }

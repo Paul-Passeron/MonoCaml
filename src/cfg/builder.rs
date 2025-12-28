@@ -22,12 +22,12 @@ pub struct Builder {
 }
 
 impl Builder {
-    pub fn new(name: FunName, params: Vec<Ty>, ret_ty: Ty, ctx: &mut TyCtx) -> Self {
+    pub fn new(name: FunName, params: Vec<(CfgVar, Ty)>, ret_ty: Ty, ctx: &mut TyCtx) -> Self {
         let l = Label::fresh();
         let use_l = Use::from(&l);
         let res = Self {
             name,
-            params: ctx.make_params(params.into_iter()),
+            params,
             ret_ty,
             label: l,
             entry: use_l,
@@ -230,6 +230,14 @@ impl Builder {
 
     pub fn value(&mut self, ctx: &mut TyCtx, value: Value) -> CfgVarUse {
         self.assign(ctx, Expr::value(value))
+    }
+
+    pub fn malloc_single(&mut self, ctx: &mut TyCtx, ty: Ty) -> CfgVarUse {
+        self.assign(ctx, Expr::malloc_single(ty))
+    }
+
+    pub fn malloc(&mut self, ctx: &mut TyCtx, ty: Ty, v: Value) -> CfgVarUse {
+        self.assign(ctx, Expr::malloc(ty, v))
     }
 }
 
