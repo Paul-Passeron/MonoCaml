@@ -224,8 +224,12 @@ impl Builder {
         self.assign(ctx, Expr::load(ctx, ptr, ty))
     }
 
-    pub fn aggregate(&mut self, ctx: &mut TyCtx, values: Vec<Value>) -> CfgVarUse {
-        self.assign(ctx, Expr::aggregate(values))
+    pub fn aggregate(&mut self, ctx: &mut TyCtx, values: Vec<Value>) -> Value {
+        if values.is_empty() {
+            Value::Const(Const::Struct(vec![]))
+        } else {
+            self.assign(ctx, Expr::aggregate(values)).into()
+        }
     }
 
     pub fn value(&mut self, ctx: &mut TyCtx, value: Value) -> CfgVarUse {
