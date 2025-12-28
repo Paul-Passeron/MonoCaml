@@ -55,8 +55,9 @@ impl Expr {
     pub fn call(ctx: &TyCtx, closure: Value, arg: Value) -> Self {
         let ty = closure.get_type(ctx);
         if !ty.repr_closure() {
-            panic!("Cannot use call on non-closure")
+            panic!("Cannot use call on non-closure ({})", ty)
         }
+        let ty = ty.field(0);
         // We assume the closure env is always passed as first arg
         if ty.param_count() != 2 {
             panic!("Closure expects 2 arguments")
@@ -127,10 +128,14 @@ impl Expr {
     }
 
     pub fn malloc_single(ty: Ty) -> Self {
-        Self::Malloc(ty, Const::Int(1).into())
+        Self::malloc(ty, Const::Int(1).into())
     }
 
     pub fn malloc(ty: Ty, v: Value) -> Self {
-        Self::Malloc(ty, v)
+        if ty.is_zero_sized() {
+            Self::Value(Const::NullPtr.into())
+        } else {
+            Self::Malloc(ty, v)
+        }
     }
 }
