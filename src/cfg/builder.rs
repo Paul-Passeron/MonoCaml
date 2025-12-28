@@ -109,10 +109,19 @@ impl Builder {
     }
 
     pub fn ret(&mut self, ctx: &TyCtx, value: Value) -> LabelUse {
+        if self.ret_ty.is_void() {
+            panic!("Cannot return value from void returning function")
+        }
         self.finalize_block(ctx, Terminator::Return(Some(value)))
     }
 
     pub fn ret_void(&mut self, ctx: &TyCtx) -> LabelUse {
+        if !self.ret_ty.is_void() {
+            panic!(
+                "Cannot return void from function that should return {}",
+                self.ret_ty
+            )
+        }
         self.finalize_block(ctx, Terminator::Return(None))
     }
 
