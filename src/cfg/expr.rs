@@ -14,7 +14,7 @@ pub enum Expr {
 
     NativeCall { fun: String, args: Vec<Value> },
 
-    GetElementPtr { ptr: Value, index: usize },
+    GetElementPtr { ptr: Value, ty: Ty, index: usize },
 
     Extract { value: Value, index: usize },
 
@@ -94,14 +94,13 @@ impl Expr {
         Self::NativeCall { fun: name, args }
     }
 
-    pub fn get_element_ptr(ctx: &TyCtx, ptr: Value, index: usize) -> Self {
-        let ty = ptr.get_type(ctx);
-        if !ty.is_ptr() {
+    pub fn get_element_ptr(ctx: &TyCtx, ptr: Value, ty: Ty, index: usize) -> Self {
+        if !ptr.get_type(ctx).is_ptr() {
             panic!("Cannot use getelementptr on non-pointer type")
         }
-        let _ = ty.into_inner().field(index);
+        let _ = ty.field(index);
 
-        Self::GetElementPtr { ptr, index }
+        Self::GetElementPtr { ptr, ty, index }
     }
 
     pub fn extract(ctx: &TyCtx, value: Value, index: usize) -> Self {

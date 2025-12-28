@@ -15,6 +15,7 @@ pub struct Builder {
     params: Vec<(CfgVar, Ty)>,
     ret_ty: Ty,
     label: Label,
+    entry: LabelUse,
     locals: Vec<(CfgVar, Ty)>,
     instrs: Vec<Instr<CfgVar>>,
     blocks: Vec<BasicBlock>,
@@ -22,11 +23,14 @@ pub struct Builder {
 
 impl Builder {
     pub fn new(name: FunName, params: Vec<Ty>, ret_ty: Ty, ctx: &mut TyCtx) -> Self {
+        let l = Label::fresh();
+        let use_l = Use::from(&l);
         let res = Self {
             name,
             params: ctx.make_params(params.into_iter()),
             ret_ty,
-            label: Label::fresh(),
+            label: l,
+            entry: use_l,
             locals: vec![],
             instrs: vec![],
             blocks: vec![],
@@ -123,6 +127,7 @@ impl Builder {
             cfg: Some(Cfg {
                 locals: self.locals.into_iter().collect(),
                 blocks: self.blocks,
+                entry: self.entry,
             }),
         }
     }
@@ -201,8 +206,14 @@ impl Builder {
         self.assign(ctx, Expr::native_call(ctx, fun, args))
     }
 
-    pub fn get_element_ptr(&mut self, ctx: &mut TyCtx, ptr: Value, index: usize) -> CfgVarUse {
-        self.assign(ctx, Expr::get_element_ptr(ctx, ptr, index))
+    pub fn get_element_ptr(
+        &mut self,
+        ctx: &mut TyCtx,
+        ptr: Value,
+        ty: Ty,
+        index: usize,
+    ) -> CfgVarUse {
+        self.assign(ctx, Expr::get_element_ptr(ctx, ptr, ty, index))
     }
 
     pub fn extract(&mut self, ctx: &mut TyCtx, value: Value, index: usize) -> CfgVarUse {

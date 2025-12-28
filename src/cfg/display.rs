@@ -133,7 +133,9 @@ impl fmt::Display for Expr {
                     .collect::<Vec<_>>()
                     .join(", ")
             ),
-            Expr::GetElementPtr { ptr, index } => write!(f, "getelementptr {} {}", ptr, index),
+            Expr::GetElementPtr { ptr, ty, index } => {
+                write!(f, "getelementptr {} {} {}", ptr, ty, index)
+            }
             Expr::Extract { value, index } => write!(f, "getelementptr {} {}", value, index),
             Expr::Load { ptr, ty } => write!(f, "load {} as {}", ptr, ty),
             Expr::Struct(values) => write!(

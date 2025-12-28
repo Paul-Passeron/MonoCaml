@@ -173,9 +173,7 @@ impl Expr {
             }
             Expr::Call { closure, .. } => closure.get_ret_type_as_closure(ctx),
             Expr::NativeCall { fun, .. } => ctx.natives[fun].get_return_type(ctx),
-            Expr::GetElementPtr { ptr, index } => {
-                Ty::Ptr(Box::new(ptr.get_type(ctx).into_inner().field(*index)))
-            }
+            Expr::GetElementPtr { ty, index, .. } => Ty::Ptr(Box::new(ty.field(*index))),
             Expr::Extract { value, index } => value.get_type(ctx).field(*index),
             Expr::Load { ty, .. } => ty.clone(),
             Expr::Struct(values) => Ty::Struct(values.iter().map(|x| x.get_type(ctx)).collect()),

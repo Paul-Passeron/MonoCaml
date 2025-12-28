@@ -16,6 +16,7 @@ use crate::{
     helpers::unique::{Unique, Use},
 };
 pub mod builder;
+pub mod compile;
 mod display;
 pub mod expr;
 mod extract;
@@ -139,6 +140,7 @@ pub struct BasicBlock {
 
 #[allow(unused)]
 pub struct Cfg {
+    entry: LabelUse,
     locals: HashMap<CfgVar, Ty>,
     blocks: Vec<BasicBlock>,
 }
@@ -171,11 +173,12 @@ impl Hash for Func {
 }
 
 pub struct Program {
-    // globals: HashMap<CfgGlobal, Const>,
+    entry: FunNameUse,
     natives: HashMap<String, FunNameUse>,
     funcs: HashSet<Func>,
 }
 
+#[derive(Clone)]
 pub struct TyCtx {
     pub sigs: HashMap<FunNameUse, Sig>,
     // pub globals: HashMap<CfgGlobalUse, Ty>,
