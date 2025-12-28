@@ -17,7 +17,7 @@ fn test_ast() -> Ast {
             Ast::app(
                 Ast::app(
                     Ast::native("add"),
-                    Ast::seq(Ast::app(Ast::native("print"), Ast::var(x)), Ast::var(x)),
+                    Ast::seq(Ast::app(Ast::native("print_int"), Ast::var(x)), Ast::var(x)),
                 ),
                 Ast::var(y),
             ),
@@ -25,8 +25,32 @@ fn test_ast() -> Ast {
     )
 }
 
+fn test_ast2() -> Ast {
+    let x = Var::fresh();
+    let y = Var::fresh();
+    Ast::app(
+        Ast::app(
+            Ast::lambda(
+                AstTyped::new(x, AstTy::int()),
+                Ast::lambda(
+                    AstTyped::new(y, AstTy::int()),
+                    Ast::app(
+                        Ast::app(
+                            Ast::native("add"),
+                            Ast::seq(Ast::app(Ast::native("print_int"), Ast::var(x)), Ast::var(x)),
+                        ),
+                        Ast::var(y),
+                    ),
+                ),
+            ),
+            Ast::Int(5),
+        ),
+        Ast::Int(6),
+    )
+}
+
 fn main() {
-    let ast = test_ast();
+    let ast = test_ast2();
     println!("{ast}\n");
     let free_vars = ast.free_vars();
     for var in free_vars {
