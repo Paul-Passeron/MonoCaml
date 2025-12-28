@@ -28,6 +28,10 @@ fn test_ast() -> Ast {
 fn main() {
     let ast = test_ast();
     println!("{ast}\n");
+    let free_vars = ast.free_vars();
+    for var in free_vars {
+        println!("Free var {var}");
+    }
     let prog = Compiler::compile(ast);
     println!("{prog}\n");
 }

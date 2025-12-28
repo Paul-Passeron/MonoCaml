@@ -15,6 +15,13 @@ impl Ty {
         }
     }
 
+    pub fn sig(&self) -> Sig {
+        match self {
+            Ty::FunPtr(sig) => sig.clone(),
+            x => panic!("Expected funptr type but got {x}"),
+        }
+    }
+
     pub fn is_ptr(&self) -> bool {
         matches!(self, Self::Ptr(_))
     }

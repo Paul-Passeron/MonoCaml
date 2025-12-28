@@ -271,8 +271,8 @@ impl TyCtx {
         tys.map(|ty| (self.new_var(ty.clone()), ty)).collect()
     }
 
-    pub fn add_native_alias(&mut self, name: String, f: FunNameUse) {
-        self.natives.insert(name, f);
+    pub fn add_native_alias<S: ToString>(&mut self, name: S, f: FunNameUse) {
+        self.natives.insert(name.to_string(), f);
     }
 
     pub fn dump_aliases_in_prog(&self, prog: &mut Program) {
