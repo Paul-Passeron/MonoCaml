@@ -123,7 +123,7 @@ impl fmt::Display for Expr {
             Expr::Mul(a, b) => write!(f, "mul {a} {b}"),
             Expr::Sub(a, b) => write!(f, "sub {a} {b}"),
             Expr::Div(a, b) => write!(f, "div {a} {b}"),
-            Expr::Call { closure, arg } => write!(f, "call {closure} {arg}"),
+            Expr::Call { closure, arg } => write!(f, "call {closure}({arg})"),
             Expr::NativeCall { fun, args } => write!(
                 f,
                 "native call {}({})",
@@ -234,8 +234,8 @@ impl fmt::Display for Func {
             ),
             None => writeln!(
                 f,
-                "external func {} ({}) -> {}",
-                self.name.0,
+                "external {} ({}) -> {}",
+                Use::from(&self.name),
                 self.params
                     .iter()
                     .map(|(a, b)| {
@@ -252,16 +252,10 @@ impl fmt::Display for Func {
 
 impl fmt::Display for Program {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // for (glob, cte) in &self.globals {
-        //     let g: Use<_> = glob.into();
-        //     writeln!(f, "{} = {}", g, cte)?;
-        // }
-        // writeln!(f, "")?;
-
         let mut funcs = self.funcs.iter().collect::<Vec<_>>();
         funcs.sort_by(|a, b| a.name.cmp(&b.name));
         for fu in funcs {
-            write!(f, "{}\n", fu)?;
+            write!(f, "{}", fu)?;
         }
         Ok(())
     }
