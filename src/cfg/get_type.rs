@@ -123,6 +123,46 @@ impl Ty {
             _ => false,
         }
     }
+
+    pub fn is_void(&self) -> bool {
+        matches!(self, Ty::Void)
+    }
+
+    pub fn matches(&self, other: &Self) -> bool {
+        if self.is_zero_sized() && other.is_zero_sized() {
+            return true;
+        }
+
+        if self.is_ptr() && other.is_ptr() {
+            return true;
+        }
+
+        match (&self, &other) {
+            (Ty::Int, Ty::Int) => true,
+            (Ty::String, Ty::String) => true,
+            (Ty::Struct(items), Ty::Struct(items2)) => {
+                if items.len() != items2.len() {
+                    return false;
+                }
+                items.iter().zip(items2.iter()).all(|(x, y)| x.matches(y))
+            }
+            (Ty::FunPtr(s1), Ty::FunPtr(s2)) => {
+                if !s1.ret.matches(&s2.ret) {
+                    return false;
+                }
+
+                if s1.params.len() != s2.params.len() {
+                    return false;
+                }
+
+                s1.params
+                    .iter()
+                    .zip(s2.params.iter())
+                    .all(|(x, y)| x.matches(y))
+            }
+            _ => false,
+        }
+    }
 }
 
 impl Value {
