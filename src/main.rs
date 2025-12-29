@@ -9,6 +9,7 @@ pub mod ast;
 pub mod cfg;
 pub mod helpers;
 
+#[allow(unused)]
 fn test_ast() -> Ast {
     let x = Var::fresh();
     let y = Var::fresh();
@@ -27,7 +28,8 @@ fn test_ast() -> Ast {
     )
 }
 
-fn test_ast2() -> Ast {
+#[allow(unused)]
+fn test_ast_2() -> Ast {
     let x = Var::fresh();
     let y = Var::fresh();
     Ast::app(
@@ -85,8 +87,12 @@ fn test_ast_3() -> Ast {
     )
 }
 
+fn test_ast_4() -> Ast {
+    Ast::app(Ast::native("print_int"), test_ast_3())
+}
+
 fn main() {
-    let ast = test_ast_3();
+    let ast = test_ast_4();
     println!("{ast}\n");
     let free_vars = ast.free_vars();
     for var in free_vars {
