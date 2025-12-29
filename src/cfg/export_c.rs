@@ -223,14 +223,6 @@ impl ExportC {
                 Self::value_as_string(value1)
             )
             .unwrap(),
-            Expr::Call { closure, arg } => write!(
-                &mut self.f,
-                "({}._0)({}._1, {})",
-                Self::value_as_string(closure),
-                Self::value_as_string(closure),
-                Self::value_as_string(arg)
-            )
-            .unwrap(),
             Expr::NativeCall { fun, args } => write!(
                 &mut self.f,
                 "{}({})",
@@ -313,7 +305,7 @@ impl ExportC {
                             .1
                             .clone();
 
-                        if !var_ty.is_void() {
+                        if !var_ty.is_zero_sized() {
                             write!(
                                 &mut self.f,
                                 "{} _v{} = ",
