@@ -156,14 +156,14 @@ impl ExportC {
         if f.cfg.is_some() {
             self.write_proto(f, alias.clone());
             writeln!(&mut self.f, ";").unwrap();
-            if let Some(alias) = alias {
-                writeln!(
-                    &mut self.f,
-                    "#define {}(...) {alias}(__VA_ARGS__)",
-                    Use::from(&f.name)
-                )
-                .unwrap();
-            }
+        }
+        if let Some(alias) = alias {
+            writeln!(
+                &mut self.f,
+                "#define {}(...) {alias}(__VA_ARGS__)",
+                Use::from(&f.name)
+            )
+            .unwrap();
         }
         writeln!(&mut self.f, "").unwrap();
     }
@@ -233,7 +233,8 @@ impl ExportC {
             .unwrap(),
             Expr::NativeCall { fun, args } => write!(
                 &mut self.f,
-                "{fun}({})",
+                "{}({})",
+                Self::value_as_string(fun),
                 args.iter()
                     .map(|x| Self::value_as_string(x))
                     .collect::<Vec<_>>()

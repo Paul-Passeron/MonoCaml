@@ -223,7 +223,7 @@ impl Expr {
                 Ty::choose_arith(a.get_type(ctx), b.get_type(ctx))
             }
             Expr::Call { closure, .. } => closure.get_ret_type_as_closure(ctx),
-            Expr::NativeCall { fun, .. } => ctx.natives[fun].get_return_type(ctx),
+            Expr::NativeCall { fun, .. } => *fun.get_type(ctx).sig().ret,
             Expr::GetElementPtr { ty, index, .. } => Ty::Ptr(Box::new(ty.field(*index))),
             Expr::Extract { value, index } => value.get_type(ctx).field(*index),
             Expr::Load { ty, .. } => ty.clone(),

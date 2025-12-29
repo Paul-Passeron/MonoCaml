@@ -217,16 +217,11 @@ impl Builder {
         }
     }
 
-    pub fn call(&mut self, ctx: &mut TyCtx, closure: Value, arg: Value) -> CfgVarUse {
-        self.assign(ctx, Expr::call(ctx, closure, arg))
-    }
+    // pub fn call(&mut self, ctx: &mut TyCtx, closure: Value, arg: Value) -> CfgVarUse {
+    //     self.assign(ctx, Expr::call(ctx, closure, arg))
+    // }
 
-    pub fn native_call<S: ToString>(
-        &mut self,
-        ctx: &mut TyCtx,
-        fun: S,
-        args: Vec<Value>,
-    ) -> CfgVarUse {
+    pub fn native_call(&mut self, ctx: &mut TyCtx, fun: Value, args: Vec<Value>) -> CfgVarUse {
         self.assign(ctx, Expr::native_call(ctx, fun, args))
     }
 

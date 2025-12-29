@@ -176,7 +176,10 @@ impl Compiler {
             Ast::App { fun, arg } => {
                 let fun_val = self.aux(*fun, b);
                 let arg_val = self.aux(*arg, b);
-                b.call(&mut self.ctx, fun_val, arg_val).into()
+                let fun_ptr = b.extract(&mut self.ctx, fun_val.clone(), 0);
+                let env_ptr = b.extract(&mut self.ctx, fun_val, 1);
+                b.native_call(&mut self.ctx, fun_ptr.into(), vec![env_ptr.into(), arg_val])
+                    .into()
             }
             Ast::Seq { fst, snd } => {
                 let _ = self.aux(*fst, b);
@@ -366,9 +369,10 @@ impl Compiler {
 
         let env_struct = b.aggregate(&mut self.ctx, env_values);
         let malloc = self.malloc_val(env_struct.into(), b);
+        let register_closure = Const::FunPtr(self.ctx.natives["register_closure"].clone());
         b.native_call(
             &mut self.ctx,
-            "register_closure",
+            register_closure.into(),
             vec![malloc.clone().into()],
         );
 
@@ -409,7 +413,7 @@ impl Compiler {
         let sig = self.ctx.sigs[&funname].clone();
         assert!(sig.params.len() > 0);
 
-        let innermost_use = self.create_innermost_closure(name.clone(), funname.clone());
+        let innermost_use = self.create_innermost_closure(name.clone());
         let mut remaining_args = sig.params.len() - 1;
         let mut last = innermost_use.clone();
 
@@ -442,9 +446,11 @@ impl Compiler {
                 let env_ptr = use_params[0].clone();
                 let env_ty =
                     Ty::Struct(sig.params[0..remaining_args - 1].iter().cloned().collect());
+                let borrow_closure = Const::FunPtr(self.ctx.natives["borrow_closure"].clone());
+
                 wrapper_func_builder.native_call(
                     &mut self.ctx,
-                    "borrow_closure",
+                    borrow_closure.into(),
                     vec![env_ptr.clone().into()],
                 );
                 let loaded_env =
@@ -468,9 +474,11 @@ impl Compiler {
             current_env_ty = aggregate_env.get_type(&self.ctx);
 
             let malloc = self.malloc_val(aggregate_env.clone().into(), &mut wrapper_func_builder);
+            let register_closure = Const::FunPtr(self.ctx.natives["register_closure"].clone());
+
             wrapper_func_builder.native_call(
                 &mut self.ctx,
-                "register_closure",
+                register_closure.into(),
                 vec![malloc.clone().into()],
             );
             let closure_struct = wrapper_func_builder.aggregate(
@@ -479,7 +487,9 @@ impl Compiler {
             );
 
             if let Some(env_ptr) = env_ptr {
-                wrapper_func_builder.native_call(&mut self.ctx, "drop_closure", vec![env_ptr]);
+                let drop_closure = Const::FunPtr(self.ctx.natives["drop_closure"].clone());
+
+                wrapper_func_builder.native_call(&mut self.ctx, drop_closure.into(), vec![env_ptr]);
             }
 
             wrapper_func_builder.ret(&mut self.ctx, closure_struct.into());
@@ -495,7 +505,8 @@ impl Compiler {
     }
 
     // Create innermost closure because it calls the native function with the unfolded closure args and the last argument
-    fn create_innermost_closure(&mut self, name: String, funname: Use<FunName>) -> Use<FunName> {
+    fn create_innermost_closure(&mut self, name: String) -> Use<FunName> {
+        let funname = self.ctx.natives[&name].clone();
         let innermost_name = FunName::fresh();
         let innermost_use = Use::from(&innermost_name);
         let sig = self.ctx.sigs[&funname].clone();
@@ -512,9 +523,11 @@ impl Compiler {
             let env_iter = sig.params[..sig.params.len() - 1].iter();
             let env_ty = Ty::Struct(env_iter.clone().cloned().collect::<Vec<_>>());
             let env_ptr = use_params[0].clone();
+            let borrow_closure = Const::FunPtr(self.ctx.natives["borrow_closure"].clone());
+
             innermost_builder.native_call(
                 &mut self.ctx,
-                "borrow_closure",
+                borrow_closure.into(),
                 vec![env_ptr.clone().into()],
             );
             let loaded_env: Value = innermost_builder
@@ -533,12 +546,19 @@ impl Compiler {
             (vec![], None)
         };
         args.push(use_params[1].clone().into());
-        let res = innermost_builder.native_call(&mut self.ctx, name, args);
+
+        let res = innermost_builder.native_call(
+            &mut self.ctx,
+            Const::FunPtr(funname.clone()).into(),
+            args,
+        );
 
         if let Some(env_ptr) = env_ptr {
+            let drop_closure = Const::FunPtr(self.ctx.natives["drop_closure"].clone());
+
             innermost_builder.native_call(
                 &mut self.ctx,
-                "drop_closure",
+                drop_closure.into(),
                 vec![env_ptr.clone().into()],
             );
         };

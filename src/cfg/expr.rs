@@ -12,7 +12,7 @@ pub enum Expr {
     // This expects a closure as first arg
     Call { closure: Value, arg: Value },
 
-    NativeCall { fun: String, args: Vec<Value> },
+    NativeCall { fun: Value, args: Vec<Value> },
 
     GetElementPtr { ptr: Value, ty: Ty, index: usize },
 
@@ -72,29 +72,24 @@ impl Expr {
         Self::Call { closure, arg }
     }
 
-    pub fn native_call<S: ToString>(ctx: &TyCtx, fun: S, args: Vec<Value>) -> Self {
-        let name = fun.to_string();
-        if !ctx.natives.contains_key(&name) {
-            panic!("Native function {name} not found")
-        }
-
-        let fname = &ctx.natives[&name];
-        let params = &ctx.sigs[fname].params;
+    pub fn native_call(ctx: &TyCtx, fun: Value, args: Vec<Value>) -> Self {
+        let params = fun.get_type(ctx).sig().params;
+        // let params = &ctx.sigs[&name].params;
 
         if params.len() != args.len() {
-            panic!("Native function {name} expects {} arguments", params.len())
+            panic!("Native function {fun} expects {} arguments", params.len())
         }
 
         for (i, (arg, expected_ty)) in args.iter().zip(params).enumerate() {
             let got_ty = arg.get_type(ctx);
-            if !got_ty.matches(expected_ty) {
+            if !got_ty.matches(&expected_ty) {
                 panic!(
-                    "Native function {name} expects argument {i} of type {expected_ty} but got {got_ty}"
+                    "Native function {fun} expects argument {i} of type {expected_ty} but got {got_ty}"
                 )
             }
         }
 
-        Self::NativeCall { fun: name, args }
+        Self::NativeCall { fun: fun, args }
     }
 
     pub fn get_element_ptr(ctx: &TyCtx, ptr: Value, ty: Ty, index: usize) -> Self {
