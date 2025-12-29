@@ -51,6 +51,51 @@ impl Compiler {
         self.add_named_func("print_int", used);
     }
 
+    fn create_borrow_closure(&mut self) {
+        let name = FunName::fresh();
+        let used = Use::from(&name);
+        let f = Func {
+            name: name,
+            params: self
+                .ctx
+                .make_params([Ty::Ptr(Box::new(Ty::Void))].into_iter()),
+            ret_ty: Ty::Void,
+            cfg: None,
+        };
+        self.add_func(f);
+        self.add_named_func("borrow_closure", used);
+    }
+
+    fn create_drop_closure(&mut self) {
+        let name = FunName::fresh();
+        let used = Use::from(&name);
+        let f = Func {
+            name: name,
+            params: self
+                .ctx
+                .make_params([Ty::Ptr(Box::new(Ty::Void))].into_iter()),
+            ret_ty: Ty::Void,
+            cfg: None,
+        };
+        self.add_func(f);
+        self.add_named_func("drop_closure", used);
+    }
+
+    fn create_register_closure(&mut self) {
+        let name = FunName::fresh();
+        let used = Use::from(&name);
+        let f = Func {
+            name: name,
+            params: self
+                .ctx
+                .make_params([Ty::Ptr(Box::new(Ty::Void))].into_iter()),
+            ret_ty: Ty::Void,
+            cfg: None,
+        };
+        self.add_func(f);
+        self.add_named_func("register_closure", used);
+    }
+
     fn add_named_func<S: ToString>(&mut self, alias: S, fun_name: FunNameUse) {
         self.prog
             .add_native_alias(alias.to_string(), fun_name.clone());
@@ -77,6 +122,9 @@ impl Compiler {
         };
         res.create_add();
         res.create_print_int();
+        res.create_borrow_closure();
+        res.create_drop_closure();
+        res.create_register_closure();
         res
     }
 
@@ -288,6 +336,11 @@ impl Compiler {
 
         let env_struct = b.aggregate(&mut self.ctx, env_values);
         let malloc = self.malloc_val(env_struct.into(), b);
+        b.native_call(
+            &mut self.ctx,
+            "register_closure",
+            vec![malloc.clone().into()],
+        );
 
         b.aggregate(&mut self.ctx, vec![funptr.into(), malloc.into()])
             .into()
@@ -355,21 +408,28 @@ impl Compiler {
             let mut wrapper_func_builder =
                 Builder::new(wrapper_name, params, ret_ty, &mut self.ctx);
 
-            let mut new_env_values = if remaining_args > 1 {
+            let (mut new_env_values, env_ptr) = if remaining_args > 1 {
                 let env_ptr = use_params[0].clone();
                 let env_ty =
                     Ty::Struct(sig.params[0..remaining_args - 1].iter().cloned().collect());
-                let loaded_env = wrapper_func_builder.load(&mut self.ctx, env_ptr.into(), env_ty);
-                (0..remaining_args - 1)
+                wrapper_func_builder.native_call(
+                    &mut self.ctx,
+                    "borrow_closure",
+                    vec![env_ptr.clone().into()],
+                );
+                let loaded_env =
+                    wrapper_func_builder.load(&mut self.ctx, env_ptr.clone().into(), env_ty);
+                let v = (0..remaining_args - 1)
                     .into_iter()
                     .map(|index| {
                         wrapper_func_builder
                             .extract(&mut self.ctx, loaded_env.clone().into(), index)
                             .into()
                     })
-                    .collect::<Vec<Value>>()
+                    .collect::<Vec<Value>>();
+                (v, Some(Value::variable(env_ptr.clone())))
             } else {
-                vec![]
+                (vec![], None)
             };
 
             new_env_values.push(use_params[1].clone().into());
@@ -378,10 +438,19 @@ impl Compiler {
             current_env_ty = aggregate_env.get_type(&self.ctx);
 
             let malloc = self.malloc_val(aggregate_env.clone().into(), &mut wrapper_func_builder);
+            wrapper_func_builder.native_call(
+                &mut self.ctx,
+                "register_closure",
+                vec![malloc.clone().into()],
+            );
             let closure_struct = wrapper_func_builder.aggregate(
                 &mut self.ctx,
                 vec![Const::FunPtr(last).into(), malloc.into()],
             );
+
+            if let Some(env_ptr) = env_ptr {
+                wrapper_func_builder.native_call(&mut self.ctx, "drop_closure", vec![env_ptr]);
+            }
 
             wrapper_func_builder.ret(&mut self.ctx, closure_struct.into());
             let func = wrapper_func_builder.finalize();
@@ -409,26 +478,40 @@ impl Compiler {
         let use_params = params.iter().map(|(x, _)| Use::from(x)).collect::<Vec<_>>();
         let mut innermost_builder =
             Builder::new(innermost_name, params, ret_ty.clone(), &mut self.ctx);
-        let mut args = if sig.params.len() > 1 {
+        let (mut args, env_ptr) = if sig.params.len() > 1 {
             let env_iter = sig.params[..sig.params.len() - 1].iter();
             let env_ty = Ty::Struct(env_iter.clone().cloned().collect::<Vec<_>>());
             let env_ptr = use_params[0].clone();
+            innermost_builder.native_call(
+                &mut self.ctx,
+                "borrow_closure",
+                vec![env_ptr.clone().into()],
+            );
             let loaded_env: Value = innermost_builder
-                .load(&mut self.ctx, env_ptr.into(), env_ty)
+                .load(&mut self.ctx, env_ptr.clone().into(), env_ty)
                 .into();
-            env_iter
+            let v = env_iter
                 .enumerate()
                 .map(|(i, _)| {
                     innermost_builder
                         .extract(&mut self.ctx, loaded_env.clone(), i)
                         .into()
                 })
-                .collect::<Vec<_>>()
+                .collect::<Vec<_>>();
+            (v, Some(Value::Var(env_ptr)))
         } else {
-            vec![]
+            (vec![], None)
         };
         args.push(use_params[1].clone().into());
         let res = innermost_builder.native_call(&mut self.ctx, name, args);
+
+        if let Some(env_ptr) = env_ptr {
+            innermost_builder.native_call(
+                &mut self.ctx,
+                "drop_closure",
+                vec![env_ptr.clone().into()],
+            );
+        };
         if res.get_type(&self.ctx).is_void() {
             innermost_builder.ret_void(&self.ctx);
         } else {
