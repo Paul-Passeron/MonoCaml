@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::{
-    ast::{Ast, AstTy, Var},
+    ast::{Ast, AstTy, RecFlag, Var},
     cfg::{
         Const, FunName, FunNameUse, Func, Program, Sig, Ty, TyCtx, Value, builder::Builder,
         var::CfgVarUse,
@@ -234,7 +234,21 @@ impl Compiler {
                 let sig = &self.ctx.sigs[f];
                 self.curry(sig)
             }
-            Ast::LetBinding { .. } => todo!(),
+            Ast::LetBinding {
+                bound,
+                rec,
+                in_expr,
+                ..
+            } => {
+                match rec {
+                    RecFlag::NonRecursive => (),
+                    RecFlag::Recursive => {
+                        let bound_ty = self.ast_ty_to_ty(bound.ty());
+                        self.type_map.insert(bound.expr().clone(), bound_ty);
+                    }
+                };
+                self.get_type_of_ast(in_expr)
+            }
         }
     }
 
