@@ -9,9 +9,6 @@ pub enum Expr {
     Sub(Value, Value),
     Div(Value, Value),
 
-    // This expects a closure as first arg
-    Call { closure: Value, arg: Value },
-
     NativeCall { fun: Value, args: Vec<Value> },
 
     GetElementPtr { ptr: Value, ty: Ty, index: usize },
@@ -50,26 +47,6 @@ impl Expr {
     pub fn div(ctx: &TyCtx, lhs: Value, rhs: Value) -> Self {
         Self::check_arith(ctx, &lhs, &rhs, "div");
         Self::Div(lhs, rhs)
-    }
-
-    pub fn call(ctx: &TyCtx, closure: Value, arg: Value) -> Self {
-        let ty = closure.get_type(ctx);
-        if !ty.repr_closure() {
-            panic!("Cannot use call on non-closure ({})", ty)
-        }
-        let ty = ty.field(0);
-        // We assume the closure env is always passed as first arg
-        if ty.param_count() != 2 {
-            panic!("Closure expects 2 arguments")
-        }
-
-        let expected_ty = ty.param(1);
-        let arg_ty = arg.get_type(ctx);
-        if !expected_ty.matches(&arg_ty) {
-            panic!("Closure expects argument of type {expected_ty} but got {arg_ty}")
-        }
-
-        Self::Call { closure, arg }
     }
 
     pub fn native_call(ctx: &TyCtx, fun: Value, args: Vec<Value>) -> Self {

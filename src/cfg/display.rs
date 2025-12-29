@@ -116,7 +116,6 @@ impl fmt::Display for Expr {
             Expr::Mul(a, b) => write!(f, "mul {a} {b}"),
             Expr::Sub(a, b) => write!(f, "sub {a} {b}"),
             Expr::Div(a, b) => write!(f, "div {a} {b}"),
-            Expr::Call { closure, arg } => write!(f, "call {closure}({arg})"),
             Expr::NativeCall { fun, args } => write!(
                 f,
                 "native call {}({})",

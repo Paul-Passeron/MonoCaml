@@ -222,7 +222,6 @@ impl Expr {
             Expr::Add(a, b) | Expr::Mul(a, b) | Expr::Sub(a, b) | Expr::Div(a, b) => {
                 Ty::choose_arith(a.get_type(ctx), b.get_type(ctx))
             }
-            Expr::Call { closure, .. } => closure.get_ret_type_as_closure(ctx),
             Expr::NativeCall { fun, .. } => *fun.get_type(ctx).sig().ret,
             Expr::GetElementPtr { ty, index, .. } => Ty::Ptr(Box::new(ty.field(*index))),
             Expr::Extract { value, index } => value.get_type(ctx).field(*index),
