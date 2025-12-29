@@ -1,4 +1,8 @@
-use std::{fs::File, path::PathBuf, process};
+use std::{
+    fs::File,
+    path::PathBuf,
+    process::{self},
+};
 
 use crate::{
     ast::{Ast, AstTy, AstTyped, Var},
@@ -108,6 +112,7 @@ fn test_ast_5() -> Ast {
     )
 }
 
+#[allow(unused)]
 fn test_ast_6() -> Ast {
     let x = Var::fresh();
 
@@ -124,6 +129,7 @@ fn test_ast_7() -> Ast {
     Ast::app(Ast::native("print_string"), Ast::string("Hello, World !\n"))
 }
 
+#[allow(unused)]
 fn test_ast_8() -> Ast {
     let x = Var::fresh();
 
@@ -135,6 +141,35 @@ fn test_ast_8() -> Ast {
     )
 }
 
+#[allow(unused)]
+fn test_ast_9() -> Ast {
+    let x = Var::fresh();
+    let print_is_zero = Ast::lambda(
+        AstTyped::new(x, AstTy::Int),
+        Ast::app(
+            Ast::native("print_string"),
+            Ast::seq(
+                Ast::app(Ast::native("print_int"), Ast::Var(x)),
+                Ast::ifte(
+                    Ast::var(x),
+                    Ast::string(" is not zero\n"),
+                    Ast::string(" is zero\n"),
+                ),
+            ),
+        ),
+    );
+    let f = Var::fresh();
+    Ast::let_binding(
+        f,
+        AstTy::fun(AstTy::Int, AstTy::Tuple(vec![])),
+        print_is_zero,
+        Ast::seq(
+            Ast::app(Ast::Var(f), Ast::Int(420)),
+            Ast::app(Ast::Var(f), Ast::Int(0)),
+        ),
+    )
+}
+
 fn compile_ast(ast: Ast) {
     println!("{ast}");
     let free_vars = ast.free_vars();
@@ -142,31 +177,25 @@ fn compile_ast(ast: Ast) {
         println!("Free var {var}");
     }
     let prog = Compiler::compile(ast);
+    // println!("{prog}\n");
     prog.export_to_c(&mut File::create(PathBuf::from("./file.c")).unwrap());
-    let out = process::Command::new("gcc")
+    process::Command::new("clang")
+        .arg("-g")
         .arg("-o")
         .arg("test")
         .arg("file.c")
         .arg("runtime.c")
-        .output()
+        .spawn()
+        .unwrap()
+        .wait()
         .unwrap();
-    print!(
-        "{}",
-        out.stdout
-            .into_iter()
-            .map(|x| char::from_u32(x as u32).unwrap())
-            .collect::<String>()
-    );
-    let out = process::Command::new("./test").output().unwrap();
-    print!(
-        "{}",
-        out.stdout
-            .into_iter()
-            .map(|x| char::from_u32(x as u32).unwrap())
-            .collect::<String>()
-    );
+    process::Command::new("./test")
+        .spawn()
+        .unwrap()
+        .wait()
+        .unwrap();
 }
 
 fn main() {
-    compile_ast(test_ast_8());
+    compile_ast(test_ast_9());
 }
