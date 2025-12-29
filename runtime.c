@@ -57,7 +57,7 @@ static ints free_refs[REF_COUNT] = {0};
 
 size_t hash(intptr_t in) { return (in >> 3) % REF_COUNT; }
 
-void register_closure(void * ptr) {
+void register_closure(void *ptr) {
   size_t hashed = hash((intptr_t)ptr);
   refs *refs = &references[hashed];
   for (size_t i = 0; i < refs->count; ++i) {
@@ -132,3 +132,5 @@ int main() {
   cleanup();
   return 0;
 }
+
+void print_string(const char *const str) { printf("%s\n", str); }
