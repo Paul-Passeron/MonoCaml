@@ -190,7 +190,16 @@ impl Ast {
             }
             Ast::Tuple(asts) => asts.iter().for_each(|x| x.free_vars_aux(s)),
             Ast::Get { from, .. } => from.free_vars_aux(s),
-            Ast::LetBinding { .. } => todo!(),
+            Ast::LetBinding {
+                bound,
+                value,
+                in_expr,
+                ..
+            } => {
+                value.free_vars_aux(s);
+                in_expr.free_vars_aux(s);
+                s.remove(bound.expr());
+            }
         }
     }
 }
