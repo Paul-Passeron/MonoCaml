@@ -112,6 +112,13 @@ impl Builder {
         if self.ret_ty.is_void() {
             panic!("Cannot return value from void returning function")
         }
+        if !self.ret_ty.matches(&value.get_type(ctx)) {
+            panic!(
+                "Cannot return value of type {} from function that should return {}",
+                value.get_type(ctx),
+                self.ret_ty
+            );
+        }
         self.finalize_block(ctx, Terminator::Return(Some(value)))
     }
 

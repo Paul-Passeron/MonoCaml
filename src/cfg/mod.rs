@@ -155,7 +155,7 @@ pub struct Cfg {
     blocks: Vec<BasicBlock>,
 }
 
-#[derive(Debug, Clone, Hash)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct Sig {
     params: Vec<Ty>,
     ret: Box<Ty>,
