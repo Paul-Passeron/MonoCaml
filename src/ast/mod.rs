@@ -89,6 +89,11 @@ pub enum Ast {
         index: usize,
     },
     Native(String),
+    LetBinding {
+        bound: AstTyped<Var>,
+        rec: RecFlag,
+        value: Box<Ast>,
+    },
 }
 
 impl Ast {
@@ -140,6 +145,22 @@ impl Ast {
         Self::Native(s.into())
     }
 
+    pub fn let_binding(v: Var, ty: AstTy, e: Ast) -> Self {
+        Self::LetBinding {
+            bound: AstTyped::new(v, ty),
+            rec: RecFlag::NonRecursive,
+            value: Box::new(e),
+        }
+    }
+
+    pub fn let_rec(v: Var, ty: AstTy, e: Ast) -> Self {
+        Self::LetBinding {
+            bound: AstTyped::new(v, ty),
+            rec: RecFlag::Recursive,
+            value: Box::new(e),
+        }
+    }
+
     pub fn free_vars(&self) -> HashSet<Var> {
         let mut s = HashSet::new();
         self.free_vars_aux(&mut s);
@@ -166,6 +187,14 @@ impl Ast {
             }
             Ast::Tuple(asts) => asts.iter().for_each(|x| x.free_vars_aux(s)),
             Ast::Get { from, .. } => from.free_vars_aux(s),
+            Ast::LetBinding { .. } => todo!(),
         }
     }
 }
+
+pub enum RecFlag {
+    NonRecursive,
+    Recursive,
+}
+
+pub struct LetBinding {}

@@ -191,6 +191,7 @@ impl Compiler {
                 b.extract(&mut self.ctx, from_val, index).into()
             }
             Ast::Native(name) => self.get_native_closure(name, b),
+            Ast::LetBinding { .. } => todo!(),
         }
     }
 
@@ -233,6 +234,7 @@ impl Compiler {
                 let sig = &self.ctx.sigs[f];
                 self.curry(sig)
             }
+            Ast::LetBinding { .. } => todo!(),
         }
     }
 

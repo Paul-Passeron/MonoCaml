@@ -52,6 +52,7 @@ impl fmt::Display for Ast {
             ),
             Ast::Get { from, index } => write!(f, "({}.{})", from, index),
             Ast::Native(name) => write!(f, "{name}"),
+            Ast::LetBinding { .. } => todo!(),
         }
     }
 }
