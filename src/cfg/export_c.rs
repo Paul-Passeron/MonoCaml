@@ -173,12 +173,12 @@ impl ExportC {
             Const::Int(i) => i.to_string(),
             Const::String(s) => format!("\"{}\"", s.escape_default()),
             Const::Struct(items) => format!(
-                "{{ {} }}",
+                "{{{}}}",
                 items
                     .iter()
                     .map(|x| Self::const_as_string(x))
                     .collect::<Vec<_>>()
-                    .join(",")
+                    .join(", ")
             ),
             Const::FunPtr(name) => format!("{}", name),
             Const::NullPtr => format!("NULL"),
@@ -259,12 +259,12 @@ impl ExportC {
             .unwrap(),
             Expr::Struct(values) => write!(
                 &mut self.f,
-                "{{ {} }}",
+                "{{{}}}",
                 values
                     .iter()
                     .map(|x| Self::value_as_string(x))
                     .collect::<Vec<_>>()
-                    .join(",")
+                    .join(", ")
             )
             .unwrap(),
             Expr::Malloc(ty, value) => {
@@ -358,7 +358,7 @@ impl ExportC {
     }
 
     fn declare_main(&mut self, entry: &FunNameUse) {
-        writeln!(&mut self.f, "void start(void) {{ {entry}(); }}").unwrap();
+        writeln!(&mut self.f, "void start(void) {{ {entry}(); }}\n").unwrap();
     }
 
     pub fn export(&mut self, prog: &Program) {
