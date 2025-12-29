@@ -125,7 +125,7 @@ void cleanup(void) {
   }
 }
 
-void print_int(int x) { printf("%d\n", x); }
+void print_int(int x) { printf("%d", x); }
 
 int main() {
   start();
@@ -133,4 +133,4 @@ int main() {
   return 0;
 }
 
-void print_string(const char *const str) { printf("%s\n", str); }
+void print_string(const char *const str) { printf("%s", str); }
