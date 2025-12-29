@@ -148,6 +148,14 @@ impl Builder {
         }
     }
 
+    pub fn assign_to(&mut self, ctx: &mut TyCtx, var: CfgVar, expr: Expr) -> CfgVarUse {
+        let ty = expr.get_type(ctx);
+        let res = Use::from(&var);
+        assert!(ty.matches(&res.get_type(ctx)));
+        self.instrs.push(Instr::Assign(var, expr));
+        res
+    }
+
     pub fn assign(&mut self, ctx: &mut TyCtx, expr: Expr) -> CfgVarUse {
         let ty = expr.get_type(ctx);
         let var = ctx.new_var(ty);
