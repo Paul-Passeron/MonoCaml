@@ -92,6 +92,7 @@ fn test_ast_4() -> Ast {
     Ast::app(Ast::native("print_int"), test_ast_3())
 }
 
+#[allow(unused)]
 fn test_ast_5() -> Ast {
     let x = Var::fresh();
 
@@ -106,8 +107,19 @@ fn test_ast_5() -> Ast {
     )
 }
 
+fn test_ast_6() -> Ast {
+    let x = Var::fresh();
+
+    Ast::let_binding(
+        x,
+        AstTy::fun(AstTy::Int, AstTy::Tuple(vec![])),
+        Ast::native("print_int"),
+        Ast::app(Ast::Var(x), Ast::Int(420)),
+    )
+}
+
 fn compile_ast(ast: Ast) {
-    println!("{ast}\n");
+    println!("{ast}");
     let free_vars = ast.free_vars();
     for var in free_vars {
         println!("Free var {var}");
@@ -139,5 +151,5 @@ fn compile_ast(ast: Ast) {
 }
 
 fn main() {
-    compile_ast(test_ast_5());
+    compile_ast(test_ast_6());
 }
