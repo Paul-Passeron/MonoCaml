@@ -2,9 +2,21 @@ use std::fmt;
 
 use crate::ast::{Ast, AstTy, AstTyped, RecFlag, Var};
 
+pub fn alphabetize(x: usize) -> String {
+    let mut x = x + 1;
+    let chars = "abcdefghijklmnopqrstuvwxyz".chars().collect::<Vec<_>>();
+    let mut result = String::new();
+    while x > 0 {
+        let index = (x - 1) % chars.len();
+        result.push(chars[index]);
+        x = (x - 1) / chars.len();
+    }
+    result.chars().rev().collect()
+}
+
 impl fmt::Display for Var {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "%{}", self.extract())
+        write!(f, "{}", alphabetize(self.extract()))
     }
 }
 
