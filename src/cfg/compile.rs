@@ -329,16 +329,28 @@ impl Compiler {
         let innermost_use = self.create_innermost_closure(name.clone(), funname.clone());
         let mut remaining_args = sig.params.len() - 1;
         let mut last = innermost_use.clone();
+
+        let mut current_env_ty = if sig.params.len() > 1 {
+            Ty::Struct(
+                sig.params[0..sig.params.len() - 1]
+                    .iter()
+                    .cloned()
+                    .collect(),
+            )
+        } else {
+            Ty::Struct(vec![])
+        };
+
         while remaining_args > 0 {
             let wrapper_name = FunName::fresh();
             let wrapper_use = Use::from(&wrapper_name);
             let void_ptr = Ty::Ptr(Box::new(Ty::Void));
             let last_sig = self.ctx.sigs.get(&last).unwrap().clone();
-            let last_ty = Ty::Struct(vec![Ty::FunPtr(last_sig), void_ptr.clone()]);
-            let ret_ty = self.get_closure(sig.params[remaining_args - 1].clone(), last_ty);
+            let param_index = sig.params.len() - remaining_args - 1;
+            let ret_ty = Ty::Struct(vec![Ty::FunPtr(last_sig), void_ptr.clone()]);
             let params = self
                 .ctx
-                .make_params([void_ptr, sig.params[remaining_args - 1].clone()].into_iter());
+                .make_params([void_ptr, sig.params[param_index].clone()].into_iter());
             let use_params = params.iter().map(|(x, _)| Use::from(x)).collect::<Vec<_>>();
             let mut wrapper_func_builder =
                 Builder::new(wrapper_name, params, ret_ty, &mut self.ctx);
@@ -363,6 +375,8 @@ impl Compiler {
             new_env_values.push(use_params[1].clone().into());
 
             let aggregate_env = wrapper_func_builder.aggregate(&mut self.ctx, new_env_values);
+            current_env_ty = aggregate_env.get_type(&self.ctx);
+
             let malloc = self.malloc_val(aggregate_env.clone().into(), &mut wrapper_func_builder);
             let closure_struct = wrapper_func_builder.aggregate(
                 &mut self.ctx,
