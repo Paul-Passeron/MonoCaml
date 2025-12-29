@@ -87,12 +87,26 @@ fn test_ast_3() -> Ast {
     )
 }
 
+#[allow(unused)]
 fn test_ast_4() -> Ast {
     Ast::app(Ast::native("print_int"), test_ast_3())
 }
 
-fn main() {
-    let ast = test_ast_4();
+fn test_ast_5() -> Ast {
+    let x = Var::fresh();
+
+    Ast::let_binding(
+        x,
+        AstTy::Int,
+        Ast::Int(5),
+        Ast::app(
+            Ast::native("print_int"),
+            Ast::app(Ast::app(Ast::native("add"), Ast::Int(64)), Ast::Var(x)),
+        ),
+    )
+}
+
+fn compile_ast(ast: Ast) {
     println!("{ast}\n");
     let free_vars = ast.free_vars();
     for var in free_vars {
@@ -122,4 +136,8 @@ fn main() {
             .map(|x| char::from_u32(x as u32).unwrap())
             .collect::<String>()
     );
+}
+
+fn main() {
+    compile_ast(test_ast_5());
 }
