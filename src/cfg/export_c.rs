@@ -153,15 +153,17 @@ impl ExportC {
     }
 
     fn forward_declare(&mut self, f: &Func, alias: Option<String>) {
-        self.write_proto(f, alias.clone());
-        writeln!(&mut self.f, ";").unwrap();
-        if let Some(alias) = alias {
-            writeln!(
-                &mut self.f,
-                "#define {}(...) {alias}(__VA_ARGS__)",
-                Use::from(&f.name)
-            )
-            .unwrap();
+        if f.cfg.is_some() {
+            self.write_proto(f, alias.clone());
+            writeln!(&mut self.f, ";").unwrap();
+            if let Some(alias) = alias {
+                writeln!(
+                    &mut self.f,
+                    "#define {}(...) {alias}(__VA_ARGS__)",
+                    Use::from(&f.name)
+                )
+                .unwrap();
+            }
         }
         writeln!(&mut self.f, "").unwrap();
     }
@@ -356,10 +358,7 @@ impl ExportC {
     }
 
     fn declare_main(&mut self, entry: &FunNameUse) {
-        writeln!(&mut self.f, "int main(void) {{").unwrap();
-        writeln!(&mut self.f, "    {entry}();").unwrap();
-        writeln!(&mut self.f, "    return 0;").unwrap();
-        writeln!(&mut self.f, "}}").unwrap();
+        writeln!(&mut self.f, "void start(void) {{ {entry}(); }}").unwrap();
     }
 
     pub fn export(&mut self, prog: &Program) {
