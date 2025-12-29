@@ -1,4 +1,4 @@
-use std::{fs::File, path::PathBuf};
+use std::{fs::File, path::PathBuf, process};
 
 use crate::{
     ast::{Ast, AstTy, AstTyped, Var},
@@ -80,7 +80,7 @@ fn test_ast_3() -> Ast {
     );
 
     Ast::app(
-        Ast::app(Ast::app(wrapper, Ast::Int(4)), Ast::Int(6)),
+        Ast::app(Ast::app(wrapper, Ast::Int(69)), Ast::Int(420)),
         print_ret,
     )
 }
@@ -94,5 +94,26 @@ fn main() {
     }
     let prog = Compiler::compile(ast);
     prog.export_to_c(&mut File::create(PathBuf::from("./file.c")).unwrap());
-    println!("{prog}\n");
+    let out = process::Command::new("gcc")
+        .arg("-o")
+        .arg("test")
+        .arg("file.c")
+        .arg("runtime.c")
+        .output()
+        .unwrap();
+    print!(
+        "{}",
+        out.stdout
+            .into_iter()
+            .map(|x| char::from_u32(x as u32).unwrap())
+            .collect::<String>()
+    );
+    let out = process::Command::new("./test").output().unwrap();
+    print!(
+        "{}",
+        out.stdout
+            .into_iter()
+            .map(|x| char::from_u32(x as u32).unwrap())
+            .collect::<String>()
+    );
 }
