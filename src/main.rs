@@ -1,3 +1,5 @@
+use std::{fs::File, path::PathBuf};
+
 use crate::{
     ast::{Ast, AstTy, AstTyped, Var},
     cfg::compile::Compiler,
@@ -91,5 +93,6 @@ fn main() {
         println!("Free var {var}");
     }
     let prog = Compiler::compile(ast);
+    prog.export_to_c(&mut File::create(PathBuf::from("./file.c")).unwrap());
     println!("{prog}\n");
 }

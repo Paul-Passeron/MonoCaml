@@ -1,13 +1,9 @@
-use std::{
-    collections::{HashMap, HashSet},
-    iter::{empty, once, repeat_n},
-    mem,
-};
+use std::collections::{HashMap, HashSet};
 
 use crate::{
     ast::{Ast, AstTy, Var},
     cfg::{
-        Const, FunName, FunNameUse, Func, Label, Program, Sig, Ty, TyCtx, Value, builder::Builder,
+        Const, FunName, FunNameUse, Func, Program, Sig, Ty, TyCtx, Value, builder::Builder,
         var::CfgVarUse,
     },
     helpers::unique::Use,
@@ -312,7 +308,7 @@ impl Compiler {
         let funname = self.ctx.natives[&name].clone();
 
         let wrapper = if !self.wrapped_natives.contains_key(&funname) {
-            self.create_native_closure(name, b)
+            self.create_native_closure(name)
         } else {
             self.wrapped_natives[&funname].clone()
         };
@@ -324,7 +320,7 @@ impl Compiler {
         .into()
     }
 
-    fn create_native_closure(&mut self, name: String, b: &mut Builder) -> FunNameUse {
+    fn create_native_closure(&mut self, name: String) -> FunNameUse {
         let funname = self.ctx.natives[&name].clone();
         // Create the closure tree (all intermediate functions taking a single arg as well as the closure env) of the native function and return the wrapper as a closure
         let sig = self.ctx.sigs[&funname].clone();

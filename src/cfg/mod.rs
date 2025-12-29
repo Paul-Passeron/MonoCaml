@@ -18,6 +18,7 @@ use crate::{
 pub mod builder;
 pub mod compile;
 mod display;
+pub mod export_c;
 pub mod expr;
 mod extract;
 mod get_type;
@@ -93,7 +94,7 @@ impl Into<Value> for CfgVarUse {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash)]
 pub enum Ty {
     Int,
     String,
@@ -102,6 +103,14 @@ pub enum Ty {
     Struct(Vec<Self>),
     FunPtr(Sig),
 }
+
+impl PartialEq for Ty {
+    fn eq(&self, other: &Self) -> bool {
+        self.matches(other)
+    }
+}
+
+impl Eq for Ty {}
 
 pub enum Instr<V: VarKind> {
     Assign(V, Expr),
@@ -146,7 +155,7 @@ pub struct Cfg {
     blocks: Vec<BasicBlock>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash)]
 pub struct Sig {
     params: Vec<Ty>,
     ret: Box<Ty>,
