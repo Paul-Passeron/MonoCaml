@@ -53,6 +53,7 @@ fn test_ast_2() -> Ast {
     )
 }
 
+#[allow(unused)]
 fn test_ast_3() -> Ast {
     let x = Var::fresh();
     let y = Var::fresh();
@@ -118,6 +119,22 @@ fn test_ast_6() -> Ast {
     )
 }
 
+#[allow(unused)]
+fn test_ast_7() -> Ast {
+    Ast::app(Ast::native("print_string"), Ast::string("Hello, World !\n"))
+}
+
+fn test_ast_8() -> Ast {
+    let x = Var::fresh();
+
+    Ast::let_rec(
+        x,
+        AstTy::fun(AstTy::Int, AstTy::Tuple(vec![])),
+        Ast::native("print_int"),
+        Ast::app(Ast::Var(x), Ast::Int(420)),
+    )
+}
+
 fn compile_ast(ast: Ast) {
     println!("{ast}");
     let free_vars = ast.free_vars();
@@ -151,5 +168,5 @@ fn compile_ast(ast: Ast) {
 }
 
 fn main() {
-    compile_ast(test_ast_6());
+    compile_ast(test_ast_8());
 }
