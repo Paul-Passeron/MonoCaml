@@ -51,6 +51,23 @@ impl Compiler {
         self.add_named_func("print_int", used);
     }
 
+    fn create_print_string(&mut self) {
+        let name = FunName::fresh();
+        let used = Use::from(&name);
+        let s = Sig {
+            params: vec![Ty::String],
+            ret: Box::new(Ty::Void),
+        };
+        let print_string_fun = Func {
+            name: name,
+            params: self.ctx.make_params(s.params.into_iter()),
+            ret_ty: *s.ret,
+            cfg: None,
+        };
+        self.add_func(print_string_fun);
+        self.add_named_func("print_string", used);
+    }
+
     fn create_borrow_closure(&mut self) {
         let name = FunName::fresh();
         let used = Use::from(&name);
@@ -122,6 +139,7 @@ impl Compiler {
         };
         res.create_add();
         res.create_print_int();
+        res.create_print_string();
         res.create_borrow_closure();
         res.create_drop_closure();
         res.create_register_closure();
@@ -208,6 +226,20 @@ impl Compiler {
                 b.assign_to(&mut self.ctx, bound_cfg, Expr::value(val.into()));
                 self.aux(*in_expr, b)
             }
+            Ast::LetBinding {
+                bound,
+                rec,
+                value,
+                in_expr,
+            } if !value.free_vars().contains(bound.expr()) => self.aux(
+                Ast::LetBinding {
+                    bound,
+                    rec: RecFlag::NonRecursive,
+                    value,
+                    in_expr,
+                },
+                b,
+            ),
             Ast::LetBinding { .. } => todo!("Recursive let binding"),
         }
     }
