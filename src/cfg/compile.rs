@@ -4,7 +4,7 @@ use crate::{
     ast::{Ast, AstTy, RecFlag, Var},
     cfg::{
         Const, FunName, FunNameUse, Func, Program, Sig, Ty, TyCtx, Value, builder::Builder,
-        var::CfgVarUse,
+        expr::Expr, var::CfgVarUse,
     },
     helpers::unique::Use,
 };
@@ -191,7 +191,21 @@ impl Compiler {
                 b.extract(&mut self.ctx, from_val, index).into()
             }
             Ast::Native(name) => self.get_native_closure(name, b),
-            Ast::LetBinding { .. } => todo!(),
+            Ast::LetBinding {
+                bound,
+                rec: RecFlag::NonRecursive,
+                value,
+                in_expr,
+            } => {
+                let val = self.aux(*value, b);
+                let bound_ty = self.ast_ty_to_ty(bound.ty());
+                assert!(val.get_type(&self.ctx).matches(&bound_ty));
+                let bound_cfg = self.ctx.new_var(bound_ty);
+                self.map.insert(bound.expr().clone(), Use::from(&bound_cfg));
+                b.assign_to(&mut self.ctx, bound_cfg, Expr::value(val.into()));
+                self.aux(*in_expr, b)
+            }
+            Ast::LetBinding { .. } => todo!("Recursive let binding"),
         }
     }
 

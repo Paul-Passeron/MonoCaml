@@ -65,12 +65,6 @@ impl UniqueDisplayer for CfgVar {
     }
 }
 
-// impl UniqueDisplayer for CfgGlobal {
-//     fn unique_displayer(x: usize) -> String {
-//         format!("@{x}")
-//     }
-// }
-
 impl UniqueDisplayer for Label {
     fn unique_displayer(x: usize) -> String {
         format!("L{x}")
@@ -108,7 +102,6 @@ impl fmt::Display for Const {
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            // Value::Global(x) => write!(f, "{x}"),
             Value::Var(x) => write!(f, "{x}"),
             Value::Const(x) => write!(f, "{x}"),
         }
