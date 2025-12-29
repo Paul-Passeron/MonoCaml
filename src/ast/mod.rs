@@ -95,6 +95,11 @@ pub enum Ast {
         value: Box<Ast>,
         in_expr: Box<Ast>,
     },
+    If {
+        cond: Box<Ast>,
+        then_e: Box<Ast>,
+        else_e: Box<Ast>,
+    },
 }
 
 impl Ast {
@@ -164,6 +169,14 @@ impl Ast {
         }
     }
 
+    pub fn ifte(cond: Self, t: Self, e: Self) -> Self {
+        Self::If {
+            cond: Box::new(cond),
+            then_e: Box::new(t),
+            else_e: Box::new(e),
+        }
+    }
+
     pub fn free_vars(&self) -> HashSet<Var> {
         let mut s = HashSet::new();
         self.free_vars_aux(&mut s);
@@ -199,6 +212,15 @@ impl Ast {
                 value.free_vars_aux(s);
                 in_expr.free_vars_aux(s);
                 s.remove(bound.expr());
+            }
+            Ast::If {
+                cond,
+                then_e,
+                else_e,
+            } => {
+                cond.free_vars_aux(s);
+                then_e.free_vars_aux(s);
+                else_e.free_vars_aux(s);
             }
         }
     }

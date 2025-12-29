@@ -144,6 +144,7 @@ pub enum Terminator {
 
 pub struct BasicBlock {
     label: Label,
+    phis: HashMap<CfgVarUse, HashSet<CfgVarUse>>,
     instrs: Vec<Instr<CfgVarUse>>,
     terminator: Terminator,
 }

@@ -1,4 +1,7 @@
-use std::{collections::HashMap, mem};
+use std::{
+    collections::{HashMap, HashSet},
+    mem,
+};
 
 use crate::{
     cfg::{
@@ -16,6 +19,7 @@ pub struct Builder {
     ret_ty: Ty,
     label: Label,
     entry: LabelUse,
+    phis: HashMap<CfgVarUse, HashSet<CfgVarUse>>,
     locals: Vec<(CfgVar, Ty)>,
     instrs: Vec<Instr<CfgVar>>,
     blocks: Vec<BasicBlock>,
@@ -31,6 +35,7 @@ impl Builder {
             ret_ty,
             label: l,
             entry: use_l,
+            phis: HashMap::new(),
             locals: vec![],
             instrs: vec![],
             blocks: vec![],
@@ -44,8 +49,8 @@ impl Builder {
         res
     }
 
-    fn replace_lbl(&mut self) -> Label {
-        let mut l = Label::fresh();
+    fn replace_lbl(&mut self, next: Label) -> Label {
+        let mut l = next;
         mem::swap(&mut l, &mut self.label);
         l
     }
@@ -74,12 +79,31 @@ impl Builder {
         (&self.label).into()
     }
 
-    pub fn finalize_block(&mut self, ctx: &TyCtx, t: Terminator) -> LabelUse {
-        let old_label = self.replace_lbl();
+    pub fn get_phis(&mut self) -> HashMap<CfgVarUse, HashSet<CfgVarUse>> {
+        let mut phis = HashMap::new();
+        mem::swap(&mut self.phis, &mut phis);
+        phis
+    }
+
+    pub fn add_phi_target(&mut self, ctx: &mut TyCtx, ty: Ty) -> CfgVarUse {
+        let new_local = self.assign(ctx, Expr::Phi(ty));
+        self.phis.insert(new_local.clone(), HashSet::new());
+        new_local
+    }
+
+    pub fn add_phi(&mut self, ctx: &mut TyCtx, to: CfgVarUse, val: CfgVarUse) {
+        assert!(to.get_type(ctx).matches(&val.get_type(ctx)));
+        self.phis.get_mut(&to).unwrap().insert(val);
+    }
+
+    pub fn finalize_block(&mut self, ctx: &TyCtx, t: Terminator, next: Label) -> LabelUse {
+        let old_label = self.replace_lbl(next);
         let use_lbl: Use<_> = (&old_label).into();
         let instrs = self.get_use_instrs(ctx);
+        let phis = self.get_phis();
         let b = BasicBlock {
             label: old_label,
+            phis,
             instrs,
             terminator: t,
         };
@@ -87,8 +111,8 @@ impl Builder {
         use_lbl
     }
 
-    pub fn goto(&mut self, ctx: &TyCtx, lbl: LabelUse) -> LabelUse {
-        self.finalize_block(ctx, Terminator::Goto(lbl))
+    pub fn goto(&mut self, ctx: &TyCtx, lbl: LabelUse, next: Label) -> LabelUse {
+        self.finalize_block(ctx, Terminator::Goto(lbl), next)
     }
 
     pub fn branch(
@@ -97,6 +121,7 @@ impl Builder {
         cond: Value,
         then_bb: LabelUse,
         else_bb: LabelUse,
+        next: Label,
     ) -> LabelUse {
         self.finalize_block(
             ctx,
@@ -105,6 +130,7 @@ impl Builder {
                 then_bb,
                 else_bb,
             },
+            next,
         )
     }
 
@@ -119,7 +145,7 @@ impl Builder {
                 self.ret_ty
             );
         }
-        self.finalize_block(ctx, Terminator::Return(Some(value)))
+        self.finalize_block(ctx, Terminator::Return(Some(value)), Label::fresh())
     }
 
     pub fn ret_void(&mut self, ctx: &TyCtx) -> LabelUse {
@@ -129,7 +155,7 @@ impl Builder {
                 self.ret_ty
             )
         }
-        self.finalize_block(ctx, Terminator::Return(None))
+        self.finalize_block(ctx, Terminator::Return(None), Label::fresh())
     }
 
     pub fn finalize(self) -> Func {

@@ -129,10 +129,6 @@ impl Ty {
     }
 
     pub fn matches(&self, other: &Self) -> bool {
-        if self.is_zero_sized() && other.is_zero_sized() {
-            return true;
-        }
-
         if self.is_ptr() && other.is_ptr() {
             return true;
         }
@@ -140,6 +136,7 @@ impl Ty {
         match (&self, &other) {
             (Ty::Int, Ty::Int) => true,
             (Ty::String, Ty::String) => true,
+            (Ty::Void, Ty::Void) => true,
             (Ty::Struct(items), Ty::Struct(items2)) => {
                 if items.len() != items2.len() {
                     return false;
@@ -228,6 +225,7 @@ impl Expr {
             Expr::Load { ty, .. } => ty.clone(),
             Expr::Struct(values) => Ty::Struct(values.iter().map(|x| x.get_type(ctx)).collect()),
             Expr::Malloc(ty, _) => Ty::Ptr(Box::new(ty.clone())),
+            Expr::Phi(ty) => ty.clone(),
         }
     }
 }

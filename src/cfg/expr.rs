@@ -20,6 +20,8 @@ pub enum Expr {
     Struct(Vec<Value>),
 
     Malloc(Ty, Value),
+
+    Phi(Ty),
 }
 
 impl Expr {

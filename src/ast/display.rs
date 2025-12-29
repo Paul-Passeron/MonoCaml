@@ -81,6 +81,13 @@ impl fmt::Display for Ast {
                 value,
                 in_expr
             ),
+            Ast::If {
+                cond,
+                then_e,
+                else_e,
+            } => {
+                write!(f, "if {} then {} else {}", cond, then_e, else_e)
+            }
         }
     }
 }

@@ -140,6 +140,7 @@ impl fmt::Display for Expr {
                     .join(", ")
             ),
             Expr::Malloc(ty, count) => write!(f, "malloc {count} {ty}"),
+            Expr::Phi(_) => write!(f, "phi"),
         }
     }
 }

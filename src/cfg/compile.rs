@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use crate::{
     ast::{Ast, AstTy, RecFlag, Var},
     cfg::{
-        Const, FunName, FunNameUse, Func, Program, Sig, Ty, TyCtx, Value, builder::Builder,
+        Const, FunName, FunNameUse, Func, Label, Program, Sig, Ty, TyCtx, Value, builder::Builder,
         expr::Expr, var::CfgVarUse,
     },
     helpers::unique::Use,
@@ -178,6 +178,7 @@ impl Compiler {
         match t {
             AstTy::Int => Ty::Int,
             AstTy::String => Ty::String,
+            AstTy::Tuple(items) if items.len() == 0 => Ty::Void,
             AstTy::Tuple(items) => Ty::Struct(items.iter().map(|x| self.ast_ty_to_ty(x)).collect()),
             AstTy::Fun { arg, ret } => self.get_closure_ty(arg, ret),
         }
@@ -241,6 +242,43 @@ impl Compiler {
                 b,
             ),
             Ast::LetBinding { .. } => todo!("Recursive let binding"),
+            Ast::If {
+                cond,
+                then_e,
+                else_e,
+            } => {
+                let compiled_cond = self.aux(*cond, b);
+                let then_bb = Label::fresh();
+                let else_bb = Label::fresh();
+                let merge_bb = Label::fresh();
+                let then_bb_use = Use::from(&then_bb);
+                let else_bb_use = Use::from(&else_bb);
+                let merge_bb_use = Use::from(&merge_bb);
+                b.branch(
+                    &mut self.ctx,
+                    compiled_cond.into(),
+                    then_bb_use,
+                    else_bb_use,
+                    then_bb,
+                );
+                let then_value = match self.aux(*then_e, b) {
+                    Value::Var(v) => v,
+                    c => b.value(&mut self.ctx, c).into(),
+                };
+                b.goto(&mut self.ctx, merge_bb_use.clone(), else_bb);
+
+                let else_value = match self.aux(*else_e, b) {
+                    Value::Var(v) => v,
+                    c => b.value(&mut self.ctx, c).into(),
+                };
+
+                b.goto(&mut self.ctx, merge_bb_use, merge_bb);
+                let res_ty = then_value.get_type(&self.ctx);
+                let res_value_use = b.add_phi_target(&mut self.ctx, res_ty);
+                b.add_phi(&mut self.ctx, res_value_use.clone(), then_value);
+                b.add_phi(&mut self.ctx, res_value_use.clone(), else_value);
+                res_value_use.into()
+            }
         }
     }
 
@@ -297,6 +335,21 @@ impl Compiler {
                     }
                 };
                 self.get_type_of_ast(in_expr)
+            }
+            Ast::If {
+                cond,
+                then_e,
+                else_e,
+            } => {
+                if !self.get_type_of_ast(cond).is_arith() {
+                    panic!("Condition must be arithmetic");
+                }
+                let t = self.get_type_of_ast(then_e);
+                let e = self.get_type_of_ast(else_e);
+                if !t.matches(&e) {
+                    panic!("Branches must have the same type");
+                }
+                t
             }
         }
     }
@@ -359,9 +412,6 @@ impl Compiler {
 
         let ret_ty = self.get_type_of_ast(&body);
 
-        if ret_ty.is_void() {
-            println!("Return type of {body} is void")
-        }
         let mut fun_builder = Builder::new(function_name, params, ret_ty.clone(), &mut self.ctx);
         if new_vars_len > 0 {
             let loaded_env =
