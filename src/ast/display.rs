@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::ast::{Ast, AstTy, AstTyped, Var};
+use crate::ast::{Ast, AstTy, AstTyped, RecFlag, Var};
 
 impl fmt::Display for Var {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -52,7 +52,23 @@ impl fmt::Display for Ast {
             ),
             Ast::Get { from, index } => write!(f, "({}.{})", from, index),
             Ast::Native(name) => write!(f, "{name}"),
-            Ast::LetBinding { .. } => todo!(),
+            Ast::LetBinding {
+                bound,
+                rec,
+                value,
+                in_expr,
+            } => write!(
+                f,
+                "let{} {} = {} in {}",
+                if matches!(rec, RecFlag::Recursive) {
+                    " rec"
+                } else {
+                    ""
+                },
+                bound,
+                value,
+                in_expr
+            ),
         }
     }
 }
