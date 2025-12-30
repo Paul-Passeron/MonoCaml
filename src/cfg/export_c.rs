@@ -160,9 +160,14 @@ impl ExportC {
                     .filter_map(|(existing_ty, existing_name)| {
                         if let Ty::Struct(_) = existing_ty {
                             if self.canonical_decayed(existing_ty) == my_canonical {
-                                let decayed_name =
-                                    self.decayed_type_names.get(existing_ty).unwrap().clone();
-                                return Some((existing_name.clone(), decayed_name));
+                                match self.decayed_type_names.get(existing_ty) {
+                                    Some(decayed_name) => {
+                                        return Some((existing_name.clone(), decayed_name.clone()));
+                                    }
+                                    None => {
+                                        return Some((existing_name.clone(), my_canonical.clone()));
+                                    }
+                                }
                             }
                         }
                         None
@@ -227,8 +232,7 @@ impl ExportC {
             Ty::Int => "int".to_string(),
             Ty::String => "const char *".to_string(),
             Ty::Void => "void".to_string(),
-            Ty::Struct(_) | Ty::FunPtr(_) => self.canonical_decayed(ty),
-            _ => panic!("Type not defined: {:?}", ty),
+            Ty::Struct(_) | Ty::FunPtr(_) | Ty::Ptr(_) => self.canonical_decayed(ty),
         }
     }
 
