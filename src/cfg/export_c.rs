@@ -54,8 +54,6 @@ impl ExportC {
     }
 
     pub fn define_type(&mut self, ty: Ty) {
-        assert!(self.type_names.len() == self.decayed_type_names.len());
-
         // Normalize empty struct to void
         let ty = match &ty {
             Ty::Struct(items) if items.is_empty() => Ty::Void,
