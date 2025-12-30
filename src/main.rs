@@ -1,12 +1,14 @@
+#![feature(exit_status_error)]
+
 use std::{
-    fs::File,
+    fs::{self, File},
     path::PathBuf,
     process::{self},
 };
 
 use crate::{
     ast::{Ast, AstTy, AstTyped, Var},
-    cfg::compile::Compiler,
+    cfg::{FunName, Label, compile::Compiler, var::CfgVar},
 };
 
 pub mod ast;
@@ -14,7 +16,7 @@ pub mod cfg;
 pub mod helpers;
 
 #[allow(unused)]
-fn test_ast() -> Ast {
+fn test_ast_1() -> Ast {
     let x = Var::fresh();
     let y = Var::fresh();
     Ast::lambda(
@@ -170,32 +172,87 @@ fn test_ast_9() -> Ast {
     )
 }
 
-fn compile_ast(ast: Ast) {
+fn compile_ast<S: ToString>(ast: Ast, prog_name: S) {
+    let prog_name = prog_name.to_string();
     println!("{ast}");
-    let free_vars = ast.free_vars();
-    for var in free_vars {
-        println!("Free var {var}");
-    }
     let prog = Compiler::compile(ast);
-    // println!("{prog}\n");
-    prog.export_to_c(&mut File::create(PathBuf::from("./file.c")).unwrap());
+    println!("{prog}");
+    prog.export_to_c(&mut File::create(PathBuf::from(format!("./{prog_name}.c"))).unwrap());
     process::Command::new("clang")
         .arg("-g")
         .arg("-o")
-        .arg("test")
-        .arg("file.c")
+        .arg(format!("{prog_name}"))
+        .arg("-I.")
+        .arg(format!("{prog_name}.c"))
         .arg("runtime.c")
         .spawn()
         .unwrap()
         .wait()
+        .unwrap()
+        .exit_ok()
         .unwrap();
-    process::Command::new("./test")
+
+    Var::reset();
+    CfgVar::reset();
+    Label::reset();
+    FunName::reset();
+}
+pub fn test_ast<S: ToString>(ast: Ast, prog_name: S) {
+    let prog_name = prog_name.to_string();
+    let p = PathBuf::from(prog_name.clone());
+    let _ = fs::remove_file(&p);
+    compile_ast(ast, prog_name.clone());
+    assert!(fs::exists(&p).is_ok());
+    process::Command::new(prog_name)
         .spawn()
         .unwrap()
         .wait()
+        .unwrap()
+        .exit_ok()
         .unwrap();
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_1() {
+        test_ast(test_ast_1(), "test_dir/test_ast_1")
+    }
+    #[test]
+    fn test_2() {
+        test_ast(test_ast_2(), "test_dir/test_ast_2")
+    }
+    #[test]
+    fn test_3() {
+        test_ast(test_ast_3(), "test_dir/test_ast_3")
+    }
+    #[test]
+    fn test_4() {
+        test_ast(test_ast_4(), "test_dir/test_ast_4")
+    }
+    #[test]
+    fn test_5() {
+        test_ast(test_ast_5(), "test_dir/test_ast_5")
+    }
+    #[test]
+    fn test_6() {
+        test_ast(test_ast_6(), "test_dir/test_ast_6")
+    }
+    #[test]
+    fn test_7() {
+        test_ast(test_ast_7(), "test_dir/test_ast_7")
+    }
+    #[test]
+    fn test_8() {
+        test_ast(test_ast_8(), "test_dir/test_ast_8")
+    }
+    #[test]
+    fn test_9() {
+        test_ast(test_ast_9(), "test_dir/test_ast_9")
+    }
+}
+
 fn main() {
-    compile_ast(test_ast_9());
+    compile_ast(test_ast_9(), "build/test_9");
 }

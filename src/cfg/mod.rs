@@ -17,13 +17,13 @@ use crate::{
 };
 pub mod builder;
 pub mod compile;
-mod display;
+pub mod display;
 pub mod export_c;
 pub mod expr;
-mod extract;
-mod get_type;
-mod token;
-mod var;
+pub mod extract;
+pub mod get_type;
+pub mod token;
+pub mod var;
 
 #[allow(unused)]
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
