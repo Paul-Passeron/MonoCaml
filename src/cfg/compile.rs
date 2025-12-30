@@ -168,7 +168,7 @@ impl Compiler {
         let entry_use = Use::from(&entry);
         let mut res = Self::new(entry_use);
         let mut b = Builder::new(entry, vec![], Ty::Void, &mut res.ctx);
-        res.aux(ast, &mut b);
+        res.aux(&ast, &mut b);
         b.ret_void(&mut res.ctx);
         res.add_func(b.finalize());
         res.ctx.dump_aliases_in_prog(&mut res.prog);
@@ -223,48 +223,100 @@ impl Compiler {
         }
     }
 
-    fn aux(&mut self, ast: Ast, b: &mut Builder) -> Value {
+    fn is_sat_aux(&self, ast: &Ast, remaining: usize) -> bool {
         match ast {
-            Ast::Str(s) => Const::String(s).into(),
-            Ast::Int(i) => Const::Int(i).into(),
-            Ast::Var(var) => Value::Var(self.map[&var].clone()),
-            Ast::Lambda { arg, body } => {
-                self.compile_lambda(arg.expr().clone(), arg.ty().clone(), *body, b)
-            }
+            Ast::App { fun, .. } => match fun.as_ref() {
+                Ast::Native(x) => {
+                    let name = &self.ctx.natives[x];
+                    let sig = &self.ctx.sigs[name];
+                    let l = sig.params.len();
+                    l == remaining
+                }
+                _ => self.is_sat_aux(fun, remaining + 1),
+            },
+            _ => false,
+        }
+    }
+
+    fn ast_is_saturated(&self, ast: &Ast) -> bool {
+        match ast {
+            Ast::App { .. } => self.is_sat_aux(ast, 1),
+            _ => false,
+        }
+    }
+
+    fn get_sat_aux(&self, ast: Ast, v: &mut Vec<Ast>) -> FunNameUse {
+        match ast {
             Ast::App { fun, arg } => {
-                let fun_val = self.aux(*fun, b);
-                let arg_val = self.aux(*arg, b);
+                let res = self.get_sat_aux(*fun, v);
+                v.push(*arg);
+                res
+            }
+            Ast::Native(x) => self.ctx.natives[&x].clone(),
+            _ => panic!("Not a saturated call"),
+        }
+    }
+
+    fn get_saturated_args_and_fun(&self, ast: Ast) -> (Vec<Ast>, FunNameUse) {
+        let mut v = vec![];
+        let f = self.get_sat_aux(ast, &mut v);
+        (v, f)
+    }
+
+    fn aux(&mut self, ast: &Ast, b: &mut Builder) -> Value {
+        match ast {
+            Ast::Str(s) => Const::String(s.clone()).into(),
+            Ast::Int(i) => Const::Int(*i).into(),
+            Ast::Var(var) => Value::Var(self.map[&var].clone()),
+            Ast::Lambda { arg, body } => self.compile_lambda(
+                arg.expr().clone(),
+                arg.ty().clone(),
+                body.as_ref().clone(),
+                b,
+            ),
+
+            Ast::App { fun, arg } => {
+                if self.ast_is_saturated(ast) {
+                    let (args, name) = self.get_saturated_args_and_fun(ast.clone());
+                    let vals = args.iter().map(|x| self.aux(x, b)).collect();
+                    return b
+                        .native_call(&mut self.ctx, Const::FunPtr(name).into(), vals)
+                        .into();
+                }
+
+                let fun_val = self.aux(fun, b);
+                let arg_val = self.aux(arg, b);
                 let fun_ptr = b.extract(&mut self.ctx, fun_val.clone(), 0);
                 let env_ptr = b.extract(&mut self.ctx, fun_val, 1);
                 b.native_call(&mut self.ctx, fun_ptr.into(), vec![env_ptr.into(), arg_val])
                     .into()
             }
             Ast::Seq { fst, snd } => {
-                let _ = self.aux(*fst, b);
-                self.aux(*snd, b)
+                let _ = self.aux(fst, b);
+                self.aux(snd, b)
             }
             Ast::Tuple(asts) => {
                 let vals = asts.into_iter().map(|x| self.aux(x, b)).collect();
                 b.aggregate(&mut self.ctx, vals).into()
             }
             Ast::Get { from, index } => {
-                let from_val = self.aux(*from, b);
-                b.extract(&mut self.ctx, from_val, index).into()
+                let from_val = self.aux(from, b);
+                b.extract(&mut self.ctx, from_val, *index).into()
             }
-            Ast::Native(name) => self.get_native_closure(name, b),
+            Ast::Native(name) => self.get_native_closure(name.clone(), b),
             Ast::LetBinding {
                 bound,
                 rec: RecFlag::NonRecursive,
                 value,
                 in_expr,
             } => {
-                let val = self.aux(*value, b);
+                let val = self.aux(value, b);
                 let bound_ty = self.ast_ty_to_ty(bound.ty());
                 assert!(val.get_type(&self.ctx).matches(&bound_ty));
                 let bound_cfg = self.ctx.new_var(bound_ty);
                 self.map.insert(bound.expr().clone(), Use::from(&bound_cfg));
                 b.assign_to(&mut self.ctx, bound_cfg, Expr::value(val.into()));
-                self.aux(*in_expr, b)
+                self.aux(in_expr, b)
             }
             Ast::LetBinding {
                 bound,
@@ -272,11 +324,11 @@ impl Compiler {
                 value,
                 in_expr,
             } if !value.free_vars().contains(bound.expr()) => self.aux(
-                Ast::LetBinding {
-                    bound,
+                &Ast::LetBinding {
+                    bound: bound.clone(),
                     rec: RecFlag::NonRecursive,
-                    value,
-                    in_expr,
+                    value: value.clone(),
+                    in_expr: in_expr.clone(),
                 },
                 b,
             ),
@@ -285,13 +337,18 @@ impl Compiler {
                 rec: _,
                 value,
                 in_expr,
-            } => self.compile_rec_let(bound, *value, *in_expr, b),
+            } => self.compile_rec_let(
+                bound.clone(),
+                value.as_ref().clone(),
+                in_expr.as_ref().clone(),
+                b,
+            ),
             Ast::If {
                 cond,
                 then_e,
                 else_e,
             } => {
-                let compiled_cond = self.aux(*cond, b);
+                let compiled_cond = self.aux(cond, b);
                 let then_bb = Label::fresh();
                 let else_bb = Label::fresh();
                 let merge_bb = Label::fresh();
@@ -305,13 +362,13 @@ impl Compiler {
                     else_bb_use,
                     then_bb,
                 );
-                let then_value = match self.aux(*then_e, b) {
+                let then_value = match self.aux(then_e, b) {
                     Value::Var(v) => v,
                     c => b.value(&mut self.ctx, c).into(),
                 };
                 b.goto(&mut self.ctx, merge_bb_use.clone(), else_bb);
 
-                let else_value = match self.aux(*else_e, b) {
+                let else_value = match self.aux(else_e, b) {
                     Value::Var(v) => v,
                     c => b.value(&mut self.ctx, c).into(),
                 };
@@ -394,7 +451,7 @@ impl Compiler {
             });
         }
 
-        let ret_value = self.aux(value, &mut builder);
+        let ret_value = self.aux(&value, &mut builder);
 
         if ret_ty.is_void() {
             builder.ret_void(&mut self.ctx);
@@ -412,7 +469,7 @@ impl Compiler {
             self.ctx.vars.insert(x, y);
         }
 
-        self.aux(in_expr, b)
+        self.aux(&in_expr, b)
     }
 
     fn create_initial_closure_for_recursion(
@@ -613,16 +670,17 @@ impl Compiler {
 
         let mut fun_builder = Builder::new(function_name, params, ret_ty.clone(), &mut self.ctx);
         if new_vars_len > 0 {
-            let loaded_env =
-                fun_builder.load(&mut self.ctx, env_arg_use.into(), closure_struct.clone());
-
+            let loaded_env = fun_builder.load(
+                &mut self.ctx,
+                env_arg_use.clone().into(),
+                closure_struct.clone(),
+            );
             env.iter().enumerate().for_each(|(i, x)| {
                 let associated = fun_builder.extract(&mut self.ctx, loaded_env.clone().into(), i);
                 *self.map.get_mut(x).unwrap() = associated;
             });
         }
-
-        let ret_value = self.aux(body, &mut fun_builder);
+        let ret_value = self.aux(&body, &mut fun_builder);
 
         if ret_ty.is_void() {
             fun_builder.ret_void(&mut self.ctx);
@@ -641,8 +699,6 @@ impl Compiler {
             self.ctx.vars.insert(x, y);
         }
 
-        let funptr = b.constant(&mut self.ctx, Const::FunPtr(fun_name));
-
         let env_values = env
             .iter()
             .map(|x| self.map[x].clone().into())
@@ -657,7 +713,10 @@ impl Compiler {
             vec![malloc.clone().into()],
         );
 
-        b.aggregate(&mut self.ctx, vec![funptr.into(), malloc.into()])
+        b.aggregate(
+            &mut self.ctx,
+            vec![Const::FunPtr(fun_name).into(), malloc.into()],
+        )
     }
 
     fn malloc_val(&mut self, v: Value, b: &mut Builder) -> Value {
