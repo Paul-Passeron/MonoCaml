@@ -344,16 +344,12 @@ impl Compiler {
 
         let mut outside_env = value.free_vars();
         outside_env.remove(&param);
-        // outside_env.remove(bound.expr());
         let mut outside_env: Vec<_> = outside_env.into_iter().collect();
         outside_env.sort();
 
         self.ctx
             .sigs
             .insert(funname_use.clone(), bound_ty.field(0).sig());
-
-        // I am creating the closure, still being in function 0
-
         self.create_initial_closure_for_recursion(bound, b, funname_use, outside_env);
 
         // Now it's just like building a regular lambda (I think)
@@ -449,7 +445,7 @@ impl Compiler {
 
         b.native_call(
             &mut self.ctx,
-            register_closure.into(),
+            register_closure.clone().into(),
             vec![malloc.clone().into()],
         );
 
@@ -459,6 +455,12 @@ impl Compiler {
         );
 
         let malloc = self.malloc_val(initial_closure.clone(), b);
+
+        b.native_call(
+            &mut self.ctx,
+            register_closure.into(),
+            vec![malloc.clone().into()],
+        );
 
         let clos_ty = malloc.get_type(&self.ctx).into_inner();
 
@@ -602,6 +604,7 @@ impl Compiler {
         let cfg_arg_use = Use::from(&cfg_arg);
         let env_arg = self.ctx.new_var(closure_env_ty.clone());
         let env_arg_use = Use::from(&env_arg);
+        self.type_map.insert(arg, arg_ty.clone());
         self.map.insert(arg, cfg_arg_use);
 
         let params = vec![(env_arg, closure_env_ty), (cfg_arg, arg_ty)];
