@@ -288,6 +288,19 @@ impl Builder {
     pub fn malloc(&mut self, ctx: &mut TyCtx, ty: Ty, v: Value) -> CfgVarUse {
         self.assign(ctx, Expr::malloc(ty, v))
     }
+
+    pub fn make_var(&mut self, ctx: &mut TyCtx, val: &Value) -> Use<CfgVar> {
+        match val {
+            Value::Var(x) => x.clone(),
+            Value::Const(c) => {
+                let ty = val.get_type(ctx);
+                let v = ctx.new_var(ty);
+                let res = Use::from(&v);
+                self.assign_to(ctx, v, Expr::value(c.clone().into()));
+                res
+            }
+        }
+    }
 }
 
 impl Program {
