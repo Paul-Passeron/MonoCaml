@@ -380,7 +380,7 @@ impl ExportC {
             Expr::GetElementPtr { ptr, ty, index } => {
                 let val = self.value_as_string(ptr);
                 let ty = self.get_type_name(ty);
-                write!(&mut self.f, "(({}*){})->_{index}", ty, val,).unwrap()
+                write!(&mut self.f, "&(({}*){})->_{index}", ty, val,).unwrap()
             }
             Expr::Extract { value, index } => {
                 let val = self.value_as_string(value);
