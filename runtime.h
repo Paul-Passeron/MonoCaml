@@ -8,4 +8,5 @@ void drop_closure(void *env);
 
 void print_int(int x);
 void print_string(const char *const str);
+int random_int(int max);
 void start(void);

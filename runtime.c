@@ -3,12 +3,13 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <time.h>
 
 #define da_reserve(da, expected_capacity)                                      \
   do {                                                                         \
     if ((expected_capacity) > (da)->capacity) {                                \
       if ((da)->capacity == 0) {                                               \
-        (da)->capacity = 32;                                                    \
+        (da)->capacity = 32;                                                   \
       }                                                                        \
       while ((expected_capacity) > (da)->capacity) {                           \
         (da)->capacity *= 2;                                                   \
@@ -128,9 +129,12 @@ void cleanup(void) {
 void print_int(int x) { printf("%d", x); }
 
 int main() {
+  srand(time(NULL));
   start();
   cleanup();
   return 0;
 }
 
 void print_string(const char *const str) { printf("%s", str); }
+
+int random_int(int max) { return rand() % max; }
