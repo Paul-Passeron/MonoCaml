@@ -217,7 +217,7 @@ fn compile_ast<S: ToString>(ast: Ast, prog_name: S) {
         .arg("-I.")
         .arg(format!("{prog_name}.c"))
         .arg("runtime.c")
-        // .arg("-O3")
+        .arg("-O3")
         .spawn()
         .unwrap()
         .wait()
@@ -306,6 +306,10 @@ mod tests {
     #[test]
     fn test_9() {
         test_ast(test_ast_9(), "test_dir/test_ast_9")
+    }
+    #[test]
+    fn test_fact() {
+        test_ast(fact_ast(), "test_dir/test_fact")
     }
 }
 
