@@ -173,6 +173,37 @@ fn test_ast_9() -> Ast {
     )
 }
 
+fn fact_ast() -> Ast {
+    let fact = Var::fresh();
+    let n = Var::fresh();
+    let int = AstTy::Int;
+    Ast::let_rec(
+        fact,
+        AstTy::fun(int.clone(), int.clone()),
+        Ast::lambda(
+            AstTyped::new(n, int),
+            Ast::ifte(
+                Ast::Var(n),
+                Ast::app(
+                    Ast::app(Ast::native("mul"), Ast::var(n)),
+                    Ast::app(
+                        Ast::Var(fact),
+                        Ast::app(Ast::app(Ast::native("add"), Ast::Int(-1)), Ast::var(n)),
+                    ),
+                ),
+                Ast::Int(1),
+            ),
+        ),
+        Ast::seq(
+            Ast::app(
+                Ast::native("print_int"),
+                Ast::app(Ast::var(fact), Ast::Int(6)),
+            ),
+            Ast::app(Ast::native("print_string"), Ast::string("\n")),
+        ),
+    )
+}
+
 fn compile_ast<S: ToString>(ast: Ast, prog_name: S) {
     let prog_name = prog_name.to_string();
     println!("{ast}");
@@ -186,7 +217,7 @@ fn compile_ast<S: ToString>(ast: Ast, prog_name: S) {
         .arg("-I.")
         .arg(format!("{prog_name}.c"))
         .arg("runtime.c")
-        .arg("-O3")
+        // .arg("-O3")
         .spawn()
         .unwrap()
         .wait()
@@ -279,5 +310,5 @@ mod tests {
 }
 
 fn main() {
-    compile_ast(test_ast_9(), "test");
+    compile_ast(fact_ast(), "test");
 }
