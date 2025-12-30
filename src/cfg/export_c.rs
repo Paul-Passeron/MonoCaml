@@ -251,7 +251,7 @@ impl ExportC {
             Ty::String => "const char *".to_string(),
             Ty::Void => "void".to_string(),
             Ty::Ptr(_) => "void*".to_string(),
-            _ => panic!("Type not defined for decay: {:?}", ty),
+            _ => self.canonical_decayed(ty),
         }
     }
 
@@ -520,7 +520,11 @@ impl ExportC {
 
     pub fn export(&mut self, prog: &Program) {
         writeln!(&mut self.f, "#include \"runtime.h\"").unwrap();
-
+        writeln!(
+            &mut self.f,
+            "#pragma clang diagnostic ignored \"-Wincompatible-pointer-types\""
+        )
+        .unwrap();
         let types = prog.get_all_types();
         for ty in types {
             self.define_type(ty);
