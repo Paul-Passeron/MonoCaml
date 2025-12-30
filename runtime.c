@@ -8,7 +8,7 @@
   do {                                                                         \
     if ((expected_capacity) > (da)->capacity) {                                \
       if ((da)->capacity == 0) {                                               \
-        (da)->capacity = 8;                                                    \
+        (da)->capacity = 32;                                                    \
       }                                                                        \
       while ((expected_capacity) > (da)->capacity) {                           \
         (da)->capacity *= 2;                                                   \
