@@ -2,8 +2,9 @@
 
 use std::{
     fs::{self, File},
+    io::Read,
     path::PathBuf,
-    process::{self},
+    process::{self, Command, Stdio},
 };
 
 use crate::{
@@ -185,6 +186,7 @@ fn compile_ast<S: ToString>(ast: Ast, prog_name: S) {
         .arg("-I.")
         .arg(format!("{prog_name}.c"))
         .arg("runtime.c")
+        .arg("-O3")
         .spawn()
         .unwrap()
         .wait()
@@ -197,19 +199,42 @@ fn compile_ast<S: ToString>(ast: Ast, prog_name: S) {
     Label::reset();
     FunName::reset();
 }
+
+fn run_and_check_output(program: &str, args: &[&str], expected: &str) -> std::io::Result<bool> {
+    let mut child = Command::new(program)
+        .args(args)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()?;
+
+    let mut stdout = String::new();
+    child.stdout.take().unwrap().read_to_string(&mut stdout)?;
+    child.wait()?;
+
+    Ok(stdout.contains(expected))
+}
+
 pub fn test_ast<S: ToString>(ast: Ast, prog_name: S) {
     let prog_name = prog_name.to_string();
     let p = PathBuf::from(prog_name.clone());
     let _ = fs::remove_file(&p);
     compile_ast(ast, prog_name.clone());
     assert!(fs::exists(&p).is_ok());
-    process::Command::new(prog_name)
+    process::Command::new(prog_name.clone())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
         .spawn()
         .unwrap()
         .wait()
         .unwrap()
         .exit_ok()
         .unwrap();
+    run_and_check_output(
+        "valgrind",
+        &[&prog_name[..]],
+        "All heap blocks were freed -- no leaks are possible",
+    )
+    .unwrap();
 }
 
 #[cfg(test)]
@@ -254,5 +279,5 @@ mod tests {
 }
 
 fn main() {
-    compile_ast(test_ast_9(), "build/test_9");
+    compile_ast(test_ast_9(), "test");
 }
