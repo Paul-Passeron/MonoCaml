@@ -204,6 +204,61 @@ fn fact_ast() -> Ast {
     )
 }
 
+fn fact_bench() -> Ast {
+    let fact = Var::fresh();
+    let loo = Var::fresh();
+    let n = Var::fresh();
+    let res = Var::fresh();
+    Ast::let_rec(
+        fact,
+        AstTy::fun(AstTy::Int, AstTy::Int),
+        Ast::lambda(
+            AstTyped::new(n, AstTy::Int),
+            Ast::ifte(
+                Ast::Var(n),
+                Ast::app(
+                    Ast::app(Ast::native("mul"), Ast::var(n)),
+                    Ast::app(
+                        Ast::Var(fact),
+                        Ast::app(Ast::app(Ast::native("add"), Ast::Int(-1)), Ast::var(n)),
+                    ),
+                ),
+                Ast::Int(1),
+            ),
+        ),
+        Ast::let_rec(
+            loo,
+            AstTy::fun(AstTy::Int, AstTy::Tuple(vec![])),
+            Ast::lambda(
+                AstTyped::new(n, AstTy::Int),
+                Ast::ifte(
+                    Ast::var(n),
+                    Ast::let_binding(
+                        res,
+                        AstTy::Int,
+                        Ast::app(
+                            Ast::var(fact),
+                            Ast::app(Ast::native("random_int"), Ast::Int(10)),
+                        ),
+                        Ast::seq(
+                            Ast::seq(
+                                Ast::app(Ast::native("print_int"), Ast::var(res)),
+                                Ast::app(Ast::native("print_string"), Ast::string("\n")),
+                            ),
+                            Ast::app(
+                                Ast::var(loo),
+                                Ast::app(Ast::app(Ast::native("add"), Ast::Int(-1)), Ast::var(n)),
+                            ),
+                        ),
+                    ),
+                    Ast::app(Ast::native("print_string"), Ast::string("Done !\n")),
+                ),
+            ),
+            Ast::app(Ast::var(loo), Ast::Int(100000)),
+        ),
+    )
+}
+
 fn compile_ast<S: ToString>(ast: Ast, prog_name: S) {
     let prog_name = prog_name.to_string();
     println!("{ast}");
@@ -314,5 +369,5 @@ mod tests {
 }
 
 fn main() {
-    compile_ast(fact_ast(), "test");
+    compile_ast(fact_bench(), "test");
 }
