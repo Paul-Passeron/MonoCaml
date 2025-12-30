@@ -57,7 +57,7 @@ static ints free_refs[REF_COUNT] = {0};
 
 size_t hash(intptr_t in) { return (in >> 3) % REF_COUNT; }
 
-void register_closure(void *ptr) {
+__inline__ void register_closure(void *ptr) {
   size_t hashed = hash((intptr_t)ptr);
   refs *refs = &references[hashed];
   for (size_t i = 0; i < refs->count; ++i) {
@@ -91,14 +91,14 @@ ref *get_ref(const void *const ptr, size_t *h, size_t *idx) {
   exit(1);
 }
 
-void borrow_closure(void *env) {
+__inline__ void borrow_closure(void *env) {
   if (!env)
     return;
   ref *ref = get_ref(env, NULL, NULL);
   ref->count++;
 }
 
-void drop_closure(void *env) {
+__inline__ void drop_closure(void *env) {
   if (!env)
     return;
   size_t hash, idx;
