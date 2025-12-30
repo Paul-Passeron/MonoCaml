@@ -232,7 +232,8 @@ impl ExportC {
             Ty::Int => "int".to_string(),
             Ty::String => "const char *".to_string(),
             Ty::Void => "void".to_string(),
-            Ty::Struct(_) | Ty::FunPtr(_) | Ty::Ptr(_) => self.canonical_decayed(ty),
+            Ty::FunPtr(_) | Ty::Ptr(_) => self.canonical_decayed(ty),
+            _ => panic!("No type but there should be !"),
         }
     }
 
