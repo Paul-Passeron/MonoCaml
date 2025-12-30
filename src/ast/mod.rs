@@ -47,7 +47,7 @@ impl AstTy {
         }
     }
 }
-
+#[derive(Clone)]
 pub struct AstTyped<T> {
     expr: T,
     ty: AstTy,
@@ -67,6 +67,7 @@ impl<T> AstTyped<T> {
     }
 }
 
+#[derive(Clone)]
 pub enum Ast {
     Str(String),
     Int(i32),
@@ -226,6 +227,7 @@ impl Ast {
     }
 }
 
+#[derive(Clone, Copy)]
 pub enum RecFlag {
     NonRecursive,
     Recursive,
