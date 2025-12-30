@@ -84,6 +84,23 @@ impl Compiler {
         self.add_named_func("print_string", used);
     }
 
+    fn create_random_int(&mut self) {
+        let name = FunName::fresh();
+        let used = Use::from(&name);
+        let s = Sig {
+            params: vec![Ty::Int],
+            ret: Box::new(Ty::Int),
+        };
+        let print_string_fun = Func {
+            name: name,
+            params: self.ctx.make_params(s.params.into_iter()),
+            ret_ty: *s.ret,
+            cfg: None,
+        };
+        self.add_func(print_string_fun);
+        self.add_named_func("random_int", used);
+    }
+
     fn create_borrow_closure(&mut self) {
         let name = FunName::fresh();
         let used = Use::from(&name);
@@ -157,6 +174,7 @@ impl Compiler {
         res.create_mul();
         res.create_print_int();
         res.create_print_string();
+        res.create_random_int();
         res.create_borrow_closure();
         res.create_drop_closure();
         res.create_register_closure();
@@ -521,14 +539,20 @@ impl Compiler {
 
         let clos_ty = malloc.get_type(&self.ctx).into_inner();
 
-        let ptr = b.get_element_ptr(&mut self.ctx, malloc.clone(), clos_ty.clone(), 1);
+        let env_ptr_addr =
+            b.get_element_ptr(&mut self.ctx, malloc.clone().into(), clos_ty.clone(), 1);
 
-        let ty = env_struct.get_type(&self.ctx);
+        let env_ty = env_struct.get_type(&self.ctx);
 
-        let ptr = b
-            .get_element_ptr(&mut self.ctx, ptr.clone().into(), ty, pos as usize)
-            .into();
-        b.store(&mut self.ctx, ptr, malloc.clone().into());
+        let env_ptr = b.load(
+            &mut self.ctx,
+            env_ptr_addr.into(),
+            Ty::Ptr(Box::new(env_ty.clone())),
+        );
+
+        let self_ref_addr = b.get_element_ptr(&mut self.ctx, env_ptr.into(), env_ty, pos as usize);
+
+        b.store(&mut self.ctx, self_ref_addr.into(), initial_closure.into());
 
         let res = b.load(&mut self.ctx, malloc, clos_ty);
 
