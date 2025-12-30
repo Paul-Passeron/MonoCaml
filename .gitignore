@@ -1,1 +1,4 @@
 /target
+test*
+file.c
+*.ll
