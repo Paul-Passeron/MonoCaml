@@ -14,11 +14,245 @@ pub struct ExportC {
     pub f: String,
     pub count: usize,
     pub type_names: HashMap<Ty, String>,
+    pub decayed_type_names: HashMap<Ty, String>,
     pub closure_tys: HashMap<(Sig, Ty), String>,
     pub var_aliases: HashMap<CfgVarUse, CfgVarUse>,
 }
 
 impl ExportC {
+    /// Compute the canonical decayed representation of a type as a string.
+    /// This doesn't require the type to be defined yet.
+    fn canonical_decayed(&self, ty: &Ty) -> String {
+        match ty {
+            Ty::Int => "int".to_string(),
+            Ty::String => "const char *".to_string(),
+            Ty::Void => "void".to_string(),
+            Ty::Struct(items) if items.is_empty() => "void".to_string(),
+            Ty::Ptr(_) => "void*".to_string(),
+            Ty::FunPtr(sig) => {
+                let ret = self.canonical_decayed(&sig.ret);
+                let params: Vec<_> = sig
+                    .params
+                    .iter()
+                    .map(|p| self.canonical_decayed(p))
+                    .collect();
+                let params_str = if params.is_empty() {
+                    "void".to_string()
+                } else {
+                    params.join(", ")
+                };
+                format!("{} (*)({})", ret, params_str)
+            }
+            Ty::Struct(items) => {
+                let fields: Vec<_> = items
+                    .iter()
+                    .map(|item| self.canonical_decayed(item))
+                    .collect();
+                format!("{{{}}}", fields.join(", "))
+            }
+        }
+    }
+
+    pub fn define_type(&mut self, ty: Ty) {
+        assert!(self.type_names.len() == self.decayed_type_names.len());
+
+        // Normalize empty struct to void
+        let ty = match &ty {
+            Ty::Struct(items) if items.is_empty() => Ty::Void,
+            _ => ty,
+        };
+
+        // Already defined?
+        if self.type_names.contains_key(&ty) {
+            return;
+        }
+
+        match &ty {
+            Ty::Int => {
+                self.type_names.insert(ty.clone(), "int".to_string());
+                self.decayed_type_names.insert(ty, "int".to_string());
+            }
+            Ty::String => {
+                self.type_names
+                    .insert(ty.clone(), "const char *".to_string());
+                self.decayed_type_names
+                    .insert(ty, "const char *".to_string());
+            }
+            Ty::Void => {
+                self.type_names.insert(ty.clone(), "void".to_string());
+                self.decayed_type_names.insert(ty, "void".to_string());
+            }
+            Ty::Ptr(inner) => {
+                self.define_type((**inner).clone());
+                let inner_name = self.get_type_name(inner);
+                self.type_names
+                    .insert(ty.clone(), format!("{}*", inner_name));
+                self.decayed_type_names.insert(ty, "void*".to_string());
+            }
+            Ty::FunPtr(sig) => {
+                // Define return and param types first (recursively)
+                self.define_type((*sig.ret).clone());
+                for param in &sig.params {
+                    self.define_type(param.clone());
+                }
+
+                // Compute canonical decayed signature for equivalence
+                let my_canonical = self.canonical_decayed(&ty);
+
+                // Look for existing equivalent function pointer
+                let existing = self
+                    .type_names
+                    .iter()
+                    .filter_map(|(existing_ty, existing_name)| {
+                        if let Ty::FunPtr(_) = existing_ty {
+                            if self.canonical_decayed(existing_ty) == my_canonical {
+                                return Some(existing_name.clone());
+                            }
+                        }
+                        None
+                    })
+                    .next();
+
+                if let Some(existing_name) = existing {
+                    self.type_names.insert(ty.clone(), existing_name.clone());
+                    self.decayed_type_names.insert(ty, existing_name);
+                    return;
+                }
+
+                // Create new typedef using decayed types
+                let name = format!("ty_{}", self.count);
+                self.count += 1;
+
+                let decayed_ret = self.get_decayed_type_name(&sig.ret);
+                let decayed_params: Vec<_> = sig
+                    .params
+                    .iter()
+                    .map(|p| self.get_decayed_type_name(p))
+                    .collect();
+
+                writeln!(
+                    &mut self.f,
+                    "typedef {} (*{})({});\n",
+                    decayed_ret,
+                    name,
+                    if decayed_params.is_empty() {
+                        "void".to_string()
+                    } else {
+                        decayed_params.join(", ")
+                    }
+                )
+                .unwrap();
+
+                self.type_names.insert(ty.clone(), name.clone());
+                self.decayed_type_names.insert(ty, name);
+            }
+            Ty::Struct(items) => {
+                // Define all inner types first
+                for item in items {
+                    self.define_type(item.clone());
+                }
+
+                // Compute canonical decayed representation for equivalence
+                let my_canonical = self.canonical_decayed(&ty);
+
+                // Check for existing equivalent struct
+                let existing = self
+                    .type_names
+                    .iter()
+                    .filter_map(|(existing_ty, existing_name)| {
+                        if let Ty::Struct(_) = existing_ty {
+                            if self.canonical_decayed(existing_ty) == my_canonical {
+                                let decayed_name =
+                                    self.decayed_type_names.get(existing_ty).unwrap().clone();
+                                return Some((existing_name.clone(), decayed_name));
+                            }
+                        }
+                        None
+                    })
+                    .next();
+
+                if let Some((existing_name, decayed_name)) = existing {
+                    self.type_names.insert(ty.clone(), existing_name);
+                    self.decayed_type_names.insert(ty, decayed_name);
+                    return;
+                }
+
+                // Handle closure type caching
+                if ty.repr_closure() {
+                    let sig = ty.field(0).sig();
+                    let key = (sig.clone(), ty.field(1));
+                    if let Some(existing) = self.closure_tys.get(&key) {
+                        self.type_names.insert(ty.clone(), existing.clone());
+                        self.decayed_type_names.insert(ty, existing.clone());
+                        return;
+                    }
+                }
+
+                // Create new typedef using decayed field types
+                let name = format!("ty_{}", self.count);
+                self.count += 1;
+
+                let decayed_field_types: Vec<_> = items
+                    .iter()
+                    .map(|item| self.get_decayed_type_name(item))
+                    .collect();
+
+                writeln!(&mut self.f, "typedef struct {{").unwrap();
+                for (i, field_ty) in decayed_field_types.iter().enumerate() {
+                    writeln!(&mut self.f, "    {} _{};", field_ty, i).unwrap();
+                }
+                writeln!(&mut self.f, "}} {};\n", name).unwrap();
+
+                if ty.repr_closure() {
+                    let sig = ty.field(0).sig();
+                    let key = (sig, ty.field(1));
+                    self.closure_tys.insert(key, name.clone());
+                }
+
+                self.type_names.insert(ty.clone(), name.clone());
+                self.decayed_type_names.insert(ty, name);
+            }
+        }
+    }
+
+    pub fn get_type_name(&self, ty: &Ty) -> String {
+        let ty = match ty {
+            Ty::Struct(items) if items.is_empty() => &Ty::Void,
+            _ => ty,
+        };
+
+        if let Some(name) = self.type_names.get(ty) {
+            return name.clone();
+        }
+
+        match ty {
+            Ty::Int => "int".to_string(),
+            Ty::String => "const char *".to_string(),
+            Ty::Void => "void".to_string(),
+            Ty::Struct(_) | Ty::FunPtr(_) => self.canonical_decayed(ty),
+            _ => panic!("Type not defined: {:?}", ty),
+        }
+    }
+
+    pub fn get_decayed_type_name(&self, ty: &Ty) -> String {
+        let ty = match ty {
+            Ty::Struct(items) if items.is_empty() => &Ty::Void,
+            _ => ty,
+        };
+
+        if let Some(name) = self.decayed_type_names.get(ty) {
+            return name.clone();
+        }
+
+        match ty {
+            Ty::Int => "int".to_string(),
+            Ty::String => "const char *".to_string(),
+            Ty::Void => "void".to_string(),
+            Ty::Ptr(_) => "void*".to_string(),
+            _ => panic!("Type not defined for decay: {:?}", ty),
+        }
+    }
+
     pub fn create_aliases(&mut self, phis: HashMap<CfgVarUse, HashSet<CfgVarUse>>) {
         self.var_aliases.clear();
         self.var_aliases.extend(
@@ -44,288 +278,15 @@ impl ExportC {
         self.create_aliases(s);
     }
 
-    // pub fn define_type(&mut self, ty: Ty, decay: bool) {
-    //     let mut ignore = false;
-
-    //     if self.type_names.contains_key(&ty) {
-    //         return;
-    //     }
-
-    //     for (other, name) in &self.type_names {
-    //         if other.matches(&ty) {
-    //             self.type_names.insert(ty, name.clone());
-    //             return;
-    //         }
-    //     }
-
-    //     let (s, wrote) = match &ty {
-    //         Ty::Int => ("int".to_string(), false),
-    //         Ty::String => ("const char *".to_string(), false),
-    //         Ty::Void => ("void".to_string(), false),
-    //         Ty::Ptr(ty) => {
-    //             self.define_type(*ty.clone(), decay);
-    //             (
-    //                 format!(
-    //                     "{}*",
-    //                     if !decay {
-    //                         self.type_names[ty].clone()
-    //                     } else {
-    //                         self.define_type(Ty::Ptr(ty.clone()), false);
-    //                         ignore = true;
-    //                         "void".into()
-    //                     }
-    //                 ),
-    //                 false,
-    //             )
-    //         }
-    //         Ty::Struct(items) => {
-    //             if ty.repr_closure() {
-    //                 items
-    //                     .iter()
-    //                     .cloned()
-    //                     .for_each(|x| self.define_type(x, true));
-
-    //                 let s = ty.field(0).sig();
-    //                 let key = &(s, ty.field(1));
-    //                 if self.closure_tys.contains_key(key) {
-    //                     (self.closure_tys[key].clone(), false)
-    //                 } else {
-    //                     let name = format!("ty_{}", self.count);
-    //                     writeln!(&mut self.f, "typedef struct {{").unwrap();
-    //                     items.iter().cloned().enumerate().for_each(|(i, x)| {
-    //                         let ty = self.get_type_name(&x);
-    //                         writeln!(&mut self.f, "    {} _{i};", &ty).unwrap()
-    //                     });
-    //                     writeln!(&mut self.f, "}} {name};\n").unwrap();
-    //                     self.closure_tys.insert(key.clone(), name.clone());
-    //                     (name, true)
-    //                 }
-    //             } else {
-    //                 items
-    //                     .iter()
-    //                     .cloned()
-    //                     .for_each(|x| self.define_type(x, true));
-    //                 writeln!(&mut self.f, "typedef struct {{").unwrap();
-    //                 items.iter().cloned().enumerate().for_each(|(i, x)| {
-    //                     let ty = {
-    //                         let s = &self.get_type_name(&x);
-    //                         if decay && s.chars().last().unwrap() == '*' {
-    //                             "void*".to_string()
-    //                         } else {
-    //                             s.clone()
-    //                         }
-    //                     };
-    //                     writeln!(&mut self.f, "    {} _{i};", ty).unwrap()
-    //                 });
-    //                 let name = format!("ty_{}", self.count);
-    //                 writeln!(&mut self.f, "}} {name};\n").unwrap();
-    //                 (name, true)
-    //             }
-    //         }
-    //         Ty::FunPtr(sig) => {
-    //             self.define_type(sig.ret.as_ref().clone(), decay);
-    //             sig.params
-    //                 .iter()
-    //                 .cloned()
-    //                 .for_each(|x| self.define_type(x, true));
-    //             let name = format!("ty_{}", self.count);
-    //             let ty = self.get_type_name(sig.ret.as_ref());
-    //             let params = sig
-    //                 .params
-    //                 .iter()
-    //                 .cloned()
-    //                 .map(|x| self.get_type_name(&x))
-    //                 .collect::<Vec<_>>()
-    //                 .join(", ");
-    //             let f = &mut self.f;
-    //             writeln!(f, "typedef {} (*{})({});\n", ty, name, params).unwrap();
-    //             (name, true)
-    //         }
-    //     };
-    //     if wrote {
-    //         self.count += 1;
-    //     }
-    //     if !ignore {
-    //         self.type_names.insert(ty, s);
-    //     }
-    // }
-
-    pub fn define_type(&mut self, ty: Ty, decay: bool) {
-        // Normalize empty struct to void
-        let ty = match &ty {
-            Ty::Struct(items) if items.is_empty() => Ty::Void,
-            _ => ty,
-        };
-
-        // Handle primitives - these should NEVER get generated names
-        match &ty {
-            Ty::Int => {
-                self.type_names
-                    .entry(ty)
-                    .or_insert_with(|| "int".to_string());
-                return;
-            }
-            Ty::String => {
-                self.type_names
-                    .entry(ty)
-                    .or_insert_with(|| "const char *".to_string());
-                return;
-            }
-            Ty::Void => {
-                self.type_names
-                    .entry(ty)
-                    .or_insert_with(|| "void".to_string());
-                return;
-            }
-            _ => {}
-        }
-
-        // Already defined exactly?
-        if self.type_names.contains_key(&ty) {
-            return;
-        }
-
-        match &ty {
-            Ty::Ptr(inner) => {
-                self.define_type((**inner).clone(), decay);
-                let inner_name = if decay {
-                    "void".to_string()
-                } else {
-                    self.get_type_name(inner)
-                };
-                self.type_names.insert(ty, format!("{}*", inner_name));
-            }
-
-            Ty::FunPtr(sig) => {
-                // Define return and param types first
-                self.define_type((*sig.ret).clone(), false);
-                for param in &sig.params {
-                    self.define_type(param.clone(), false);
-                }
-
-                // Check if we already have an equivalent function pointer type
-                let ret_name = self.get_type_name(&sig.ret);
-                let param_names: Vec<_> =
-                    sig.params.iter().map(|p| self.get_type_name(p)).collect();
-
-                // Look for existing equivalent
-                for (existing_ty, existing_name) in &self.type_names {
-                    if let Ty::FunPtr(existing_sig) = existing_ty {
-                        let existing_ret = self.get_type_name(&existing_sig.ret);
-                        let existing_params: Vec<_> = existing_sig
-                            .params
-                            .iter()
-                            .map(|p| self.get_type_name(p))
-                            .collect();
-
-                        if existing_ret == ret_name && existing_params == param_names {
-                            self.type_names.insert(ty, existing_name.clone());
-                            return;
-                        }
-                    }
-                }
-
-                // Create new typedef
-                let name = format!("ty_{}", self.count);
-                self.count += 1;
-
-                writeln!(
-                    &mut self.f,
-                    "typedef {} (*{})({});\n",
-                    ret_name,
-                    name,
-                    param_names.join(", ")
-                )
-                .unwrap();
-
-                self.type_names.insert(ty, name);
-            }
-
-            Ty::Struct(items) => {
-                // Define all inner types first
-                for item in items {
-                    self.define_type(item.clone(), true);
-                }
-
-                // Get the string representation of field types
-                let field_types: Vec<_> = items
-                    .iter()
-                    .map(|item| {
-                        let s = self.get_type_name(item);
-                        if decay && s.ends_with('*') {
-                            "void*".to_string()
-                        } else {
-                            s
-                        }
-                    })
-                    .collect();
-
-                // Check for existing equivalent struct
-                for (existing_ty, existing_name) in &self.type_names {
-                    if let Ty::Struct(existing_items) = existing_ty {
-                        if existing_items.len() == items.len() {
-                            let existing_field_types: Vec<_> = existing_items
-                                .iter()
-                                .map(|item| {
-                                    let s = self.get_type_name(item);
-                                    if decay && s.ends_with('*') {
-                                        "void*".to_string()
-                                    } else {
-                                        s
-                                    }
-                                })
-                                .collect();
-
-                            if existing_field_types == field_types {
-                                self.type_names.insert(ty, existing_name.clone());
-                                return;
-                            }
-                        }
-                    }
-                }
-
-                // Handle closure type caching
-                if ty.repr_closure() {
-                    let sig = ty.field(0).sig();
-                    let key = (sig.clone(), ty.field(1));
-                    if let Some(existing) = self.closure_tys.get(&key) {
-                        self.type_names.insert(ty, existing.clone());
-                        return;
-                    }
-                }
-
-                // Create new typedef
-                let name = format!("ty_{}", self.count);
-                self.count += 1;
-
-                writeln!(&mut self.f, "typedef struct {{").unwrap();
-                for (i, field_ty) in field_types.iter().enumerate() {
-                    writeln!(&mut self.f, "    {} _{};", field_ty, i).unwrap();
-                }
-                writeln!(&mut self.f, "}} {};\n", name).unwrap();
-
-                if ty.repr_closure() {
-                    let sig = ty.field(0).sig();
-                    let key = (sig, ty.field(1));
-                    self.closure_tys.insert(key, name.clone());
-                }
-
-                self.type_names.insert(ty, name);
-            }
-
-            _ => unreachable!("Unhandled type: {:?}", ty),
-        }
-    }
-
     fn write_proto(&mut self, f: &Func, alias: Option<String>) {
-        let ret_ty_name = self.get_type_name(&f.ret_ty);
+        let ret_ty_name = self.get_decayed_type_name(&f.ret_ty);
         let param_ty_names = f
             .params
             .iter()
             .map(|(name, x)| {
                 format!(
                     "{} {}",
-                    self.get_type_name(x),
+                    self.get_decayed_type_name(x),
                     format!("_v{}", name.extract())
                 )
             })
@@ -555,34 +516,12 @@ impl ExportC {
         writeln!(&mut self.f, "void start(void) {{ {entry}(); }}\n").unwrap();
     }
 
-    fn get_type_name(&self, ty: &Ty) -> String {
-        match ty {
-            Ty::Int => return "int".into(),
-            Ty::String => return "const char *".into(),
-            Ty::Void => return "void".into(),
-            Ty::Ptr(_) => (),
-            Ty::Struct(items) if items.is_empty() => return "void".into(),
-            Ty::FunPtr(_) => (),
-            Ty::Struct(_) => (),
-        }
-        if self.type_names.contains_key(ty) {
-            self.type_names.get(ty).unwrap().clone()
-        } else {
-            for (k, v) in self.type_names.iter() {
-                if k.matches(ty) {
-                    return v.clone();
-                }
-            }
-            panic!("Could not find def for type {ty}");
-        }
-    }
-
     pub fn export(&mut self, prog: &Program) {
         writeln!(&mut self.f, "#include \"runtime.h\"").unwrap();
 
         let types = prog.get_all_types();
         for ty in types {
-            self.define_type(ty, false);
+            self.define_type(ty);
         }
 
         let rev_map = prog
