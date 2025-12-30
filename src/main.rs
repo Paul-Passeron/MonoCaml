@@ -173,6 +173,7 @@ fn test_ast_9() -> Ast {
     )
 }
 
+#[allow(unused)]
 fn fact_ast() -> Ast {
     let fact = Var::fresh();
     let n = Var::fresh();
@@ -204,6 +205,7 @@ fn fact_ast() -> Ast {
     )
 }
 
+#[allow(unused)]
 fn fact_bench() -> Ast {
     let fact = Var::fresh();
     let loo = Var::fresh();
