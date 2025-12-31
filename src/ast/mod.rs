@@ -92,7 +92,6 @@ pub enum Ast {
     Native(String),
     LetBinding {
         bound: AstTyped<Var>,
-        rec: RecFlag,
         value: Box<Ast>,
         in_expr: Box<Ast>,
     },
@@ -152,19 +151,9 @@ impl Ast {
         Self::Native(s.into())
     }
 
-    pub fn let_binding(v: Var, ty: AstTy, e: Ast, in_e: Ast) -> Self {
+    pub fn let_in(v: Var, ty: AstTy, e: Ast, in_e: Ast) -> Self {
         Self::LetBinding {
             bound: AstTyped::new(v, ty),
-            rec: RecFlag::NonRecursive,
-            value: Box::new(e),
-            in_expr: Box::new(in_e),
-        }
-    }
-
-    pub fn let_rec(v: Var, ty: AstTy, e: Ast, in_e: Ast) -> Self {
-        Self::LetBinding {
-            bound: AstTyped::new(v, ty),
-            rec: RecFlag::Recursive,
             value: Box::new(e),
             in_expr: Box::new(in_e),
         }
@@ -226,11 +215,3 @@ impl Ast {
         }
     }
 }
-
-#[derive(Clone, Copy)]
-pub enum RecFlag {
-    NonRecursive,
-    Recursive,
-}
-
-pub struct LetBinding {}

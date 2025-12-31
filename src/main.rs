@@ -105,7 +105,7 @@ fn test_ast_4() -> Ast {
 fn test_ast_5() -> Ast {
     let x = Var::fresh();
 
-    Ast::let_binding(
+    Ast::let_in(
         x,
         AstTy::Int,
         Ast::Int(5),
@@ -120,7 +120,7 @@ fn test_ast_5() -> Ast {
 fn test_ast_6() -> Ast {
     let x = Var::fresh();
 
-    Ast::let_binding(
+    Ast::let_in(
         x,
         AstTy::fun(AstTy::Int, AstTy::Tuple(vec![])),
         Ast::native("print_int"),
@@ -137,7 +137,7 @@ fn test_ast_7() -> Ast {
 fn test_ast_8() -> Ast {
     let x = Var::fresh();
 
-    Ast::let_rec(
+    Ast::let_in(
         x,
         AstTy::fun(AstTy::Int, AstTy::Tuple(vec![])),
         Ast::native("print_int"),
@@ -163,7 +163,7 @@ fn test_ast_9() -> Ast {
         ),
     );
     let f = Var::fresh();
-    Ast::let_binding(
+    Ast::let_in(
         f,
         AstTy::fun(AstTy::Int, AstTy::Tuple(vec![])),
         print_is_zero,
@@ -179,7 +179,7 @@ fn fact_ast() -> Ast {
     let fact = Var::fresh();
     let n = Var::fresh();
     let int = AstTy::Int;
-    Ast::let_rec(
+    Ast::let_in(
         fact,
         AstTy::fun(int.clone(), int.clone()),
         Ast::lambda(
@@ -212,7 +212,7 @@ fn fact_bench() -> Ast {
     let loo = Var::fresh();
     let n = Var::fresh();
     let res = Var::fresh();
-    Ast::let_rec(
+    Ast::let_in(
         fact,
         AstTy::fun(AstTy::Int, AstTy::Int),
         Ast::lambda(
@@ -229,14 +229,14 @@ fn fact_bench() -> Ast {
                 Ast::Int(1),
             ),
         ),
-        Ast::let_rec(
+        Ast::let_in(
             loo,
             AstTy::fun(AstTy::Int, AstTy::Tuple(vec![])),
             Ast::lambda(
                 AstTyped::new(n, AstTy::Int),
                 Ast::ifte(
                     Ast::var(n),
-                    Ast::let_binding(
+                    Ast::let_in(
                         res,
                         AstTy::Int,
                         Ast::app(

@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::{
-    ast::{Ast, AstTy, AstTyped, RecFlag, Var},
+    ast::{Ast, AstTy, AstTyped, Var},
     cfg::{
         Const, FunName, FunNameUse, Func, Label, Program, Sig, Ty, TyCtx, Value, builder::Builder,
         expr::Expr, var::CfgVarUse,
@@ -324,81 +324,77 @@ impl Compiler {
             Ast::Native(name) => self.get_native_closure(name.clone(), b),
             Ast::LetBinding {
                 bound,
-                rec: RecFlag::NonRecursive,
                 value,
                 in_expr,
             } => {
-                let val = self.aux(value, b);
-                let bound_ty = self.ast_ty_to_ty(bound.ty());
-                assert!(val.get_type(&self.ctx).matches(&bound_ty));
-                let bound_cfg = self.ctx.new_var(bound_ty);
-                self.map.insert(bound.expr().clone(), Use::from(&bound_cfg));
-                b.assign_to(&mut self.ctx, bound_cfg, Expr::value(val.into()));
-                self.aux(in_expr, b)
+                if value.free_vars().contains(bound.expr()) {
+                    self.compile_rec_let(
+                        bound.clone(),
+                        value.as_ref().clone(),
+                        in_expr.as_ref().clone(),
+                        b,
+                    )
+                } else {
+                    self.compile_nonrec_let(b, bound, value, in_expr)
+                }
             }
-            Ast::LetBinding {
-                bound,
-                rec,
-                value,
-                in_expr,
-            } if !value.free_vars().contains(bound.expr()) => self.aux(
-                &Ast::LetBinding {
-                    bound: bound.clone(),
-                    rec: RecFlag::NonRecursive,
-                    value: value.clone(),
-                    in_expr: in_expr.clone(),
-                },
-                b,
-            ),
-            Ast::LetBinding {
-                bound,
-                rec: _,
-                value,
-                in_expr,
-            } => self.compile_rec_let(
-                bound.clone(),
-                value.as_ref().clone(),
-                in_expr.as_ref().clone(),
-                b,
-            ),
+
             Ast::If {
                 cond,
                 then_e,
                 else_e,
-            } => {
-                let compiled_cond = self.aux(cond, b);
-                let then_bb = Label::fresh();
-                let else_bb = Label::fresh();
-                let merge_bb = Label::fresh();
-                let then_bb_use = Use::from(&then_bb);
-                let else_bb_use = Use::from(&else_bb);
-                let merge_bb_use = Use::from(&merge_bb);
-                b.branch(
-                    &mut self.ctx,
-                    compiled_cond.into(),
-                    then_bb_use,
-                    else_bb_use,
-                    then_bb,
-                );
-                let then_value = match self.aux(then_e, b) {
-                    Value::Var(v) => v,
-                    c => b.value(&mut self.ctx, c).into(),
-                };
-                b.goto(&mut self.ctx, merge_bb_use.clone(), else_bb);
-
-                let else_value = match self.aux(else_e, b) {
-                    Value::Var(v) => v,
-                    c => b.value(&mut self.ctx, c).into(),
-                };
-
-                b.goto(&mut self.ctx, merge_bb_use, merge_bb);
-                let res_ty = then_value.get_type(&self.ctx);
-                let res_value_use = b.add_phi_target(&mut self.ctx, res_ty);
-                b.add_phi(&mut self.ctx, res_value_use.clone(), then_value);
-                b.add_phi(&mut self.ctx, res_value_use.clone(), else_value);
-                res_value_use.into()
-            }
+            } => self.compile_if(b, cond, then_e, else_e),
         }
+    }
+
+    fn compile_nonrec_let(
+        &mut self,
+        b: &mut Builder,
+        bound: &AstTyped<Var>,
+        value: &Ast,
+        in_expr: &Ast,
+    ) -> Value {
+        let val = self.aux(value, b);
+        let bound_ty = self.ast_ty_to_ty(bound.ty());
+        assert!(val.get_type(&self.ctx).matches(&bound_ty));
+        let bound_cfg = self.ctx.new_var(bound_ty);
+        self.map.insert(bound.expr().clone(), Use::from(&bound_cfg));
+        b.assign_to(&mut self.ctx, bound_cfg, Expr::value(val.into()));
+        self.aux(in_expr, b)
+    }
+
+    fn compile_if(&mut self, b: &mut Builder, cond: &Ast, then_e: &Ast, else_e: &Ast) -> Value {
+        let compiled_cond = self.aux(cond, b);
+        let then_bb = Label::fresh();
+        let else_bb = Label::fresh();
+        let merge_bb = Label::fresh();
+        let then_bb_use = Use::from(&then_bb);
+        let else_bb_use = Use::from(&else_bb);
+        let merge_bb_use = Use::from(&merge_bb);
+        b.branch(
+            &mut self.ctx,
+            compiled_cond.into(),
+            then_bb_use,
+            else_bb_use,
+            then_bb,
+        );
+        let then_value = match self.aux(then_e, b) {
+            Value::Var(v) => v,
+            c => b.value(&mut self.ctx, c).into(),
+        };
+        b.goto(&mut self.ctx, merge_bb_use.clone(), else_bb);
+
+        let else_value = match self.aux(else_e, b) {
+            Value::Var(v) => v,
+            c => b.value(&mut self.ctx, c).into(),
+        };
+
+        b.goto(&mut self.ctx, merge_bb_use, merge_bb);
+        let res_ty = then_value.get_type(&self.ctx);
+        let res_value_use = b.add_phi_target(&mut self.ctx, res_ty);
+        b.add_phi(&mut self.ctx, res_value_use.clone(), then_value);
+        b.add_phi(&mut self.ctx, res_value_use.clone(), else_value);
+        res_value_use.into()
     }
 
     fn compile_rec_let(
@@ -600,19 +596,9 @@ impl Compiler {
                 let sig = &self.ctx.sigs[f];
                 self.curry(sig)
             }
-            Ast::LetBinding {
-                bound,
-                rec,
-                in_expr,
-                ..
-            } => {
-                match rec {
-                    RecFlag::NonRecursive => (),
-                    RecFlag::Recursive => {
-                        let bound_ty = self.ast_ty_to_ty(bound.ty());
-                        self.type_map.insert(bound.expr().clone(), bound_ty);
-                    }
-                };
+            Ast::LetBinding { bound, in_expr, .. } => {
+                let bound_ty = self.ast_ty_to_ty(bound.ty());
+                self.type_map.insert(bound.expr().clone(), bound_ty);
                 self.get_type_of_ast(in_expr)
             }
             Ast::If {

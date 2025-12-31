@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::ast::{Ast, AstTy, AstTyped, RecFlag, Var};
+use crate::ast::{Ast, AstTy, AstTyped, Var};
 
 pub fn alphabetize(x: usize) -> String {
     let mut x = x + 1;
@@ -66,21 +66,9 @@ impl fmt::Display for Ast {
             Ast::Native(name) => write!(f, "{name}"),
             Ast::LetBinding {
                 bound,
-                rec,
                 value,
                 in_expr,
-            } => write!(
-                f,
-                "let{} {} = {} in {}",
-                if matches!(rec, RecFlag::Recursive) {
-                    " rec"
-                } else {
-                    ""
-                },
-                bound,
-                value,
-                in_expr
-            ),
+            } => write!(f, "let {} = {} in {}", bound, value, in_expr),
             Ast::If {
                 cond,
                 then_e,
