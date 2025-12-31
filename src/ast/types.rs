@@ -32,18 +32,22 @@ impl AstTy {
         match self {
             AstTy::Int => false,
             AstTy::String => false,
-            AstTy::Tuple(items) => items.iter().all(|x| x.is_rec_aux(ctx, names)),
+            AstTy::Tuple(items) => items.iter().any(|x| x.is_rec_aux(ctx, names)),
             AstTy::Fun { arg, ret } => arg.is_rec_aux(ctx, names) || ret.is_rec_aux(ctx, names),
             AstTy::Named(this) => {
-                let def = &ctx.types[this];
-                match def {
-                    TypeDef::Alias(ast_ty) => ast_ty.is_rec_aux(ctx, names),
-                    TypeDef::Enum(enum_def) => enum_def
-                        .cases
-                        .iter()
-                        .map(|x| x.args.iter())
-                        .flatten()
-                        .all(|x| x.is_rec_aux(ctx, names)),
+                if names.contains(&this[..]) {
+                    true
+                } else {
+                    let def = &ctx.types[this];
+                    match def {
+                        TypeDef::Alias(ast_ty) => ast_ty.is_rec_aux(ctx, names),
+                        TypeDef::Enum(enum_def) => enum_def
+                            .cases
+                            .iter()
+                            .map(|x| x.arg.iter())
+                            .flatten()
+                            .any(|x| x.is_rec_aux(ctx, names)),
+                    }
                 }
             }
         }
@@ -59,9 +63,9 @@ impl AstTy {
                     TypeDef::Enum(enum_def) => enum_def
                         .cases
                         .iter()
-                        .map(|x| x.args.iter())
+                        .map(|x| x.arg.iter())
                         .flatten()
-                        .all(|x| x.is_rec_aux(ctx, names)),
+                        .any(|x| x.is_rec_aux(ctx, names)),
                 }
             }
             _ => false,
@@ -90,7 +94,7 @@ impl<T> AstTyped<T> {
 
 pub struct EnumCase {
     pub cons_name: String,
-    pub args: Vec<AstTy>,
+    pub arg: Option<AstTy>,
 }
 
 pub struct EnumDef {
@@ -105,4 +109,37 @@ pub enum TypeDef {
 #[derive(Default)]
 pub struct AstCtx {
     pub types: HashMap<String, TypeDef>,
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::ast::types::{AstCtx, AstTy, EnumCase, EnumDef, TypeDef};
+
+    #[test]
+    pub fn test_list_is_rec() {
+        let mut ctx = AstCtx::default();
+        let elem_ty = AstTy::Int;
+        ctx.types
+            .insert("elem".into(), TypeDef::Alias(elem_ty.clone()));
+        let list_ty = EnumDef {
+            cases: vec![
+                EnumCase {
+                    cons_name: "Nil".into(),
+                    arg: None,
+                },
+                EnumCase {
+                    cons_name: "Cons".into(),
+                    arg: Some(AstTy::Tuple(vec![
+                        AstTy::Named("elem".into()),
+                        AstTy::Named("list".into()),
+                    ])),
+                },
+            ],
+        };
+
+        ctx.types.insert("list".into(), TypeDef::Enum(list_ty));
+
+        assert!(AstTy::Named("list".into()).is_recursive(&ctx));
+        assert!(!AstTy::Named("elem".into()).is_recursive(&ctx));
+    }
 }
