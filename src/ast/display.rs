@@ -42,7 +42,7 @@ impl fmt::Display for AstTy {
 
 impl<T: fmt::Display> fmt::Display for AstTyped<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "({}:{})", self.expr, self.ty)
+        write!(f, "({}:{})", self.expr(), self.ty())
     }
 }
 

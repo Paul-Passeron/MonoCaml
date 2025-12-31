@@ -1,7 +1,10 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::{
-    ast::{Ast, AstCtx, AstTy, AstTyped, Var},
+    ast::{
+        Ast, Var,
+        types::{AstCtx, AstTy, AstTyped},
+    },
     cfg::{
         Const, FunName, FunNameUse, Func, Label, Program, Sig, Ty, TyCtx, Value, builder::Builder,
         expr::Expr, var::CfgVarUse,

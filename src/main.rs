@@ -7,7 +7,10 @@ use std::{
 };
 
 use crate::{
-    ast::{Ast, AstCtx, AstTy, AstTyped, Var},
+    ast::{
+        Ast, Var,
+        types::{AstCtx, AstTy, AstTyped},
+    },
     backend::c_backend::ExportC,
     cfg::{FunName, Label, compile::Compiler, var::CfgVar},
 };
