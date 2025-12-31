@@ -1,3 +1,4 @@
+use crate::backend::Backend;
 use crate::cfg::expr::Expr;
 use crate::cfg::var::CfgVarUse;
 use crate::cfg::{
@@ -6,20 +7,22 @@ use crate::cfg::{
 use crate::helpers::unique::{Extractable, Use};
 use std::collections::{HashMap, HashSet};
 use std::fmt::Write as FmtWrite;
+use std::fs::File;
 use std::io::Write;
 use std::iter::repeat;
+use std::path::Path;
 
-#[derive(Default)]
-pub struct ExportC {
+pub struct ExportC<P: AsRef<Path>> {
     pub f: String,
     pub count: usize,
     pub type_names: HashMap<Ty, String>,
     pub decayed_type_names: HashMap<Ty, String>,
     pub closure_tys: HashMap<(Sig, Ty), String>,
     pub var_aliases: HashMap<CfgVarUse, CfgVarUse>,
+    pub output_file: P,
 }
 
-impl ExportC {
+impl<P: AsRef<Path>> ExportC<P> {
     /// Compute the canonical decayed representation of a type as a string.
     /// This doesn't require the type to be defined yet.
     fn canonical_decayed(&self, ty: &Ty) -> String {
@@ -30,9 +33,9 @@ impl ExportC {
             Ty::Struct(items) if items.is_empty() => "void".to_string(),
             Ty::Ptr(_) => "void*".to_string(),
             Ty::FunPtr(sig) => {
-                let ret = self.canonical_decayed(&sig.ret);
+                let ret = self.canonical_decayed(sig.ret());
                 let params: Vec<_> = sig
-                    .params
+                    .params()
                     .iter()
                     .map(|p| self.canonical_decayed(p))
                     .collect();
@@ -89,8 +92,8 @@ impl ExportC {
             }
             Ty::FunPtr(sig) => {
                 // Define return and param types first (recursively)
-                self.define_type((*sig.ret).clone());
-                for param in &sig.params {
+                self.define_type((sig.ret()).clone());
+                for param in sig.params() {
                     self.define_type(param.clone());
                 }
 
@@ -121,9 +124,9 @@ impl ExportC {
                 let name = format!("ty_{}", self.count);
                 self.count += 1;
 
-                let decayed_ret = self.get_decayed_type_name(&sig.ret);
+                let decayed_ret = self.get_decayed_type_name(&sig.ret());
                 let decayed_params: Vec<_> = sig
-                    .params
+                    .params()
                     .iter()
                     .map(|p| self.get_decayed_type_name(p))
                     .collect();
@@ -266,14 +269,14 @@ impl ExportC {
     }
 
     pub fn get_phis_aux(b: &BasicBlock, s: &mut HashMap<CfgVarUse, HashSet<CfgVarUse>>) {
-        s.extend(b.phis.iter().map(|(a, b)| (a.clone(), b.clone())));
+        s.extend(b.phis().iter().map(|(a, b)| (a.clone(), b.clone())));
     }
 
     pub fn set_phis(&mut self, prog: &Program) {
         let mut s = HashMap::new();
-        for f in &prog.funcs {
-            if let Some(cfg) = &f.cfg {
-                for b in &cfg.blocks {
+        for f in prog.funcs() {
+            if let Some(cfg) = &f.cfg() {
+                for b in cfg.blocks() {
                     Self::get_phis_aux(b, &mut s);
                 }
             }
@@ -282,9 +285,9 @@ impl ExportC {
     }
 
     fn write_proto(&mut self, f: &Func, alias: Option<String>) {
-        let ret_ty_name = self.get_decayed_type_name(&f.ret_ty);
+        let ret_ty_name = self.get_decayed_type_name(f.ret_ty());
         let param_ty_names = f
-            .params
+            .params()
             .iter()
             .map(|(name, x)| {
                 format!(
@@ -301,14 +304,14 @@ impl ExportC {
             alias
                 .as_ref()
                 .cloned()
-                .unwrap_or_else(|| format!("{}", Use::from(&f.name))),
+                .unwrap_or_else(|| format!("{}", f.name())),
             param_ty_names.join(", ")
         )
         .unwrap();
     }
 
     fn forward_declare(&mut self, f: &Func, alias: Option<String>) {
-        if f.cfg.is_some() {
+        if f.cfg().is_some() {
             self.write_proto(f, alias.clone());
             writeln!(&mut self.f, ";").unwrap();
         }
@@ -316,7 +319,7 @@ impl ExportC {
             writeln!(
                 &mut self.f,
                 "#define {}(...) {alias}(__VA_ARGS__)",
-                Use::from(&f.name)
+                f.name()
             )
             .unwrap();
         }
@@ -441,23 +444,23 @@ impl ExportC {
     }
 
     fn write_cfg(&mut self, cfg: &Cfg) {
-        for (local, ty) in &cfg.locals {
+        for (local, ty) in cfg.locals() {
             if ty.is_zero_sized() || self.var_aliases.contains_key(&Use::from(local)) {
                 continue;
             }
             let t = self.get_type_name(ty);
             writeln!(&mut self.f, "    {} _v{};", t, local.extract()).unwrap();
         }
-        writeln!(&mut self.f, "    goto {};", cfg.entry).unwrap();
-        for b in &cfg.blocks {
-            writeln!(&mut self.f, "    {}: {{", Use::from(&b.label)).unwrap();
-            for instr in &b.instrs {
+        writeln!(&mut self.f, "    goto {};", cfg.entry()).unwrap();
+        for b in cfg.blocks() {
+            writeln!(&mut self.f, "    {}: {{", b.label()).unwrap();
+            for instr in b.instrs() {
                 write!(&mut self.f, "        ").unwrap();
 
                 match instr {
                     Instr::Assign(var, expr) => {
                         let var_ty = cfg
-                            .locals
+                            .locals()
                             .iter()
                             .find(|(x, _)| x.extract() == var.extract())
                             .unwrap()
@@ -489,7 +492,7 @@ impl ExportC {
                         let v2 = self.value_as_string(value);
                         let ty = if let Value::Var(v) = value {
                             let var_ty = cfg
-                                .locals
+                                .locals()
                                 .iter()
                                 .find(|(x, _)| x.extract() == v.extract())
                                 .unwrap()
@@ -503,7 +506,7 @@ impl ExportC {
                     }
                 }
             }
-            self.write_terminator(&b.terminator);
+            self.write_terminator(b.terminator());
             writeln!(&mut self.f, "    }}").unwrap();
         }
     }
@@ -511,7 +514,7 @@ impl ExportC {
     fn declare(&mut self, f: &Func, alias: Option<String>) {
         self.write_proto(f, alias.clone());
         writeln!(&mut self.f, "{{").unwrap();
-        self.write_cfg(f.cfg.as_ref().unwrap());
+        self.write_cfg(f.cfg().as_ref().unwrap());
         writeln!(&mut self.f, "}}").unwrap();
     }
 
@@ -532,13 +535,13 @@ impl ExportC {
         }
 
         let rev_map = prog
-            .natives
+            .natives()
             .iter()
             .map(|(alias, true_name)| (true_name.clone(), alias.clone()))
             .collect::<HashMap<_, _>>();
 
-        for f in &prog.funcs {
-            self.forward_declare(f, rev_map.get(&Use::from(&f.name)).cloned());
+        for f in prog.funcs() {
+            self.forward_declare(f, rev_map.get(&f.name()).cloned());
         }
 
         self.set_phis(prog);
@@ -549,19 +552,34 @@ impl ExportC {
             writeln!(&mut self.f, "#define {} {}", orig, alias).unwrap();
         }
 
-        self.declare_main(&prog.entry);
+        self.declare_main(&prog.entry());
 
-        for f in &prog.funcs {
-            if f.cfg.is_some() {
-                self.declare(f, rev_map.get(&Use::from(&f.name)).cloned());
+        for f in prog.funcs() {
+            if f.cfg().is_some() {
+                if f.name() == prog.entry() {
+                    write!(&mut self.f, "__inline__ ").unwrap();
+                }
+                self.declare(f, rev_map.get(&f.name()).cloned());
             }
+        }
+    }
+
+    pub fn new(p: P) -> Self {
+        Self {
+            f: Default::default(),
+            count: Default::default(),
+            type_names: Default::default(),
+            decayed_type_names: Default::default(),
+            closure_tys: Default::default(),
+            var_aliases: Default::default(),
+            output_file: p,
         }
     }
 }
 
 impl Cfg {
     pub fn get_all_types(&self) -> HashSet<Ty> {
-        HashSet::from_iter(self.locals.values().cloned())
+        HashSet::from_iter(self.locals().values().cloned())
     }
 }
 
@@ -574,31 +592,39 @@ fn add_type(s: &mut HashSet<Ty>, ty: &Ty) {
         Ty::Ptr(ty) => add_type(s, ty),
         Ty::Struct(items) => items.iter().for_each(|x| add_type(s, x)),
         Ty::FunPtr(sig) => {
-            add_type(s, &sig.ret);
-            sig.params.iter().for_each(|x| add_type(s, x));
+            add_type(s, &sig.ret());
+            sig.params().iter().for_each(|x| add_type(s, x));
         }
         _ => (),
+    }
+}
+
+impl<P: AsRef<Path>> Backend for ExportC<P> {
+    type Out = ();
+
+    type Err = ();
+
+    fn compile(self, prog: &Program) -> Result<(), ()> {
+        let mut this = self;
+        this.export(prog);
+        let mut f = File::create(this.output_file).map_err(|_| ())?;
+        f.write_all(this.f.as_bytes()).unwrap();
+        Ok(())
     }
 }
 
 impl Program {
     fn get_all_types(&self) -> HashSet<Ty> {
         let mut s = HashSet::new();
-        for f in &self.funcs {
-            f.params.iter().for_each(|(_, x)| add_type(&mut s, x));
-            add_type(&mut s, &f.ret_ty);
-            f.cfg
+        for f in self.funcs() {
+            f.params().iter().for_each(|(_, x)| add_type(&mut s, x));
+            add_type(&mut s, f.ret_ty());
+            f.cfg()
                 .iter()
                 .map(|x| x.get_all_types())
                 .flatten()
                 .for_each(|x| add_type(&mut s, &x));
         }
         s
-    }
-
-    pub fn export_to_c(&self, f: &mut std::fs::File) {
-        let mut exporter = ExportC::default();
-        exporter.export(self);
-        writeln!(f, "{}", exporter.f).unwrap();
     }
 }

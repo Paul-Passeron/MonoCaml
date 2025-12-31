@@ -4,6 +4,7 @@ use std::{
 };
 
 use crate::{
+    backend::Backend,
     cfg::{
         expr::Expr,
         var::{
@@ -15,10 +16,10 @@ use crate::{
     },
     helpers::unique::{Unique, Use},
 };
+
 pub mod builder;
 pub mod compile;
 pub mod display;
-pub mod export_c;
 pub mod expr;
 pub mod extract;
 pub mod get_type;
@@ -39,7 +40,7 @@ impl FunName {
     }
 }
 
-type FunNameUse = Use<FunName>;
+pub type FunNameUse = Use<FunName>;
 
 #[allow(unused)]
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -149,11 +150,43 @@ pub struct BasicBlock {
     terminator: Terminator,
 }
 
+impl BasicBlock {
+    pub fn phis(&self) -> &HashMap<CfgVarUse, HashSet<CfgVarUse>> {
+        &self.phis
+    }
+
+    pub fn label(&self) -> LabelUse {
+        Use::from(&self.label)
+    }
+
+    pub fn terminator(&self) -> &Terminator {
+        &self.terminator
+    }
+
+    pub fn instrs(&self) -> &Vec<Instr<CfgVarUse>> {
+        &self.instrs
+    }
+}
+
 #[allow(unused)]
 pub struct Cfg {
     entry: LabelUse,
     locals: HashMap<CfgVar, Ty>,
     blocks: Vec<BasicBlock>,
+}
+
+impl Cfg {
+    pub fn entry(&self) -> &LabelUse {
+        &self.entry
+    }
+
+    pub fn locals(&self) -> &HashMap<CfgVar, Ty> {
+        &self.locals
+    }
+
+    pub fn blocks(&self) -> &Vec<BasicBlock> {
+        &self.blocks
+    }
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -162,11 +195,46 @@ pub struct Sig {
     ret: Box<Ty>,
 }
 
+impl Sig {
+    pub fn new(params: Vec<Ty>, ret: Ty) -> Self {
+        Sig {
+            params,
+            ret: Box::new(ret),
+        }
+    }
+
+    pub fn ret(&self) -> &Ty {
+        &self.ret
+    }
+
+    pub fn params(&self) -> &Vec<Ty> {
+        &self.params
+    }
+}
+
 pub struct Func {
     name: FunName,
     params: Vec<(CfgVar, Ty)>,
     ret_ty: Ty,
     cfg: Option<Cfg>,
+}
+
+impl Func {
+    pub fn name(&self) -> FunNameUse {
+        Use::from(&self.name)
+    }
+
+    pub fn params(&self) -> &Vec<(CfgVar, Ty)> {
+        &self.params
+    }
+
+    pub fn ret_ty(&self) -> &Ty {
+        &self.ret_ty
+    }
+
+    pub fn cfg(&self) -> &Option<Cfg> {
+        &self.cfg
+    }
 }
 
 impl PartialEq for Func {
@@ -183,16 +251,34 @@ impl Hash for Func {
     }
 }
 
+#[allow(unused)]
 pub struct Program {
     entry: FunNameUse,
     natives: HashMap<String, FunNameUse>,
     funcs: HashSet<Func>,
 }
 
+impl Program {
+    pub fn entry(&self) -> FunNameUse {
+        self.entry.clone()
+    }
+
+    pub fn natives(&self) -> &HashMap<String, FunNameUse> {
+        &self.natives
+    }
+
+    pub fn funcs(&self) -> &HashSet<Func> {
+        &self.funcs
+    }
+
+    pub fn compile<B: Backend>(&self, b: B) -> Result<B::Out, B::Err> {
+        b.compile(self)
+    }
+}
+
 #[derive(Clone)]
 pub struct TyCtx {
     pub sigs: HashMap<FunNameUse, Sig>,
-    // pub globals: HashMap<CfgGlobalUse, Ty>,
     pub vars: HashMap<CfgVarUse, Ty>,
     pub natives: HashMap<String, FunNameUse>,
 }

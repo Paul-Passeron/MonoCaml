@@ -1,7 +1,6 @@
 #![feature(exit_status_error)]
 
 use std::{
-    fs::{self, File},
     io::Read,
     path::PathBuf,
     process::{self, Command, Stdio},
@@ -9,10 +8,12 @@ use std::{
 
 use crate::{
     ast::{Ast, AstTy, AstTyped, Var},
+    backend::c_backend::ExportC,
     cfg::{FunName, Label, compile::Compiler, var::CfgVar},
 };
 
 pub mod ast;
+pub mod backend;
 pub mod cfg;
 pub mod helpers;
 
@@ -266,7 +267,9 @@ fn compile_ast<S: ToString>(ast: Ast, prog_name: S) {
     println!("{ast}");
     let prog = Compiler::compile(ast);
     println!("{prog}");
-    prog.export_to_c(&mut File::create(PathBuf::from(format!("./{prog_name}.c"))).unwrap());
+    prog.compile(ExportC::new(PathBuf::from(format!("./{prog_name}.c"))))
+        .unwrap();
+
     process::Command::new("clang")
         .arg("-g")
         .arg("-o")
@@ -305,9 +308,9 @@ fn run_and_check_output(program: &str, args: &[&str], expected: &str) -> std::io
 pub fn test_ast<S: ToString>(ast: Ast, prog_name: S) {
     let prog_name = prog_name.to_string();
     let p = PathBuf::from(prog_name.clone());
-    let _ = fs::remove_file(&p);
+    let _ = std::fs::remove_file(&p);
     compile_ast(ast, prog_name.clone());
-    assert!(fs::exists(&p).is_ok());
+    assert!(std::fs::exists(&p).is_ok());
     process::Command::new(prog_name.clone())
         .stdout(Stdio::null())
         .stderr(Stdio::null())
@@ -371,5 +374,5 @@ mod tests {
 }
 
 fn main() {
-    compile_ast(fact_bench(), "test");
+    compile_ast(fact_ast(), "test");
 }
