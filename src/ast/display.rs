@@ -35,6 +35,7 @@ impl fmt::Display for AstTy {
                     .join(", ")
             ),
             AstTy::Fun { arg, ret } => write!(f, "({} -> {})", arg, ret),
+            AstTy::Named(s) => write!(f, "{s}"),
         }
     }
 }

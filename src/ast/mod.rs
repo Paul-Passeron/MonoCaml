@@ -1,7 +1,7 @@
 pub mod display;
 mod vars;
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use crate::helpers::unique::Unique;
 
@@ -29,6 +29,7 @@ pub enum AstTy {
     String,
     Tuple(Vec<AstTy>),
     Fun { arg: Box<AstTy>, ret: Box<AstTy> },
+    Named(String),
 }
 
 impl AstTy {
@@ -214,4 +215,23 @@ impl Ast {
             }
         }
     }
+}
+
+pub struct EnumCase {
+    pub cons_name: String,
+    pub args: Vec<AstTy>,
+}
+
+pub struct EnumDef {
+    pub cases: Vec<EnumCase>,
+}
+
+pub enum TypeDef {
+    Alias(AstTy),
+    Enum(EnumDef),
+}
+
+#[derive(Default)]
+pub struct AstCtx {
+    pub types: HashMap<String, TypeDef>,
 }

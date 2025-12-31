@@ -7,7 +7,7 @@ use std::{
 };
 
 use crate::{
-    ast::{Ast, AstTy, AstTyped, Var},
+    ast::{Ast, AstCtx, AstTy, AstTyped, Var},
     backend::c_backend::ExportC,
     cfg::{FunName, Label, compile::Compiler, var::CfgVar},
 };
@@ -263,9 +263,13 @@ fn fact_bench() -> Ast {
 }
 
 fn compile_ast<S: ToString>(ast: Ast, prog_name: S) {
+    compile_ast_with_ctx(ast, prog_name, AstCtx::default())
+}
+
+fn compile_ast_with_ctx<S: ToString>(ast: Ast, prog_name: S, ctx: AstCtx) {
     let prog_name = prog_name.to_string();
     println!("{ast}");
-    let prog = Compiler::compile(ast);
+    let prog = Compiler::compile(ast, ctx);
     println!("{prog}");
     prog.compile(ExportC::new(PathBuf::from(format!("./{prog_name}.c"))))
         .unwrap();

@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use crate::{
-    ast::{Ast, AstTy, AstTyped, Var},
+    ast::{Ast, AstCtx, AstTy, AstTyped, Var},
     cfg::{
         Const, FunName, FunNameUse, Func, Label, Program, Sig, Ty, TyCtx, Value, builder::Builder,
         expr::Expr, var::CfgVarUse,
@@ -15,6 +15,7 @@ pub struct Compiler {
     type_map: HashMap<Var, Ty>,
     ctx: TyCtx,
     wrapped_natives: HashMap<FunNameUse, FunNameUse>,
+    ast_ctx: AstCtx,
 }
 
 impl Compiler {
@@ -169,6 +170,7 @@ impl Compiler {
             map: HashMap::new(),
             ctx: TyCtx::new(),
             wrapped_natives: HashMap::new(),
+            ast_ctx: Default::default(),
         };
         res.create_add();
         res.create_mul();
@@ -181,10 +183,11 @@ impl Compiler {
         res
     }
 
-    pub fn compile(ast: Ast) -> Program {
+    pub fn compile(ast: Ast, ctx: AstCtx) -> Program {
         let entry = FunName::fresh();
         let entry_use = Use::from(&entry);
         let mut res = Self::new(entry_use);
+        res.ast_ctx = ctx;
         let mut b = Builder::new(entry, vec![], Ty::Void, &mut res.ctx);
         res.aux(&ast, &mut b);
         b.ret_void(&mut res.ctx);
@@ -216,6 +219,7 @@ impl Compiler {
             AstTy::Tuple(items) if items.len() == 0 => Ty::Void,
             AstTy::Tuple(items) => Ty::Struct(items.iter().map(|x| self.ast_ty_to_ty(x)).collect()),
             AstTy::Fun { arg, ret } => self.get_closure_ty(arg, ret),
+            AstTy::Named(_) => todo!(),
         }
     }
 
