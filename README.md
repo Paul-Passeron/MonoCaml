@@ -12,23 +12,19 @@ Closure environnements are allocated on the stack and reference-counted by a sma
 ## Example
 Pseudo-Code:
 ```
-print_then_return = (λ(a:int).((print_int a); a))
-
-(print_int (((
-  (λ(a:int).
-    (λ(b:int).
-      (λ(c:(int -> int)).
-        ((add (c a)) (c b)))))
-      69)
-    420)
-print_then_return))
+let rec fact: (int -> int) = λb: int.
+  if b then
+    (mul b (fact (add -1 b)))
+  else
+    1
+in
+print_int (fact 6);
+print_string "\n"
 ```
 
 Compiles and executes:
 ```
-69
-420
-489
+720
 ```
 
 ## What's interesting
