@@ -1,4 +1,7 @@
-use std::collections::HashMap;
+use std::{
+    collections::{HashMap, HashSet},
+    iter::once,
+};
 
 #[derive(Clone)]
 pub enum AstTy {
@@ -22,6 +25,46 @@ impl AstTy {
         Self::Fun {
             arg: Box::new(arg),
             ret: Box::new(ret),
+        }
+    }
+
+    pub fn is_rec_aux(&self, ctx: &AstCtx, names: &mut HashSet<&str>) -> bool {
+        match self {
+            AstTy::Int => false,
+            AstTy::String => false,
+            AstTy::Tuple(items) => items.iter().all(|x| x.is_rec_aux(ctx, names)),
+            AstTy::Fun { arg, ret } => arg.is_rec_aux(ctx, names) || ret.is_rec_aux(ctx, names),
+            AstTy::Named(this) => {
+                let def = &ctx.types[this];
+                match def {
+                    TypeDef::Alias(ast_ty) => ast_ty.is_rec_aux(ctx, names),
+                    TypeDef::Enum(enum_def) => enum_def
+                        .cases
+                        .iter()
+                        .map(|x| x.args.iter())
+                        .flatten()
+                        .all(|x| x.is_rec_aux(ctx, names)),
+                }
+            }
+        }
+    }
+
+    pub fn is_recursive(&self, ctx: &AstCtx) -> bool {
+        match self {
+            AstTy::Named(this) => {
+                let def = &ctx.types[this];
+                let names = &mut HashSet::from_iter(once(&this[..]));
+                match def {
+                    TypeDef::Alias(ast_ty) => ast_ty.is_rec_aux(ctx, names),
+                    TypeDef::Enum(enum_def) => enum_def
+                        .cases
+                        .iter()
+                        .map(|x| x.args.iter())
+                        .flatten()
+                        .all(|x| x.is_rec_aux(ctx, names)),
+                }
+            }
+            _ => false,
         }
     }
 }
