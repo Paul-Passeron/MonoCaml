@@ -26,6 +26,8 @@ pub struct Compiler {
     pub ast_ctx: AstCtx,
     pub ast_tys: HashMap<Var, AstTy>,
     pub constructors: HashMap<String, HashMap<String, FunNameUse>>,
+    pub borrows: HashMap<String, FunNameUse>,
+    pub drops: HashMap<String, FunNameUse>,
 }
 
 #[allow(unused)]
@@ -62,14 +64,16 @@ impl Compiler {
             ast_ctx,
             ast_tys: HashMap::new(),
             constructors: HashMap::new(),
+            borrows: HashMap::new(),
+            drops: HashMap::new(),
         };
         res.create_add();
         res.create_mul();
         res.create_print_int();
         res.create_print_string();
         res.create_random_int();
-        res.create_borrow_closure();
-        res.create_drop_closure();
+        res.create_borrow_object();
+        res.create_drop_object();
         res.create_register_object();
         res.create_print_lst();
         res
@@ -79,6 +83,7 @@ impl Compiler {
         let entry = FunName::fresh();
         let entry_use = Use::from(&entry);
         let mut res = Self::new(entry_use, ctx);
+        res.create_borrows();
         res.create_constructors();
         let mut b = Builder::new(entry, vec![], Ty::Void, &mut res.ctx);
         res.aux(&ast, &mut b);
@@ -109,7 +114,9 @@ impl Compiler {
 
             let mut args = vec![Const::Int(i as i32).into()];
             if !use_params.is_empty() {
-                args.push(use_params[0].clone().into());
+                let val: Value = use_params[0].clone().into();
+                self.borrow_ty(val.clone(), case.arg.as_ref().unwrap(), &mut builder);
+                args.push(val);
             }
             let struct_val = builder.aggregate(&mut self.ctx, args);
 
@@ -135,9 +142,113 @@ impl Compiler {
         }
     }
 
+    fn borrow_ty(&mut self, val: Value, ty: &AstTy, b: &mut Builder) {
+        match ty {
+            AstTy::Tuple(items) => {
+                for (i, item) in items.iter().enumerate() {
+                    let ty_pro = self.ast_ty_to_ty_pro(item, true);
+                    if ty_pro.is_ptr() {
+                        let v = b.extract(&mut self.ctx, val.clone(), i);
+                        self.borrow_ty(v.into(), item, b);
+                    }
+                }
+            }
+            AstTy::Fun { .. } => {}
+            AstTy::Named(ty) => {
+                let borrow_fun = self.borrows[ty].clone();
+                b.native_call(&mut self.ctx, Const::FunPtr(borrow_fun).into(), vec![val]);
+            }
+            _ => (),
+        }
+    }
+
+    fn create_borrows_for_enum(&mut self, enum_def: &EnumDef) {
+        let named = AstTy::named(&enum_def.name);
+        let self_ty = self.ast_ty_to_ty(&named);
+        let is_rec = named.is_recursive(&self.ast_ctx);
+        let funname = FunName::fresh();
+        let funname_use = Use::from(&funname);
+        let param_var = self.ctx.new_var(self_ty.clone());
+        let param_use = Use::from(&param_var);
+        let mut builder = Builder::new(
+            funname,
+            vec![(param_var, self_ty.clone())],
+            Ty::Void,
+            &mut self.ctx,
+        );
+
+        let discr: Value = if is_rec {
+            let ptr = builder.get_element_ptr(
+                &mut self.ctx,
+                param_use.clone().into(),
+                self_ty.into_inner(),
+                0,
+            );
+            builder.load(&mut self.ctx, ptr.into(), Ty::Int).into()
+        } else {
+            builder
+                .extract(&mut self.ctx, param_use.clone().into(), 0)
+                .into()
+        };
+
+        let ret_lbl = Label::fresh();
+        let ret_use = Use::from(&ret_lbl);
+
+        let mut curr_lbl_use = builder.current_lbl();
+
+        for (i, case) in enum_def.cases.iter().enumerate() {
+            let is_i = builder.eq(&mut self.ctx, discr.clone(), Const::Int(i as i32).into());
+
+            let curr_lbl = Label::fresh();
+            let lbl_use = Use::from(&curr_lbl);
+            builder.branch(&mut self.ctx, is_i, lbl_use, ret_use.clone(), curr_lbl);
+
+            let struct_repr = Ty::Struct(vec![Ty::Int, Ty::Ptr(Box::new(Ty::Void))]);
+            for t in case.arg.iter() {
+                let repr = self.ast_ty_to_ty_pro(t, true);
+                if repr.is_ptr() {
+                    let val = if is_rec {
+                        let ptr = builder.get_element_ptr(
+                            &mut self.ctx,
+                            param_use.clone().into(),
+                            struct_repr.clone(),
+                            1,
+                        );
+                        builder.load(&mut self.ctx, ptr.into(), repr.clone()).into()
+                    } else {
+                        builder
+                            .extract(&mut self.ctx, param_use.clone().into(), 1)
+                            .into()
+                    };
+                    self.borrow_ty(val, t, &mut builder);
+                }
+                let next_lbl = Label::fresh();
+                builder.goto(&mut self.ctx, Use::from(&next_lbl), next_lbl);
+            }
+        }
+
+        builder.goto(&mut self.ctx, ret_use, ret_lbl);
+
+        builder.ret_void(&mut self.ctx);
+        let f = builder.finalize();
+        self.add_func(f);
+        self.borrows
+            .entry(enum_def.name.clone())
+            .or_insert(funname_use);
+    }
+
+    fn create_borrows(&mut self) {
+        self.ast_ctx
+            .types
+            .iter()
+            .map(|(_, x)| x.clone())
+            .collect::<Vec<_>>()
+            .iter()
+            .for_each(|x| self.create_borrows_for_enum(x));
+    }
+
     fn create_constructors(&mut self) {
-        let enums = self
-            .ast_ctx
+        self.ast_ctx
             .types
             .iter()
             .map(|(_, x)| x.clone())
@@ -812,11 +923,11 @@ impl Compiler {
                 let env_ptr = use_params[0].clone();
                 let env_ty =
                     Ty::Struct(sig.params[0..remaining_args - 1].iter().cloned().collect());
-                let borrow_closure = Const::FunPtr(self.ctx.natives["borrow_closure"].clone());
+                let borrow_object = Const::FunPtr(self.ctx.natives["borrow_object"].clone());
 
                 wrapper_func_builder.native_call(
                     &mut self.ctx,
-                    borrow_closure.into(),
+                    borrow_object.into(),
                     vec![env_ptr.clone().into()],
                 );
                 let loaded_env =
@@ -889,11 +1000,11 @@ impl Compiler {
             let env_iter = sig.params[..sig.params.len() - 1].iter();
             let env_ty = Ty::Struct(env_iter.clone().cloned().collect::<Vec<_>>());
             let env_ptr = use_params[0].clone();
-            let borrow_closure = Const::FunPtr(self.ctx.natives["borrow_closure"].clone());
+            let borrow_object = Const::FunPtr(self.ctx.natives["borrow_object"].clone());
 
             innermost_builder.native_call(
                 &mut self.ctx,
-                borrow_closure.into(),
+                borrow_object.into(),
                 vec![env_ptr.clone().into()],
             );
             let loaded_env: Value = innermost_builder
