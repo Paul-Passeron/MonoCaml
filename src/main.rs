@@ -328,6 +328,50 @@ fn list_test2() -> (Ast, AstCtx) {
 }
 
 #[allow(unused)]
+fn list_test3() -> (Ast, AstCtx) {
+    let mut ctx = AstCtx::default();
+    ctx.natives.insert(
+        "print_lst".into(),
+        AstTy::fun(AstTy::named("lst"), AstTy::Tuple(vec![])),
+    );
+    ctx.types.insert(
+        "lst".into(),
+        EnumDef {
+            name: "lst".into(),
+            cases: vec![
+                EnumCase {
+                    cons_name: "Nil".into(),
+                    arg: None,
+                },
+                EnumCase {
+                    cons_name: "Cons".into(),
+                    arg: Some(AstTy::Tuple(vec![AstTy::Int, AstTy::named("lst")])),
+                },
+            ],
+        },
+    );
+    let constr = |name: &str, val| Ast::cons("lst", name, val);
+    let cons = |val, old| constr("Cons", Some(Ast::tuple(vec![val, old])));
+    let nil = || constr("Nil", None);
+    let add_cons = Var::fresh();
+    let l = Var::fresh();
+    let ast = Ast::let_in(
+        add_cons,
+        AstTy::fun(AstTy::named("lst"), AstTy::named("lst")),
+        Ast::lambda(
+            AstTyped::new(l, AstTy::named("lst")),
+            cons(Ast::Int(123), Ast::Var(l)),
+        ),
+        Ast::app(
+            Ast::native("print_lst"),
+            Ast::app(Ast::Var(add_cons), Ast::app(Ast::Var(add_cons), nil())),
+        ),
+    );
+
+    (ast, ctx)
+}
+
+#[allow(unused)]
 fn compile_ast<S: ToString>(ast: Ast, prog_name: S) {
     compile_ast_with_ctx(ast, prog_name, AstCtx::default())
 }
@@ -455,11 +499,17 @@ mod tests {
     #[test]
     fn test_list2() {
         let (ast, ctx) = list_test2();
-        test_ast_with_ctx(ast, "test_dir/list_test", ctx);
+        test_ast_with_ctx(ast, "test_dir/list_test2", ctx);
+    }
+
+    #[test]
+    fn test_list3() {
+        let (ast, ctx) = list_test3();
+        test_ast_with_ctx(ast, "test_dir/list_test3", ctx);
     }
 }
 
 fn main() {
-    let (ast, ctx) = list_test2();
+    let (ast, ctx) = list_test3();
     compile_ast_with_ctx(ast, "list_test", ctx);
 }
