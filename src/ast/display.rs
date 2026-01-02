@@ -80,7 +80,11 @@ impl fmt::Display for Ast {
             } => {
                 write!(f, "if {} then {} else {}", cond, then_e, else_e)
             }
-            Ast::Cons { enum_name, arg } => todo!(),
+            Ast::Cons {
+                enum_name,
+                arg,
+                case,
+            } => todo!(),
         }
     }
 }

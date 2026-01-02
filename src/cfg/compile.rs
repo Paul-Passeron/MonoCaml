@@ -69,6 +69,7 @@ impl Compiler {
         res.create_borrow_closure();
         res.create_drop_closure();
         res.create_register_object();
+        res.create_print_lst();
         res
     }
 
@@ -240,7 +241,11 @@ impl Compiler {
                 then_e,
                 else_e,
             } => self.compile_if(b, cond, then_e, else_e),
-            Ast::Cons { enum_name, arg } => todo!(),
+            Ast::Cons {
+                enum_name,
+                arg,
+                case,
+            } => todo!(),
         }
     }
 
@@ -513,7 +518,11 @@ impl Compiler {
                 }
                 t
             }
-            Ast::Cons { enum_name, arg } => todo!(),
+            Ast::Cons {
+                enum_name,
+                arg,
+                case,
+            } => todo!(),
         }
     }
 

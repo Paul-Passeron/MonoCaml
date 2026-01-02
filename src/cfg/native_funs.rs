@@ -131,4 +131,19 @@ impl Compiler {
         self.add_func(f);
         self.add_named_func("register_object", used);
     }
+
+    pub fn create_print_lst(&mut self) {
+        let name = FunName::fresh();
+        let used = Use::from(&name);
+        let f = Func {
+            name: name,
+            params: self
+                .ctx
+                .make_params([Ty::Ptr(Box::new(Ty::Void))].into_iter()),
+            ret_ty: Ty::Void,
+            cfg: None,
+        };
+        self.add_func(f);
+        self.add_named_func("print_lst", used);
+    }
 }

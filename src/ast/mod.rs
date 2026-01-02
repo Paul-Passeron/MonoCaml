@@ -61,6 +61,7 @@ pub enum Ast {
     },
     Cons {
         enum_name: String,
+        case: String,
         arg: Option<Box<Ast>>,
     },
 }
@@ -127,6 +128,14 @@ impl Ast {
             cond: Box::new(cond),
             then_e: Box::new(t),
             else_e: Box::new(e),
+        }
+    }
+
+    pub fn cons<S1: ToString, S2: ToString>(ty_name: S1, case: S2, arg: Option<Self>) -> Self {
+        Self::Cons {
+            enum_name: ty_name.to_string(),
+            case: case.to_string(),
+            arg: arg.map(Box::new),
         }
     }
 

@@ -25,6 +25,10 @@ impl AstTy {
         }
     }
 
+    pub fn named<S: ToString>(name: S) -> Self {
+        AstTy::Named(name.to_string())
+    }
+
     pub fn rec_aux(&self, this: &str, ctx: &AstCtx) -> bool {
         match self {
             AstTy::Int => false,
