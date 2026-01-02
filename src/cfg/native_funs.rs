@@ -87,7 +87,7 @@ impl Compiler {
         self.add_named_func("random_int", used);
     }
 
-    pub fn create_borrow_closure(&mut self) {
+    pub fn create_borrow_object(&mut self) {
         let name = FunName::fresh();
         let used = Use::from(&name);
         let f = Func {
@@ -99,10 +99,10 @@ impl Compiler {
             cfg: None,
         };
         self.add_func(f);
-        self.add_named_func("borrow_closure", used);
+        self.add_named_func("borrow_object", used);
     }
 
-    pub fn create_drop_closure(&mut self) {
+    pub fn create_drop_object(&mut self) {
         let name = FunName::fresh();
         let used = Use::from(&name);
         let f = Func {
@@ -114,7 +114,7 @@ impl Compiler {
             cfg: None,
         };
         self.add_func(f);
-        self.add_named_func("drop_closure", used);
+        self.add_named_func("drop_object", used);
     }
 
     pub fn create_register_object(&mut self) {

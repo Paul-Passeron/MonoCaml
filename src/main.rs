@@ -316,19 +316,18 @@ fn list_test2() -> (Ast, AstCtx) {
             ],
         },
     );
-    let cons = |name: &str, val| Ast::cons("lst", name, val);
-
+    let constr = |name: &str, val| Ast::cons("lst", name, val);
+    let cons = |val, old| constr("Cons", Some(Ast::tuple(vec![val, old])));
+    let nil = || constr("Nil", None);
     let ast = Ast::app(
         Ast::native("print_lst"),
-        cons(
-            "Cons",
-            Some(Ast::tuple(vec![Ast::Int(69), cons("Nil", None)])),
-        ),
+        cons(Ast::Int(420), cons(Ast::Int(69), nil())),
     );
 
     (ast, ctx)
 }
 
+#[allow(unused)]
 fn compile_ast<S: ToString>(ast: Ast, prog_name: S) {
     compile_ast_with_ctx(ast, prog_name, AstCtx::default())
 }
