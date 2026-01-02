@@ -265,6 +265,7 @@ fn fact_bench() -> Ast {
     )
 }
 
+#[allow(unused)]
 fn list_test() -> (Ast, AstCtx) {
     let mut ctx = AstCtx::default();
     ctx.natives.insert(
@@ -292,6 +293,7 @@ fn list_test() -> (Ast, AstCtx) {
     (ast, ctx)
 }
 
+#[allow(unused)]
 fn list_test2() -> (Ast, AstCtx) {
     let mut ctx = AstCtx::default();
     ctx.natives.insert(
@@ -375,10 +377,14 @@ fn run_and_check_output(program: &str, args: &[&str], expected: &str) -> std::io
 }
 
 pub fn test_ast<S: ToString>(ast: Ast, prog_name: S) {
+    test_ast_with_ctx(ast, prog_name, Default::default());
+}
+
+pub fn test_ast_with_ctx<S: ToString>(ast: Ast, prog_name: S, ctx: AstCtx) {
     let prog_name = prog_name.to_string();
     let p = PathBuf::from(prog_name.clone());
     let _ = std::fs::remove_file(&p);
-    compile_ast(ast, prog_name.clone());
+    compile_ast_with_ctx(ast, prog_name.clone(), ctx);
     assert!(std::fs::exists(&p).is_ok());
     process::Command::new(prog_name.clone())
         .stdout(Stdio::null())
@@ -439,6 +445,18 @@ mod tests {
     #[test]
     fn test_fact() {
         test_ast(fact_ast(), "test_dir/test_fact")
+    }
+
+    #[test]
+    fn test_list() {
+        let (ast, ctx) = list_test();
+        test_ast_with_ctx(ast, "test_dir/list_test", ctx);
+    }
+
+    #[test]
+    fn test_list2() {
+        let (ast, ctx) = list_test2();
+        test_ast_with_ctx(ast, "test_dir/list_test", ctx);
     }
 }
 
