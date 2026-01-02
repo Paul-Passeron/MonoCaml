@@ -201,7 +201,26 @@ impl Compiler {
                         Ty::Ptr(Box::new(Ty::Void))
                     }
                 } else {
-                    todo!()
+                    let enum_def = &self.ast_ctx.types[ty];
+                    let max_case = enum_def
+                        .cases
+                        .iter()
+                        .max_by_key(|x| {
+                            x.arg
+                                .as_ref()
+                                .map_or(0, |x| self.ast_ty_to_ty_pro(x, false).get_size())
+                        })
+                        .expect("Enum type requires at least one variant");
+                    let ty_of_case = max_case
+                        .arg
+                        .as_ref()
+                        .map_or(Ty::Void, |x| self.ast_ty_to_ty_pro(x, false));
+                    let fields = if !ty_of_case.is_zero_sized() {
+                        vec![Ty::Int, ty_of_case]
+                    } else {
+                        vec![Ty::Int]
+                    };
+                    Ty::Struct(fields)
                 }
             }
         }
@@ -625,11 +644,7 @@ impl Compiler {
                 }
                 t
             }
-            Ast::Cons {
-                enum_name,
-                arg,
-                case,
-            } => todo!(),
+            Ast::Cons { enum_name, .. } => self.ast_ty_to_ty(&AstTy::named(enum_name)),
         }
     }
 
@@ -909,7 +924,6 @@ impl Compiler {
             (vec![], None)
         };
         args.push(use_params[1].clone().into());
-
         let res = innermost_builder.native_call(
             &mut self.ctx,
             Const::FunPtr(funname.clone()).into(),
