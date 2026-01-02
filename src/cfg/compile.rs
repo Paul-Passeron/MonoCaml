@@ -154,7 +154,10 @@ impl Compiler {
                     }
                 }
             }
-            AstTy::Fun { .. } => {}
+            AstTy::Fun { .. } => {
+                let drop_object = self.prog.natives()["drop_object"].clone();
+                b.native_call(&mut self.ctx, Const::FunPtr(drop_object).into(), vec![val]);
+            }
             AstTy::Named(ty) => {
                 let drop_fun = self.drops[ty].clone();
                 b.native_call(&mut self.ctx, Const::FunPtr(drop_fun).into(), vec![val]);
@@ -174,7 +177,14 @@ impl Compiler {
                     }
                 }
             }
-            AstTy::Fun { .. } => {}
+            AstTy::Fun { .. } => {
+                let borrow_object = self.prog.natives()["borrow_object"].clone();
+                b.native_call(
+                    &mut self.ctx,
+                    Const::FunPtr(borrow_object).into(),
+                    vec![val],
+                );
+            }
             AstTy::Named(ty) => {
                 let borrow_fun = self.borrows[ty].clone();
                 b.native_call(&mut self.ctx, Const::FunPtr(borrow_fun).into(), vec![val]);
