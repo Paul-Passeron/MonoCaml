@@ -39,14 +39,11 @@ impl AstTy {
                 if x == this {
                     true
                 } else {
-                    let d = &ctx.types[&x[..]];
-                    match d {
-                        TypeDef::Alias(ast_ty) => ast_ty.rec_aux(this, ctx),
-                        TypeDef::Enum(enum_def) => enum_def
-                            .cases
-                            .iter()
-                            .any(|x| x.arg.iter().any(|x| x.rec_aux(this, ctx))),
-                    }
+                    let enum_def = &ctx.types[&x[..]];
+                    enum_def
+                        .cases
+                        .iter()
+                        .any(|x| x.arg.iter().any(|x| x.rec_aux(this, ctx)))
                 }
             }
         }
@@ -59,14 +56,11 @@ impl AstTy {
     pub fn is_recursive(&self, ctx: &AstCtx) -> bool {
         match self {
             AstTy::Named(this) => {
-                let d = &ctx.types[&this[..]];
-                match d {
-                    TypeDef::Alias(ast_ty) => ast_ty.rec_aux(this, ctx),
-                    TypeDef::Enum(enum_def) => enum_def
-                        .cases
-                        .iter()
-                        .any(|x| x.arg.iter().any(|x| x.rec_aux(this, ctx))),
-                }
+                let enum_def = &ctx.types[&this[..]];
+                enum_def
+                    .cases
+                    .iter()
+                    .any(|x| x.arg.iter().any(|x| x.rec_aux(this, ctx)))
             }
             _ => false,
         }
@@ -93,37 +87,32 @@ impl<T> AstTyped<T> {
     }
 }
 
+#[derive(Clone)]
 pub struct EnumCase {
     pub cons_name: String,
     pub arg: Option<AstTy>,
 }
 
+#[derive(Clone)]
 pub struct EnumDef {
     pub name: String,
     pub cases: Vec<EnumCase>,
 }
 
-pub enum TypeDef {
-    Alias(AstTy),
-    Enum(EnumDef),
-}
-
 #[derive(Default)]
 pub struct AstCtx {
-    pub types: HashMap<String, TypeDef>,
+    pub types: HashMap<String, EnumDef>,
     pub natives: HashMap<String, AstTy>,
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::ast::types::{AstCtx, AstTy, EnumCase, EnumDef, TypeDef};
+    use crate::ast::types::{AstCtx, AstTy, EnumCase, EnumDef};
 
     #[test]
     pub fn test_list_is_rec() {
         let mut ctx = AstCtx::default();
         let elem_ty = AstTy::Int;
-        ctx.types
-            .insert("elem".into(), TypeDef::Alias(elem_ty.clone()));
         let list_ty = EnumDef {
             name: "list".into(),
             cases: vec![
@@ -134,7 +123,7 @@ mod tests {
                 EnumCase {
                     cons_name: "Cons".into(),
                     arg: Some(AstTy::Tuple(vec![
-                        AstTy::Named("elem".into()),
+                        elem_ty.clone(),
                         AstTy::Named("list".into()),
                     ])),
                 },
@@ -142,17 +131,14 @@ mod tests {
         };
 
         println!("{list_ty}");
-
-        ctx.types.insert("list".into(), TypeDef::Enum(list_ty));
-
+        ctx.types.insert("list".into(), list_ty);
         assert!(AstTy::Named("list".into()).is_recursive(&ctx));
-        assert!(!AstTy::Named("elem".into()).is_recursive(&ctx));
+        assert!(!elem_ty.is_recursive(&ctx));
     }
 
     #[test]
     pub fn test_mutually_is_rec() {
         let mut ctx = AstCtx::default();
-        let elem_ty = AstTy::Int;
         let a_ty = EnumDef {
             name: "a".into(),
             cases: vec![EnumCase {
@@ -168,8 +154,8 @@ mod tests {
             }],
         };
 
-        ctx.types.insert("a".into(), TypeDef::Enum(a_ty));
-        ctx.types.insert("b".into(), TypeDef::Enum(b_ty));
+        ctx.types.insert("a".into(), a_ty);
+        ctx.types.insert("b".into(), b_ty);
 
         assert!(AstTy::Named("a".into()).is_recursive(&ctx));
         assert!(AstTy::Named("b".into()).is_recursive(&ctx));
