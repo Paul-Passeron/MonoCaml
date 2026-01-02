@@ -20,6 +20,12 @@ impl Compiler {
         );
 
         let discr: Value = if is_rec {
+            let borrow_object = self.prog.natives()["borrow_object"].clone();
+            builder.native_call(
+                &mut self.ctx,
+                Const::FunPtr(borrow_object).into(),
+                vec![param_use.clone().into()],
+            );
             let ptr = builder.get_element_ptr(
                 &mut self.ctx,
                 param_use.clone().into(),
@@ -78,7 +84,6 @@ impl Compiler {
         builder.ret_void(&mut self.ctx);
         let f = builder.finalize();
         self.add_func(f);
-        println!("Borrow for {} is {funname_use}", enum_def.name);
         self.borrows
             .entry(enum_def.name.clone())
             .or_insert(funname_use);
@@ -113,6 +118,12 @@ impl Compiler {
         );
 
         let discr: Value = if is_rec {
+            let drop_object = self.prog.natives()["drop_object"].clone();
+            builder.native_call(
+                &mut self.ctx,
+                Const::FunPtr(drop_object).into(),
+                vec![param_use.clone().into()],
+            );
             let ptr = builder.get_element_ptr(
                 &mut self.ctx,
                 param_use.clone().into(),
@@ -160,7 +171,6 @@ impl Compiler {
                         .extract(&mut self.ctx, param_use.clone().into(), 1)
                         .into()
                 };
-                println!("Dropping type {t}");
                 self.drop_ty(val, t, &mut builder);
             }
 
@@ -172,7 +182,6 @@ impl Compiler {
         builder.ret_void(&mut self.ctx);
         let f = builder.finalize();
         self.add_func(f);
-        println!("Drop for {} is {funname_use}", enum_def.name);
         self.drops
             .entry(enum_def.name.clone())
             .or_insert(funname_use);
