@@ -9,7 +9,7 @@ use std::{
 use crate::{
     ast::{
         Ast, Var,
-        types::{AstCtx, AstTy, AstTyped, EnumCase, EnumDef, TypeDef},
+        types::{AstCtx, AstTy, AstTyped, EnumCase, EnumDef},
     },
     backend::c_backend::ExportC,
     cfg::{FunName, Label, compile::Compiler, var::CfgVar},
@@ -273,7 +273,7 @@ fn list_test() -> (Ast, AstCtx) {
     );
     ctx.types.insert(
         "lst".into(),
-        TypeDef::Enum(EnumDef {
+        EnumDef {
             name: "lst".into(),
             cases: vec![
                 EnumCase {
@@ -285,9 +285,44 @@ fn list_test() -> (Ast, AstCtx) {
                     arg: Some(AstTy::Tuple(vec![AstTy::Int, AstTy::named("lst")])),
                 },
             ],
-        }),
+        },
     );
     let ast = Ast::app(Ast::native("print_lst"), Ast::cons("lst", "Nil", None));
+
+    (ast, ctx)
+}
+
+fn list_test2() -> (Ast, AstCtx) {
+    let mut ctx = AstCtx::default();
+    ctx.natives.insert(
+        "print_lst".into(),
+        AstTy::fun(AstTy::named("lst"), AstTy::Tuple(vec![])),
+    );
+    ctx.types.insert(
+        "lst".into(),
+        EnumDef {
+            name: "lst".into(),
+            cases: vec![
+                EnumCase {
+                    cons_name: "Nil".into(),
+                    arg: None,
+                },
+                EnumCase {
+                    cons_name: "Cons".into(),
+                    arg: Some(AstTy::Tuple(vec![AstTy::Int, AstTy::named("lst")])),
+                },
+            ],
+        },
+    );
+    let cons = |name: &str, val| Ast::cons("lst", name, val);
+
+    let ast = Ast::app(
+        Ast::native("print_lst"),
+        cons(
+            "Cons",
+            Some(Ast::tuple(vec![Ast::Int(69), cons("Nil", None)])),
+        ),
+    );
 
     (ast, ctx)
 }
@@ -408,5 +443,6 @@ mod tests {
 }
 
 fn main() {
-    compile_ast(fact_ast(), "test");
+    let (ast, ctx) = list_test2();
+    compile_ast_with_ctx(ast, "list_test", ctx);
 }
