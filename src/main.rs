@@ -9,7 +9,7 @@ use std::{
 use crate::{
     ast::{
         Ast, Var,
-        types::{AstCtx, AstTy, AstTyped},
+        types::{AstCtx, AstTy, AstTyped, EnumCase, EnumDef, TypeDef},
     },
     backend::c_backend::ExportC,
     cfg::{FunName, Label, compile::Compiler, var::CfgVar},
@@ -263,6 +263,33 @@ fn fact_bench() -> Ast {
             Ast::app(Ast::var(loo), Ast::Int(100000)),
         ),
     )
+}
+
+fn list_test() -> (Ast, AstCtx) {
+    let mut ctx = AstCtx::default();
+    ctx.natives.insert(
+        "print_lst".into(),
+        AstTy::fun(AstTy::named("lst"), AstTy::Tuple(vec![])),
+    );
+    ctx.types.insert(
+        "lst".into(),
+        TypeDef::Enum(EnumDef {
+            name: "lst".into(),
+            cases: vec![
+                EnumCase {
+                    cons_name: "Nil".into(),
+                    arg: None,
+                },
+                EnumCase {
+                    cons_name: "Cons".into(),
+                    arg: Some(AstTy::Tuple(vec![AstTy::Int, AstTy::named("lst")])),
+                },
+            ],
+        }),
+    );
+    let ast = Ast::app(Ast::native("print_lst"), Ast::cons("lst", "Nil", None));
+
+    (ast, ctx)
 }
 
 fn compile_ast<S: ToString>(ast: Ast, prog_name: S) {
