@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use crate::{
     ast::{
         Ast, Var,
-        types::{AstCtx, AstTy, AstTyped, EnumDef},
+        types::{AstCtx, AstTy, AstTyped},
     },
     cfg::{
         Const, FunName, FunNameUse, Func, Label, Program, Sig, Ty, TyCtx, Value, builder::Builder,
@@ -17,20 +17,6 @@ pub enum RecFlag {
     NoRec,
 }
 
-pub enum TypeRepr {
-    Enum(RecFlag, HashMap<String, TypeRepr>),
-    Struct(RecFlag, Vec<TypeRepr>),
-    Named(String),
-    Ptr(Box<TypeRepr>),
-    Int,
-    String,
-    Void,
-    FunPtr {
-        params: Vec<TypeRepr>,
-        ret: Box<TypeRepr>,
-    },
-}
-
 pub struct Compiler {
     pub prog: Program,
     pub map: HashMap<Var, CfgVarUse>,
@@ -38,10 +24,10 @@ pub struct Compiler {
     pub ctx: TyCtx,
     pub wrapped_natives: HashMap<FunNameUse, FunNameUse>,
     pub ast_ctx: AstCtx,
-    pub reprs: HashMap<String, TypeRepr>,
     pub ast_tys: HashMap<Var, AstTy>,
 }
 
+#[allow(unused)]
 impl Compiler {
     fn get_enum_repr(m: &HashMap<String, Ty>) -> Ty {
         let discr = Ty::Int;
@@ -53,21 +39,6 @@ impl Compiler {
         self.prog
             .add_native_alias(alias.to_string(), fun_name.clone());
         self.ctx.add_native_alias(alias, fun_name);
-    }
-
-    fn create_repr_for_ast(&mut self, t: &AstTy) -> TypeRepr {
-        match t {
-            AstTy::Int => TypeRepr::Int,
-            AstTy::String => TypeRepr::String,
-            AstTy::Tuple(items) => todo!(),
-            AstTy::Fun { arg, ret } => todo!(),
-            AstTy::Named(_) => todo!(),
-        }
-    }
-
-    fn create_enum_repr(&mut self, e: &EnumDef, f: RecFlag) -> TypeRepr {
-        // e.cases.
-        todo!()
     }
 
     pub fn add_func(&mut self, f: Func) {
@@ -88,7 +59,6 @@ impl Compiler {
             ctx: TyCtx::new(),
             wrapped_natives: HashMap::new(),
             ast_ctx: Default::default(),
-            reprs: HashMap::new(),
             ast_tys: HashMap::new(),
         };
         res.create_add();
