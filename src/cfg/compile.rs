@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use crate::{
     ast::{
         Ast, Var,
-        types::{AstCtx, AstTy, AstTyped},
+        types::{AstCtx, AstTy, AstTyped, EnumDef},
     },
     cfg::{
         Const, FunName, FunNameUse, Func, Label, Program, Sig, Ty, TyCtx, Value, builder::Builder,
@@ -25,6 +25,7 @@ pub struct Compiler {
     pub wrapped_natives: HashMap<FunNameUse, FunNameUse>,
     pub ast_ctx: AstCtx,
     pub ast_tys: HashMap<Var, AstTy>,
+    pub constructors: HashMap<String, HashMap<String, FunNameUse>>,
 }
 
 #[allow(unused)]
@@ -51,15 +52,16 @@ impl Compiler {
         self.ctx.sigs.insert(name, sig);
     }
 
-    fn new(entry: FunNameUse) -> Self {
+    fn new(entry: FunNameUse, ast_ctx: AstCtx) -> Self {
         let mut res = Self {
             prog: Program::new(entry),
             type_map: HashMap::new(),
             map: HashMap::new(),
             ctx: TyCtx::new(),
             wrapped_natives: HashMap::new(),
-            ast_ctx: Default::default(),
+            ast_ctx,
             ast_tys: HashMap::new(),
+            constructors: HashMap::new(),
         };
         res.create_add();
         res.create_mul();
@@ -76,14 +78,72 @@ impl Compiler {
     pub fn compile(ast: Ast, ctx: AstCtx) -> Program {
         let entry = FunName::fresh();
         let entry_use = Use::from(&entry);
-        let mut res = Self::new(entry_use);
-        res.ast_ctx = ctx;
+        let mut res = Self::new(entry_use, ctx);
+        res.create_constructors();
         let mut b = Builder::new(entry, vec![], Ty::Void, &mut res.ctx);
         res.aux(&ast, &mut b);
         b.ret_void(&mut res.ctx);
         res.add_func(b.finalize());
         res.ctx.dump_aliases_in_prog(&mut res.prog);
         res.prog
+    }
+
+    fn create_constructors_for_enum(&mut self, enum_def: &EnumDef) {
+        let named = AstTy::named(&enum_def.name);
+        let ret_ty = self.ast_ty_to_ty(&named);
+        let is_rec = named.is_recursive(&self.ast_ctx);
+        for (i, case) in enum_def.cases.iter().enumerate() {
+            let funname = FunName::fresh();
+            let funname_use = Use::from(&funname);
+            let params = case
+                .arg
+                .iter()
+                .map(|x| self.ast_ty_to_ty(x))
+                .collect::<Vec<_>>();
+            let var_params = self.ctx.make_params(params.clone().into_iter());
+            let use_params = var_params
+                .iter()
+                .map(|(x, _)| Use::from(x))
+                .collect::<Vec<_>>();
+            let mut builder = Builder::new(funname, var_params, ret_ty.clone(), &mut self.ctx);
+
+            let mut args = vec![Const::Int(i as i32).into()];
+            if !use_params.is_empty() {
+                args.push(use_params[0].clone().into());
+            }
+            let struct_val = builder.aggregate(&mut self.ctx, args);
+
+            if is_rec {
+                let m = builder.malloc_single(&mut self.ctx, ret_ty.clone().into_inner());
+                let register_object = Const::FunPtr(self.ctx.natives["register_object"].clone());
+                builder.native_call(
+                    &mut self.ctx,
+                    register_object.clone().into(),
+                    vec![m.clone().into()],
+                );
+                builder.store(&mut self.ctx, m.clone().into(), struct_val);
+                builder.ret(&mut self.ctx, m.into());
+            } else {
+                builder.ret(&mut self.ctx, struct_val);
+            }
+            let f = builder.finalize();
+            self.add_func(f);
+            self.constructors
+                .entry(enum_def.name.clone())
+                .or_default()
+                .insert(case.cons_name.clone(), funname_use);
+        }
+    }
+
+    fn create_constructors(&mut self) {
+        let enums = self
+            .ast_ctx
+            .types
+            .iter()
+            .map(|(_, x)| x.clone())
+            .collect::<Vec<_>>()
+            .iter()
+            .for_each(|x| self.create_constructors_for_enum(x));
     }
 
     fn get_closure(&self, arg: Ty, ret: Ty) -> Ty {
@@ -102,15 +162,56 @@ impl Compiler {
         self.get_closure(arg_ty, ret_ty)
     }
 
-    fn ast_ty_to_ty(&self, t: &AstTy) -> Ty {
+    fn get_closure_ty_pro(&self, arg: &AstTy, ret: &AstTy, r: bool) -> Ty {
+        let arg_ty = self.ast_ty_to_ty_pro(arg, r);
+        let ret_ty = self.ast_ty_to_ty_pro(ret, r);
+        self.get_closure(arg_ty, ret_ty)
+    }
+
+    fn ast_ty_to_ty_pro(&self, t: &AstTy, r: bool) -> Ty {
         match t {
             AstTy::Int => Ty::Int,
             AstTy::String => Ty::String,
             AstTy::Tuple(items) if items.len() == 0 => Ty::Void,
-            AstTy::Tuple(items) => Ty::Struct(items.iter().map(|x| self.ast_ty_to_ty(x)).collect()),
-            AstTy::Fun { arg, ret } => self.get_closure_ty(arg, ret),
-            AstTy::Named(_) => todo!(),
+            AstTy::Tuple(items) => {
+                Ty::Struct(items.iter().map(|x| self.ast_ty_to_ty_pro(x, r)).collect())
+            }
+            AstTy::Fun { arg, ret } => self.get_closure_ty_pro(arg, ret, r),
+            AstTy::Named(ty) => {
+                if AstTy::named(ty).is_recursive(&self.ast_ctx) {
+                    if r {
+                        let enum_def = &self.ast_ctx.types[ty];
+                        let max_case = enum_def
+                            .cases
+                            .iter()
+                            .max_by_key(|x| {
+                                x.arg
+                                    .as_ref()
+                                    .map_or(0, |x| self.ast_ty_to_ty_pro(x, false).get_size())
+                            })
+                            .expect("Enum type requires at least one variant");
+                        let ty_of_case = max_case
+                            .arg
+                            .as_ref()
+                            .map_or(Ty::Void, |x| self.ast_ty_to_ty_pro(x, false));
+                        let fields = if !ty_of_case.is_zero_sized() {
+                            vec![Ty::Int, ty_of_case]
+                        } else {
+                            vec![Ty::Int]
+                        };
+                        Ty::Ptr(Box::new(Ty::Struct(fields)))
+                    } else {
+                        Ty::Ptr(Box::new(Ty::Void))
+                    }
+                } else {
+                    todo!()
+                }
+            }
         }
+    }
+
+    fn ast_ty_to_ty(&self, t: &AstTy) -> Ty {
+        self.ast_ty_to_ty_pro(t, true)
     }
 
     fn normalize_lambda(&mut self, a: Ast) -> (Option<(Var, Ty)>, Ast) {
@@ -243,9 +344,18 @@ impl Compiler {
             } => self.compile_if(b, cond, then_e, else_e),
             Ast::Cons {
                 enum_name,
-                arg,
                 case,
-            } => todo!(),
+                arg,
+            } => {
+                let arg = arg.as_ref().map(|x| self.aux(x, b));
+                let cons_fun = self.constructors[enum_name][case].clone();
+                b.native_call(
+                    &mut self.ctx,
+                    Const::FunPtr(cons_fun).into(),
+                    arg.into_iter().collect(),
+                )
+                .into()
+            }
         }
     }
 
