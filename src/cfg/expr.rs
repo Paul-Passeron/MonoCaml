@@ -8,6 +8,7 @@ pub enum Expr {
     Mul(Value, Value),
     Sub(Value, Value),
     Div(Value, Value),
+    Eq(Value, Value),
 
     NativeCall { fun: Value, args: Vec<Value> },
 
@@ -29,6 +30,11 @@ impl Expr {
         if !lhs.get_type(ctx).is_arith() || !rhs.get_type(ctx).is_arith() {
             panic!("Cannot {str} non arith")
         }
+    }
+
+    pub fn eq(ctx: &TyCtx, lhs: Value, rhs: Value) -> Self {
+        Self::check_arith(ctx, &lhs, &rhs, "add");
+        Self::Eq(lhs, rhs)
     }
 
     pub fn add(ctx: &TyCtx, lhs: Value, rhs: Value) -> Self {

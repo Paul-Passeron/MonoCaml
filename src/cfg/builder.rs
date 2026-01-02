@@ -216,6 +216,15 @@ impl Builder {
         }
     }
 
+    pub fn eq(&mut self, ctx: &mut TyCtx, lhs: Value, rhs: Value) -> Value {
+        match (&lhs, &rhs) {
+            (Value::Const(Const::Int(l)), Value::Const(Const::Int(r))) => {
+                Value::Const(Const::Int(l + r))
+            }
+            _ => self.assign(ctx, Expr::eq(ctx, lhs, rhs)).into(),
+        }
+    }
+
     pub fn mul(&mut self, ctx: &mut TyCtx, lhs: Value, rhs: Value) -> Value {
         match (&lhs, &rhs) {
             (Value::Const(Const::Int(l)), Value::Const(Const::Int(r))) => {

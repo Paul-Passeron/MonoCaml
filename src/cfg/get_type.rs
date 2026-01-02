@@ -232,6 +232,7 @@ impl Expr {
             Expr::Struct(values) => Ty::Struct(values.iter().map(|x| x.get_type(ctx)).collect()),
             Expr::Malloc(ty, _) => Ty::Ptr(Box::new(ty.clone())),
             Expr::Phi(ty) => ty.clone(),
+            Expr::Eq(_, _) => Ty::Int,
         }
     }
 }

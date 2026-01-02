@@ -413,6 +413,11 @@ impl<P: AsRef<Path>> ExportC<P> {
                 write!(&mut self.f, "malloc({} * sizeof({ty_name}))", val).unwrap();
             }
             Expr::Phi(_) => (),
+            Expr::Eq(value, value1) => {
+                let v1 = self.value_as_string(value);
+                let v2 = self.value_as_string(value1);
+                write!(&mut self.f, "{} == {}", v1, v2).unwrap()
+            }
         }
     }
 
