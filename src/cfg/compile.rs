@@ -192,12 +192,10 @@ impl Compiler {
             _ => (),
         }
     }
-
-    fn create_borrows_for_enum(&mut self, enum_def: &EnumDef) {
+    fn create_borrows_for_enum(&mut self, enum_def: &EnumDef, funname: FunName) {
         let named = AstTy::named(&enum_def.name);
         let self_ty = self.ast_ty_to_ty(&named);
         let is_rec = named.is_recursive(&self.ast_ctx);
-        let funname = FunName::fresh();
         let funname_use = Use::from(&funname);
         let param_var = self.ctx.new_var(self_ty.clone());
         let param_use = Use::from(&param_var);
@@ -225,37 +223,43 @@ impl Compiler {
         let ret_lbl = Label::fresh();
         let ret_use = Use::from(&ret_lbl);
 
-        let mut curr_lbl_use = builder.current_lbl();
+        let num_cases = enum_def.cases.len();
 
         for (i, case) in enum_def.cases.iter().enumerate() {
             let is_i = builder.eq(&mut self.ctx, discr.clone(), Const::Int(i as i32).into());
+            let case_body_lbl = Label::fresh();
+            let case_body_use = Use::from(&case_body_lbl);
+            let next_check_lbl = Label::fresh();
+            let next_check_use = Use::from(&next_check_lbl);
 
-            let curr_lbl = Label::fresh();
-            let lbl_use = Use::from(&curr_lbl);
-            builder.branch(&mut self.ctx, is_i, lbl_use, ret_use.clone(), curr_lbl);
+            builder.branch(
+                &mut self.ctx,
+                is_i,
+                case_body_use,
+                next_check_use.clone(),
+                case_body_lbl,
+            );
 
             let struct_repr = Ty::Struct(vec![Ty::Int, Ty::Ptr(Box::new(Ty::Void))]);
             for t in case.arg.iter() {
                 let repr = self.ast_ty_to_ty_pro(t, true);
-                if repr.is_ptr() {
-                    let val = if is_rec {
-                        let ptr = builder.get_element_ptr(
-                            &mut self.ctx,
-                            param_use.clone().into(),
-                            struct_repr.clone(),
-                            1,
-                        );
-                        builder.load(&mut self.ctx, ptr.into(), repr.clone()).into()
-                    } else {
-                        builder
-                            .extract(&mut self.ctx, param_use.clone().into(), 1)
-                            .into()
-                    };
-                    self.borrow_ty(val, t, &mut builder);
-                }
-                let next_lbl = Label::fresh();
-                builder.goto(&mut self.ctx, Use::from(&next_lbl), next_lbl);
+                let val = if is_rec {
+                    let ptr = builder.get_element_ptr(
+                        &mut self.ctx,
+                        param_use.clone().into(),
+                        struct_repr.clone(),
+                        1,
+                    );
+                    builder.load(&mut self.ctx, ptr.into(), repr.clone()).into()
+                } else {
+                    builder
+                        .extract(&mut self.ctx, param_use.clone().into(), 1)
+                        .into()
+                };
+                self.borrow_ty(val, t, &mut builder);
             }
+
+            builder.goto(&mut self.ctx, ret_use.clone(), next_check_lbl);
         }
 
         builder.goto(&mut self.ctx, ret_use, ret_lbl);
@@ -263,16 +267,30 @@ impl Compiler {
         builder.ret_void(&mut self.ctx);
         let f = builder.finalize();
         self.add_func(f);
+        println!("Borrow for {} is {funname_use}", enum_def.name);
         self.borrows
             .entry(enum_def.name.clone())
             .or_insert(funname_use);
     }
 
-    fn create_drops_for_enum(&mut self, enum_def: &EnumDef) {
+    fn declare_borrows_for_enum(&mut self, enum_def: &EnumDef) -> FunName {
+        let funname = FunName::fresh();
+        self.borrows
+            .insert(enum_def.name.clone(), Use::from(&funname));
+        funname
+    }
+
+    fn declare_drops_for_enum(&mut self, enum_def: &EnumDef) -> FunName {
+        let funname = FunName::fresh();
+        self.drops
+            .insert(enum_def.name.clone(), Use::from(&funname));
+        funname
+    }
+
+    fn create_drops_for_enum(&mut self, enum_def: &EnumDef, funname: FunName) {
         let named = AstTy::named(&enum_def.name);
         let self_ty = self.ast_ty_to_ty(&named);
         let is_rec = named.is_recursive(&self.ast_ctx);
-        let funname = FunName::fresh();
         let funname_use = Use::from(&funname);
         let param_var = self.ctx.new_var(self_ty.clone());
         let param_use = Use::from(&param_var);
@@ -300,37 +318,44 @@ impl Compiler {
         let ret_lbl = Label::fresh();
         let ret_use = Use::from(&ret_lbl);
 
-        let mut curr_lbl_use = builder.current_lbl();
+        let num_cases = enum_def.cases.len();
 
         for (i, case) in enum_def.cases.iter().enumerate() {
             let is_i = builder.eq(&mut self.ctx, discr.clone(), Const::Int(i as i32).into());
+            let case_body_lbl = Label::fresh();
+            let case_body_use = Use::from(&case_body_lbl);
+            let next_check_lbl = Label::fresh();
+            let next_check_use = Use::from(&next_check_lbl);
 
-            let curr_lbl = Label::fresh();
-            let lbl_use = Use::from(&curr_lbl);
-            builder.branch(&mut self.ctx, is_i, lbl_use, ret_use.clone(), curr_lbl);
+            builder.branch(
+                &mut self.ctx,
+                is_i,
+                case_body_use,
+                next_check_use.clone(),
+                case_body_lbl,
+            );
 
             let struct_repr = Ty::Struct(vec![Ty::Int, Ty::Ptr(Box::new(Ty::Void))]);
             for t in case.arg.iter() {
                 let repr = self.ast_ty_to_ty_pro(t, true);
-                if repr.is_ptr() {
-                    let val = if is_rec {
-                        let ptr = builder.get_element_ptr(
-                            &mut self.ctx,
-                            param_use.clone().into(),
-                            struct_repr.clone(),
-                            1,
-                        );
-                        builder.load(&mut self.ctx, ptr.into(), repr.clone()).into()
-                    } else {
-                        builder
-                            .extract(&mut self.ctx, param_use.clone().into(), 1)
-                            .into()
-                    };
-                    self.drop_ty(val, t, &mut builder);
-                }
-                let next_lbl = Label::fresh();
-                builder.goto(&mut self.ctx, Use::from(&next_lbl), next_lbl);
+                let val = if is_rec {
+                    let ptr = builder.get_element_ptr(
+                        &mut self.ctx,
+                        param_use.clone().into(),
+                        struct_repr.clone(),
+                        1,
+                    );
+                    builder.load(&mut self.ctx, ptr.into(), repr.clone()).into()
+                } else {
+                    builder
+                        .extract(&mut self.ctx, param_use.clone().into(), 1)
+                        .into()
+                };
+                println!("Dropping type {t}");
+                self.drop_ty(val, t, &mut builder);
             }
+
+            builder.goto(&mut self.ctx, ret_use.clone(), next_check_lbl);
         }
 
         builder.goto(&mut self.ctx, ret_use, ret_lbl);
@@ -338,7 +363,8 @@ impl Compiler {
         builder.ret_void(&mut self.ctx);
         let f = builder.finalize();
         self.add_func(f);
-        self.borrows
+        println!("Drop for {} is {funname_use}", enum_def.name);
+        self.drops
             .entry(enum_def.name.clone())
             .or_insert(funname_use);
     }
@@ -350,7 +376,10 @@ impl Compiler {
             .map(|(_, x)| x.clone())
             .collect::<Vec<_>>()
             .iter()
-            .for_each(|x| self.create_drops_for_enum(x));
+            .map(|x| (x, self.declare_drops_for_enum(x)))
+            .collect::<Vec<_>>()
+            .into_iter()
+            .for_each(|(x, name)| (self.create_drops_for_enum(x, name)));
     }
 
     fn create_borrows(&mut self) {
@@ -360,7 +389,10 @@ impl Compiler {
             .map(|(_, x)| x.clone())
             .collect::<Vec<_>>()
             .iter()
-            .for_each(|x| self.create_borrows_for_enum(x));
+            .map(|x| (x, self.declare_borrows_for_enum(x)))
+            .collect::<Vec<_>>()
+            .into_iter()
+            .for_each(|(x, name)| (self.create_borrows_for_enum(x, name)));
     }
 
     fn create_constructors(&mut self) {
