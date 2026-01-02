@@ -23,6 +23,7 @@ pub mod display;
 pub mod expr;
 pub mod extract;
 pub mod get_type;
+pub mod native_funs;
 pub mod token;
 pub mod var;
 

@@ -32,151 +32,24 @@ pub enum TypeRepr {
 }
 
 pub struct Compiler {
-    prog: Program,
-    map: HashMap<Var, CfgVarUse>,
-    type_map: HashMap<Var, Ty>,
-    ctx: TyCtx,
-    wrapped_natives: HashMap<FunNameUse, FunNameUse>,
-    ast_ctx: AstCtx,
-    reprs: HashMap<String, TypeRepr>,
+    pub prog: Program,
+    pub map: HashMap<Var, CfgVarUse>,
+    pub type_map: HashMap<Var, Ty>,
+    pub ctx: TyCtx,
+    pub wrapped_natives: HashMap<FunNameUse, FunNameUse>,
+    pub ast_ctx: AstCtx,
+    pub reprs: HashMap<String, TypeRepr>,
+    pub ast_tys: HashMap<Var, AstTy>,
 }
 
 impl Compiler {
-    fn create_add(&mut self) {
-        let add_name = FunName::fresh();
-        let used = Use::from(&add_name);
-
-        let params = self.ctx.make_params([Ty::Int, Ty::Int].into_iter());
-        let x = Use::from(&params[0].0);
-        let y = Use::from(&params[1].0);
-
-        let mut b = Builder::new(add_name, params, Ty::Int, &mut self.ctx);
-        let res = b.add(&mut self.ctx, x.into(), y.into());
-        b.ret(&mut self.ctx, res.into());
-        let f = b.finalize();
-        self.add_func(f);
-        self.add_named_func("add", used);
-    }
-
     fn get_enum_repr(m: &HashMap<String, Ty>) -> Ty {
         let discr = Ty::Int;
         let largest = m.values().max_by_key(|x| x.get_size()).unwrap().clone();
         Ty::Struct(vec![discr, largest])
     }
 
-    fn create_mul(&mut self) {
-        let add_name = FunName::fresh();
-        let used = Use::from(&add_name);
-
-        let params = self.ctx.make_params([Ty::Int, Ty::Int].into_iter());
-        let x = Use::from(&params[0].0);
-        let y = Use::from(&params[1].0);
-
-        let mut b = Builder::new(add_name, params, Ty::Int, &mut self.ctx);
-        let res = b.mul(&mut self.ctx, x.into(), y.into());
-        b.ret(&mut self.ctx, res.into());
-        let f = b.finalize();
-        self.add_func(f);
-        self.add_named_func("mul", used);
-    }
-
-    fn create_print_int(&mut self) {
-        let name = FunName::fresh();
-        let used = Use::from(&name);
-        let s = Sig {
-            params: vec![Ty::Int],
-            ret: Box::new(Ty::Void),
-        };
-        let print_int_fun = Func {
-            name: name,
-            params: self.ctx.make_params(s.params.into_iter()),
-            ret_ty: *s.ret,
-            cfg: None,
-        };
-        self.add_func(print_int_fun);
-        self.add_named_func("print_int", used);
-    }
-
-    fn create_print_string(&mut self) {
-        let name = FunName::fresh();
-        let used = Use::from(&name);
-        let s = Sig {
-            params: vec![Ty::String],
-            ret: Box::new(Ty::Void),
-        };
-        let print_string_fun = Func {
-            name: name,
-            params: self.ctx.make_params(s.params.into_iter()),
-            ret_ty: *s.ret,
-            cfg: None,
-        };
-        self.add_func(print_string_fun);
-        self.add_named_func("print_string", used);
-    }
-
-    fn create_random_int(&mut self) {
-        let name = FunName::fresh();
-        let used = Use::from(&name);
-        let s = Sig {
-            params: vec![Ty::Int],
-            ret: Box::new(Ty::Int),
-        };
-        let print_string_fun = Func {
-            name: name,
-            params: self.ctx.make_params(s.params.into_iter()),
-            ret_ty: *s.ret,
-            cfg: None,
-        };
-        self.add_func(print_string_fun);
-        self.add_named_func("random_int", used);
-    }
-
-    fn create_borrow_closure(&mut self) {
-        let name = FunName::fresh();
-        let used = Use::from(&name);
-        let f = Func {
-            name: name,
-            params: self
-                .ctx
-                .make_params([Ty::Ptr(Box::new(Ty::Void))].into_iter()),
-            ret_ty: Ty::Void,
-            cfg: None,
-        };
-        self.add_func(f);
-        self.add_named_func("borrow_closure", used);
-    }
-
-    fn create_drop_closure(&mut self) {
-        let name = FunName::fresh();
-        let used = Use::from(&name);
-        let f = Func {
-            name: name,
-            params: self
-                .ctx
-                .make_params([Ty::Ptr(Box::new(Ty::Void))].into_iter()),
-            ret_ty: Ty::Void,
-            cfg: None,
-        };
-        self.add_func(f);
-        self.add_named_func("drop_closure", used);
-    }
-
-    fn create_register_object(&mut self) {
-        let name = FunName::fresh();
-        let used = Use::from(&name);
-        let f = Func {
-            name: name,
-            params: self
-                .ctx
-                .make_params([Ty::Ptr(Box::new(Ty::Void))].into_iter()),
-            ret_ty: Ty::Void,
-            cfg: None,
-        };
-        self.add_func(f);
-        self.add_named_func("register_object", used);
-    }
-
-    fn add_named_func<S: ToString>(&mut self, alias: S, fun_name: FunNameUse) {
+    pub fn add_named_func<S: ToString>(&mut self, alias: S, fun_name: FunNameUse) {
         self.prog
             .add_native_alias(alias.to_string(), fun_name.clone());
         self.ctx.add_native_alias(alias, fun_name);
@@ -197,7 +70,7 @@ impl Compiler {
         todo!()
     }
 
-    fn add_func(&mut self, f: Func) {
+    pub fn add_func(&mut self, f: Func) {
         let sig = Sig {
             params: f.params.iter().map(|(_, x)| x.clone()).collect(),
             ret: Box::new(f.ret_ty.clone()),
@@ -216,6 +89,7 @@ impl Compiler {
             wrapped_natives: HashMap::new(),
             ast_ctx: Default::default(),
             reprs: HashMap::new(),
+            ast_tys: HashMap::new(),
         };
         res.create_add();
         res.create_mul();
@@ -283,7 +157,12 @@ impl Compiler {
             ),
             _ => {
                 let v = Var::fresh();
+                let orig_t = match self.get_ast_ty_of(&a) {
+                    AstTy::Fun { arg, .. } => *arg,
+                    _ => unreachable!(),
+                };
                 let v_t = ty.field(0).param(1);
+                self.ast_tys.insert(v.clone(), orig_t.clone());
                 self.type_map.insert(v, v_t.clone());
                 (Some((v, v_t)), Ast::app(a, Ast::Var(v)))
             }
@@ -968,6 +847,59 @@ impl Compiler {
         let func = innermost_builder.finalize();
         self.add_func(func);
         innermost_use
+    }
+
+    fn get_ast_ty_of(&mut self, a: &Ast) -> AstTy {
+        match a {
+            Ast::Str(_) => AstTy::String,
+            Ast::Int(_) => AstTy::Int,
+            Ast::Var(var) => self.ast_tys[var].clone(),
+            Ast::Lambda { arg, body } => {
+                self.ast_tys.insert(arg.expr().clone(), arg.ty().clone());
+                let ret = self.get_ast_ty_of(body);
+                AstTy::fun(arg.ty().clone(), ret)
+            }
+            Ast::App { fun, .. } => {
+                let f_ty = self.get_ast_ty_of(fun);
+                match f_ty {
+                    AstTy::Fun { ret, .. } => *ret,
+                    _ => unreachable!(),
+                }
+            }
+            Ast::Seq { fst, snd } => {
+                let _ = self.get_ast_ty_of(fst);
+                self.get_ast_ty_of(snd)
+            }
+            Ast::Tuple(asts) => AstTy::Tuple(asts.iter().map(|x| self.get_ast_ty_of(x)).collect()),
+            Ast::Get { from, index } => {
+                let tu = self.get_ast_ty_of(from);
+                match tu {
+                    AstTy::Tuple(items) => items[*index].clone(),
+                    _ => unreachable!(),
+                }
+            }
+            Ast::Native(x) => self.ast_ctx.natives[x].clone(),
+            Ast::LetBinding {
+                bound,
+                value,
+                in_expr,
+            } => {
+                self.ast_tys
+                    .insert(bound.expr().clone(), bound.ty().clone());
+                let _ = self.get_ast_ty_of(value);
+                self.get_ast_ty_of(in_expr)
+            }
+            Ast::If {
+                cond,
+                then_e,
+                else_e,
+            } => {
+                let _ = self.get_ast_ty_of(cond);
+                let _ = self.get_ast_ty_of(then_e);
+                self.get_ast_ty_of(else_e)
+            }
+            Ast::Cons { enum_name, .. } => AstTy::Named(enum_name.clone()),
+        }
     }
 }
 

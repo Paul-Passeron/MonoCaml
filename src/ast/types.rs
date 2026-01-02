@@ -1,7 +1,4 @@
-use std::{
-    collections::{HashMap, HashSet},
-    iter::once,
-};
+use std::collections::HashMap;
 
 #[derive(Clone)]
 pub enum AstTy {
@@ -35,10 +32,7 @@ impl AstTy {
             AstTy::Tuple(items) => items.iter().any(|x| x.rec_aux(this, ctx)),
             AstTy::Fun { arg, ret } => arg.rec_aux(this, ctx) || ret.rec_aux(this, ctx),
             AstTy::Named(x) => {
-                println!("{x} vs {this}");
-
                 if x == this {
-                    println!("Recursion detected");
                     true
                 } else {
                     let d = &ctx.types[&x[..]];
@@ -113,6 +107,7 @@ pub enum TypeDef {
 #[derive(Default)]
 pub struct AstCtx {
     pub types: HashMap<String, TypeDef>,
+    pub natives: HashMap<String, AstTy>,
 }
 
 #[cfg(test)]
@@ -148,5 +143,31 @@ mod tests {
 
         assert!(AstTy::Named("list".into()).is_recursive(&ctx));
         assert!(!AstTy::Named("elem".into()).is_recursive(&ctx));
+    }
+
+    #[test]
+    pub fn test_mutually_is_rec() {
+        let mut ctx = AstCtx::default();
+        let elem_ty = AstTy::Int;
+        let a_ty = EnumDef {
+            name: "a".into(),
+            cases: vec![EnumCase {
+                cons_name: "B".into(),
+                arg: Some(AstTy::Named("b".into())),
+            }],
+        };
+        let b_ty = EnumDef {
+            name: "b".into(),
+            cases: vec![EnumCase {
+                cons_name: "A".into(),
+                arg: Some(AstTy::Named("a".into())),
+            }],
+        };
+
+        ctx.types.insert("a".into(), TypeDef::Enum(a_ty));
+        ctx.types.insert("b".into(), TypeDef::Enum(b_ty));
+
+        assert!(AstTy::Named("a".into()).is_recursive(&ctx));
+        assert!(AstTy::Named("b".into()).is_recursive(&ctx));
     }
 }
