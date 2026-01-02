@@ -20,6 +20,7 @@ use crate::{
 pub mod builder;
 pub mod compile;
 pub mod display;
+pub mod enums;
 pub mod expr;
 pub mod extract;
 pub mod get_type;
