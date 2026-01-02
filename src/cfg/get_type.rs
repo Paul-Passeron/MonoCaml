@@ -160,12 +160,30 @@ impl Ty {
             _ => false,
         }
     }
+
+    pub fn get_size(&self) -> usize {
+        match self {
+            Ty::Int => 4,
+            Ty::String => 8,
+            Ty::Void => 0,
+            Ty::Ptr(_) => 8,
+            Ty::Struct(items) => items.iter().fold(0, |s, x| s + align_to(x.get_size(), 8)),
+            Ty::FunPtr(_) => 8,
+        }
+    }
+}
+
+fn align_to(n: usize, align: usize) -> usize {
+    if n % align == 0 {
+        n
+    } else {
+        n + align - (n % align)
+    }
 }
 
 impl Value {
     pub fn get_type(&self, ctx: &TyCtx) -> Ty {
         match self {
-            // Value::Global(x) => x.get_type(ctx),
             Value::Var(x) => x.get_type(ctx),
             Value::Const(x) => x.get_type(ctx),
         }
@@ -176,10 +194,7 @@ impl Value {
             Ty::Struct(items) if items.len() == 2 => {
                 let fst = &items[0];
                 match fst {
-                    Ty::FunPtr(sig) => {
-                        // assert!(sig.params.len() == 1);
-                        sig.ret.as_ref().clone()
-                    }
+                    Ty::FunPtr(sig) => sig.ret.as_ref().clone(),
                     _ => unreachable!(),
                 }
             }
@@ -194,19 +209,10 @@ impl CfgVarUse {
     }
 }
 
-// impl CfgGlobalUse {
-//     pub fn get_type(&self, ctx: &TyCtx) -> Ty {
-//         // ctx.globals[self].clone()
-//     }
-// }
-
 impl FunNameUse {
     pub fn get_return_type(&self, ctx: &TyCtx) -> Ty {
         match Const::FunPtr(self.clone()).get_type(ctx) {
-            Ty::FunPtr(sig) => {
-                // assert!(sig.params.len() == 1);
-                sig.ret.as_ref().clone()
-            }
+            Ty::FunPtr(sig) => sig.ret.as_ref().clone(),
             _ => unreachable!(),
         }
     }

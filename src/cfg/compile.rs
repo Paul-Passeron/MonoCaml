@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use crate::{
     ast::{
         Ast, Var,
-        types::{AstCtx, AstTy, AstTyped},
+        types::{AstCtx, AstTy, AstTyped, EnumDef},
     },
     cfg::{
         Const, FunName, FunNameUse, Func, Label, Program, Sig, Ty, TyCtx, Value, builder::Builder,
@@ -12,6 +12,25 @@ use crate::{
     helpers::unique::Use,
 };
 
+pub enum RecFlag {
+    Rec,
+    NoRec,
+}
+
+pub enum TypeRepr {
+    Enum(RecFlag, HashMap<String, TypeRepr>),
+    Struct(RecFlag, Vec<TypeRepr>),
+    Named(String),
+    Ptr(Box<TypeRepr>),
+    Int,
+    String,
+    Void,
+    FunPtr {
+        params: Vec<TypeRepr>,
+        ret: Box<TypeRepr>,
+    },
+}
+
 pub struct Compiler {
     prog: Program,
     map: HashMap<Var, CfgVarUse>,
@@ -19,6 +38,7 @@ pub struct Compiler {
     ctx: TyCtx,
     wrapped_natives: HashMap<FunNameUse, FunNameUse>,
     ast_ctx: AstCtx,
+    reprs: HashMap<String, TypeRepr>,
 }
 
 impl Compiler {
@@ -36,6 +56,12 @@ impl Compiler {
         let f = b.finalize();
         self.add_func(f);
         self.add_named_func("add", used);
+    }
+
+    fn get_enum_repr(m: &HashMap<String, Ty>) -> Ty {
+        let discr = Ty::Int;
+        let largest = m.values().max_by_key(|x| x.get_size()).unwrap().clone();
+        Ty::Struct(vec![discr, largest])
     }
 
     fn create_mul(&mut self) {
@@ -135,7 +161,7 @@ impl Compiler {
         self.add_named_func("drop_closure", used);
     }
 
-    fn create_register_closure(&mut self) {
+    fn create_register_object(&mut self) {
         let name = FunName::fresh();
         let used = Use::from(&name);
         let f = Func {
@@ -147,13 +173,28 @@ impl Compiler {
             cfg: None,
         };
         self.add_func(f);
-        self.add_named_func("register_closure", used);
+        self.add_named_func("register_object", used);
     }
 
     fn add_named_func<S: ToString>(&mut self, alias: S, fun_name: FunNameUse) {
         self.prog
             .add_native_alias(alias.to_string(), fun_name.clone());
         self.ctx.add_native_alias(alias, fun_name);
+    }
+
+    fn create_repr_for_ast(&mut self, t: &AstTy) -> TypeRepr {
+        match t {
+            AstTy::Int => TypeRepr::Int,
+            AstTy::String => TypeRepr::String,
+            AstTy::Tuple(items) => todo!(),
+            AstTy::Fun { arg, ret } => todo!(),
+            AstTy::Named(_) => todo!(),
+        }
+    }
+
+    fn create_enum_repr(&mut self, e: &EnumDef, f: RecFlag) -> TypeRepr {
+        // e.cases.
+        todo!()
     }
 
     fn add_func(&mut self, f: Func) {
@@ -174,6 +215,7 @@ impl Compiler {
             ctx: TyCtx::new(),
             wrapped_natives: HashMap::new(),
             ast_ctx: Default::default(),
+            reprs: HashMap::new(),
         };
         res.create_add();
         res.create_mul();
@@ -182,7 +224,7 @@ impl Compiler {
         res.create_random_int();
         res.create_borrow_closure();
         res.create_drop_closure();
-        res.create_register_closure();
+        res.create_register_object();
         res
     }
 
@@ -299,7 +341,6 @@ impl Compiler {
                 body.as_ref().clone(),
                 b,
             ),
-
             Ast::App { fun, arg } => {
                 if self.ast_is_saturated(ast) {
                     let (args, name) = self.get_saturated_args_and_fun(ast.clone());
@@ -345,12 +386,12 @@ impl Compiler {
                     self.compile_nonrec_let(b, bound, value, in_expr)
                 }
             }
-
             Ast::If {
                 cond,
                 then_e,
                 else_e,
             } => self.compile_if(b, cond, then_e, else_e),
+            Ast::Cons { enum_name, arg } => todo!(),
         }
     }
 
@@ -519,11 +560,11 @@ impl Compiler {
         let env_struct = b.aggregate(&mut self.ctx, env_values);
 
         let malloc = self.malloc_val(env_struct.clone().into(), b);
-        let register_closure = Const::FunPtr(self.ctx.natives["register_closure"].clone());
+        let register_object = Const::FunPtr(self.ctx.natives["register_object"].clone());
 
         b.native_call(
             &mut self.ctx,
-            register_closure.clone().into(),
+            register_object.clone().into(),
             vec![malloc.clone().into()],
         );
 
@@ -536,7 +577,7 @@ impl Compiler {
 
         b.native_call(
             &mut self.ctx,
-            register_closure.into(),
+            register_object.into(),
             vec![malloc.clone().into()],
         );
 
@@ -623,6 +664,7 @@ impl Compiler {
                 }
                 t
             }
+            Ast::Cons { enum_name, arg } => todo!(),
         }
     }
 
@@ -723,10 +765,10 @@ impl Compiler {
 
         let env_struct = b.aggregate(&mut self.ctx, env_values);
         let malloc = self.malloc_val(env_struct.into(), b);
-        let register_closure = Const::FunPtr(self.ctx.natives["register_closure"].clone());
+        let register_object = Const::FunPtr(self.ctx.natives["register_object"].clone());
         b.native_call(
             &mut self.ctx,
-            register_closure.into(),
+            register_object.into(),
             vec![malloc.clone().into()],
         );
 
@@ -830,11 +872,11 @@ impl Compiler {
             current_env_ty = aggregate_env.get_type(&self.ctx);
 
             let malloc = self.malloc_val(aggregate_env.clone().into(), &mut wrapper_func_builder);
-            let register_closure = Const::FunPtr(self.ctx.natives["register_closure"].clone());
+            let register_object = Const::FunPtr(self.ctx.natives["register_object"].clone());
 
             wrapper_func_builder.native_call(
                 &mut self.ctx,
-                register_closure.into(),
+                register_object.into(),
                 vec![malloc.clone().into()],
             );
             let closure_struct = wrapper_func_builder.aggregate(

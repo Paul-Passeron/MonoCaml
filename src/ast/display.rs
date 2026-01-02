@@ -1,6 +1,9 @@
 use std::fmt;
 
-use crate::ast::{Ast, AstTy, AstTyped, Var};
+use crate::ast::{
+    Ast, AstTy, AstTyped, Var,
+    types::{EnumCase, EnumDef},
+};
 
 pub fn alphabetize(x: usize) -> String {
     let mut x = x + 1;
@@ -77,6 +80,39 @@ impl fmt::Display for Ast {
             } => {
                 write!(f, "if {} then {} else {}", cond, then_e, else_e)
             }
+            Ast::Cons { enum_name, arg } => todo!(),
         }
+    }
+}
+
+impl fmt::Display for EnumCase {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "| {}{}",
+            self.cons_name,
+            match &self.arg {
+                None => "".into(),
+                Some(ty) => format!(" of {}", {
+                    let t = ty.to_string();
+                    let as_str = t.as_str();
+                    as_str
+                        .strip_prefix("(")
+                        .map(|x| x.strip_suffix(")").unwrap())
+                        .unwrap_or(as_str)
+                        .to_string()
+                }),
+            }
+        )
+    }
+}
+
+impl fmt::Display for EnumDef {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(f, "enum {}", self.name)?;
+        for case in &self.cases {
+            writeln!(f, "    {case}")?;
+        }
+        Ok(())
     }
 }

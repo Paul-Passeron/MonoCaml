@@ -2,9 +2,11 @@
 #include <stdlib.h>
 #include <string.h>
 
-void register_closure(void *env);
-void borrow_closure(void *env);
-void drop_closure(void *env);
+void register_object(void *env);
+void borrow_object(void *env);
+void drop_object(void *env);
+
+void print_lst(void *lst);
 
 void print_int(int x);
 void print_string(const char *const str);

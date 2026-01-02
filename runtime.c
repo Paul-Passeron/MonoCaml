@@ -58,7 +58,7 @@ static ints free_refs[REF_COUNT] = {0};
 
 size_t hash(intptr_t in) { return (in >> 3) % REF_COUNT; }
 
-__inline__ void register_closure(void *ptr) {
+__inline__ void register_object(void *ptr) {
   size_t hashed = hash((intptr_t)ptr);
   refs *refs = &references[hashed];
   for (size_t i = 0; i < refs->count; ++i) {
@@ -87,19 +87,19 @@ ref *get_ref(const void *const ptr, size_t *h, size_t *idx) {
       return &refs->items[i];
     }
   }
-  fprintf(stderr, "RUNTIME ERROR: CANNOT FIND REFERENCE TO CLOSURE...\n");
+  fprintf(stderr, "RUNTIME ERROR: CANNOT FIND REFERENCE TO OBJECT...\n");
   fprintf(stderr, "ABORTING NOW...\n");
   exit(1);
 }
 
-__inline__ void borrow_closure(void *env) {
+__inline__ void borrow_object(void *env) {
   if (!env)
     return;
   ref *ref = get_ref(env, NULL, NULL);
   ref->count++;
 }
 
-__inline__ void drop_closure(void *env) {
+__inline__ void drop_object(void *env) {
   if (!env)
     return;
   size_t hash, idx;
@@ -128,7 +128,64 @@ void cleanup(void) {
 
 void print_int(int x) { printf("%d", x); }
 
+typedef enum {
+  MY_LST_NIL,
+  MY_LST_CONS,
+} my_lst_discr;
+typedef struct my_lst my_lst;
+
+struct my_lst {
+  int _0;
+  union {
+    struct {
+      int _0;
+      my_lst *_1;
+    } cons;
+  } _1;
+};
+
+void print_lst_aux(my_lst *ptr, int first) {
+lbl:
+  if (!first) {
+    printf(", ");
+  }
+  if (ptr->_0 == 0) {
+    printf("Nil");
+  } else {
+    printf("%d", ptr->_1.cons._0);
+    ptr = ptr->_1.cons._1;
+    first = 0;
+    goto lbl;
+  }
+}
+
+my_lst *lst_nil(void) {
+  my_lst *res = malloc(sizeof(*res));
+  register_object(res);
+  res->_0 = 0;
+  return res;
+}
+
+my_lst *lst_cons(int elt, my_lst *next) {
+  my_lst *res = malloc(sizeof(*res));
+  register_object(res);
+  res->_0 = 1;
+  res->_1.cons._0 = elt;
+  res->_1.cons._1 = next;
+  return res;
+}
+
+void print_lst(void *lst) {
+  printf("[");
+  print_lst_aux(lst, 1);
+  printf("]\n");
+}
+
 int main() {
+  // TEST
+  my_lst *lst = lst_cons(4, lst_cons(5, lst_nil()));
+  print_lst(lst);
+
   srand(time(NULL));
   start();
   cleanup();

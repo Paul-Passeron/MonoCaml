@@ -28,50 +28,53 @@ impl AstTy {
         }
     }
 
-    pub fn is_rec_aux(&self, ctx: &AstCtx, names: &mut HashSet<&str>) -> bool {
+    pub fn rec_aux(&self, this: &str, ctx: &AstCtx) -> bool {
         match self {
             AstTy::Int => false,
             AstTy::String => false,
-            AstTy::Tuple(items) => items.iter().any(|x| x.is_rec_aux(ctx, names)),
-            AstTy::Fun { arg, ret } => arg.is_rec_aux(ctx, names) || ret.is_rec_aux(ctx, names),
-            AstTy::Named(this) => {
-                if names.contains(&this[..]) {
+            AstTy::Tuple(items) => items.iter().any(|x| x.rec_aux(this, ctx)),
+            AstTy::Fun { arg, ret } => arg.rec_aux(this, ctx) || ret.rec_aux(this, ctx),
+            AstTy::Named(x) => {
+                println!("{x} vs {this}");
+
+                if x == this {
+                    println!("Recursion detected");
                     true
                 } else {
-                    let def = &ctx.types[this];
-                    match def {
-                        TypeDef::Alias(ast_ty) => ast_ty.is_rec_aux(ctx, names),
+                    let d = &ctx.types[&x[..]];
+                    match d {
+                        TypeDef::Alias(ast_ty) => ast_ty.rec_aux(this, ctx),
                         TypeDef::Enum(enum_def) => enum_def
                             .cases
                             .iter()
-                            .map(|x| x.arg.iter())
-                            .flatten()
-                            .any(|x| x.is_rec_aux(ctx, names)),
+                            .any(|x| x.arg.iter().any(|x| x.rec_aux(this, ctx))),
                     }
                 }
             }
         }
     }
 
+    // TODO: Maybe use another version of this when compiling to CFG because:
+    // - Here, Types are marked as recursive even if the type containing them is later turned into a pointer
+    //      Example: the type enum T { Nil | AFunction(T -> T) } is marked as recursive even though a T -> T is
+    //      turned into a closure which sizes are invariant.
     pub fn is_recursive(&self, ctx: &AstCtx) -> bool {
         match self {
             AstTy::Named(this) => {
-                let def = &ctx.types[this];
-                let names = &mut HashSet::from_iter(once(&this[..]));
-                match def {
-                    TypeDef::Alias(ast_ty) => ast_ty.is_rec_aux(ctx, names),
+                let d = &ctx.types[&this[..]];
+                match d {
+                    TypeDef::Alias(ast_ty) => ast_ty.rec_aux(this, ctx),
                     TypeDef::Enum(enum_def) => enum_def
                         .cases
                         .iter()
-                        .map(|x| x.arg.iter())
-                        .flatten()
-                        .any(|x| x.is_rec_aux(ctx, names)),
+                        .any(|x| x.arg.iter().any(|x| x.rec_aux(this, ctx))),
                 }
             }
             _ => false,
         }
     }
 }
+
 #[derive(Clone)]
 pub struct AstTyped<T> {
     expr: T,
@@ -98,6 +101,7 @@ pub struct EnumCase {
 }
 
 pub struct EnumDef {
+    pub name: String,
     pub cases: Vec<EnumCase>,
 }
 
@@ -122,6 +126,7 @@ mod tests {
         ctx.types
             .insert("elem".into(), TypeDef::Alias(elem_ty.clone()));
         let list_ty = EnumDef {
+            name: "list".into(),
             cases: vec![
                 EnumCase {
                     cons_name: "Nil".into(),
@@ -136,6 +141,8 @@ mod tests {
                 },
             ],
         };
+
+        println!("{list_ty}");
 
         ctx.types.insert("list".into(), TypeDef::Enum(list_ty));
 

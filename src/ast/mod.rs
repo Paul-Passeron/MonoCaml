@@ -59,6 +59,10 @@ pub enum Ast {
         then_e: Box<Ast>,
         else_e: Box<Ast>,
     },
+    Cons {
+        enum_name: String,
+        arg: Option<Box<Ast>>,
+    },
 }
 
 impl Ast {
@@ -171,6 +175,7 @@ impl Ast {
                 then_e.free_vars_aux(s);
                 else_e.free_vars_aux(s);
             }
+            Ast::Cons { arg, .. } => arg.iter().for_each(|x| x.free_vars_aux(s)),
         }
     }
 }
