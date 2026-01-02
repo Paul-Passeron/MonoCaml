@@ -182,10 +182,6 @@ void print_lst(void *lst) {
 }
 
 int main() {
-  // TEST
-  my_lst *lst = lst_cons(4, lst_cons(5, lst_nil()));
-  print_lst(lst);
-
   srand(time(NULL));
   start();
   cleanup();
