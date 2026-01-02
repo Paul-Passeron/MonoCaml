@@ -146,12 +146,10 @@ struct my_lst {
 
 void print_lst_aux(my_lst *ptr, int first) {
 lbl:
-  if (!first) {
-    printf(", ");
-  }
-  if (ptr->_0 == 0) {
-    printf("Nil");
-  } else {
+  if (ptr->_0 != 0) {
+    if (!first) {
+      printf(", ");
+    }
     printf("%d", ptr->_1.cons._0);
     ptr = ptr->_1.cons._1;
     first = 0;
