@@ -84,7 +84,16 @@ impl fmt::Display for Ast {
                 enum_name,
                 arg,
                 case,
-            } => todo!(),
+            } => write!(
+                f,
+                "{}.{}{}",
+                enum_name,
+                case,
+                match arg {
+                    Some(x) => format!(" {x}"),
+                    None => "".into(),
+                }
+            ),
         }
     }
 }
