@@ -611,6 +611,11 @@ impl<P: AsRef<Path>> ExportC<P> {
 
     pub fn export(&mut self, prog: &Program) {
         writeln!(&mut self.f, "#include \"runtime.h\"").unwrap();
+        writeln!(
+            &mut self.f,
+            "#pragma clang diagnostic ignored \"-Wincompatible-pointer-types\""
+        )
+        .unwrap();
         let types = prog.get_all_types();
         for ty in types {
             self.define_type(ty);
