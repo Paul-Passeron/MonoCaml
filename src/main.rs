@@ -448,6 +448,93 @@ fn match_ast() -> (Ast, AstCtx) {
     (ast, ctx)
 }
 
+fn list_test4() -> (Ast, AstCtx) {
+    let mut ctx = AstCtx::default();
+    ctx.natives.insert(
+        "print_lst".into(),
+        AstTy::fun(AstTy::named("lst"), AstTy::Tuple(vec![])),
+    );
+    ctx.types.insert(
+        "lst".into(),
+        EnumDef {
+            name: "lst".into(),
+            cases: vec![
+                EnumCase {
+                    cons_name: "Nil".into(),
+                    arg: None,
+                },
+                EnumCase {
+                    cons_name: "Cons".into(),
+                    arg: Some(AstTy::Tuple(vec![AstTy::Int, AstTy::named("lst")])),
+                },
+            ],
+        },
+    );
+    let constr = |name: &str, val| Ast::cons("lst", name, val);
+    let cons = |val, old| constr("Cons", Some(Ast::tuple(vec![val, old])));
+    let nil = || constr("Nil", None);
+    let rev = Var::fresh();
+    let l = Var::fresh();
+    let l2 = Var::fresh();
+    let hd = Var::fresh();
+    let tl = Var::fresh();
+    let acc = Var::fresh();
+    let aux = Var::fresh();
+    let ast = Ast::let_in(
+        rev,
+        AstTy::fun(AstTy::named("lst"), AstTy::named("lst")),
+        Ast::lambda(
+            AstTyped::new(l, AstTy::named("lst")),
+            Ast::let_in(
+                aux,
+                AstTy::fun(
+                    AstTy::named("lst"),
+                    AstTy::fun(AstTy::named("lst"), AstTy::named("lst")),
+                ),
+                Ast::lambda(
+                    AstTyped::new(l2, AstTy::named("lst")),
+                    Ast::lambda(
+                        AstTyped::new(acc, AstTy::named("lst")),
+                        Ast::match_with(
+                            Ast::var(l2),
+                            vec![
+                                MatchCase {
+                                    pat: Pattern::cons("lst", "Nil", None),
+                                    expr: Ast::var(acc),
+                                },
+                                MatchCase {
+                                    pat: Pattern::cons(
+                                        "lst",
+                                        "Cons",
+                                        Some(Pattern::tuple(vec![
+                                            Pattern::symb(hd, AstTy::Int),
+                                            Pattern::symb(tl, AstTy::named("lst")),
+                                        ])),
+                                    ),
+                                    expr: Ast::app(
+                                        Ast::app(Ast::Var(aux), Ast::Var(tl)),
+                                        cons(Ast::Var(hd), Ast::var(acc)),
+                                    ),
+                                },
+                            ],
+                        ),
+                    ),
+                ),
+                Ast::app(Ast::app(Ast::Var(aux), Ast::var(l)), nil()),
+            ),
+        ),
+        Ast::app(
+            Ast::native("print_lst"),
+            Ast::app(
+                Ast::var(rev),
+                cons(Ast::Int(123), cons(Ast::Int(456), nil())),
+            ),
+        ),
+    );
+
+    (ast, ctx)
+}
+
 #[allow(unused)]
 fn compile_ast<S: ToString>(ast: Ast, prog_name: S) {
     compile_ast_with_ctx(ast, prog_name, AstCtx::default())
@@ -587,6 +674,6 @@ mod tests {
 }
 
 fn main() {
-    let (ast, ctx) = match_ast();
+    let (ast, ctx) = list_test4();
     compile_ast_with_ctx(ast, "match_test", ctx);
 }
