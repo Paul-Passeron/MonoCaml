@@ -8,7 +8,8 @@ use std::{
 
 use crate::{
     ast::{
-        Ast, Var,
+        Ast, MatchCase, Var,
+        pattern::Pattern,
         types::{AstCtx, AstTy, AstTyped, EnumCase, EnumDef},
     },
     backend::c_backend::ExportC,
@@ -372,6 +373,82 @@ fn list_test3() -> (Ast, AstCtx) {
 }
 
 #[allow(unused)]
+fn match_ast() -> (Ast, AstCtx) {
+    let mut ctx = AstCtx::default();
+    ctx.types.insert(
+        "val".into(),
+        EnumDef {
+            name: "val".into(),
+            cases: vec![
+                EnumCase {
+                    cons_name: "Int".into(),
+                    arg: Some(AstTy::Int),
+                },
+                EnumCase {
+                    cons_name: "Str".into(),
+                    arg: Some(AstTy::String),
+                },
+            ],
+        },
+    );
+    ctx.natives.insert(
+        "print_int".into(),
+        AstTy::fun(AstTy::Int, AstTy::Tuple(vec![])),
+    );
+    ctx.natives.insert(
+        "print_string".into(),
+        AstTy::fun(AstTy::String, AstTy::Tuple(vec![])),
+    );
+    let print_val = Var::fresh();
+    let v = Var::fresh();
+    let int_val = Var::fresh();
+    let str_val = Var::fresh();
+    let ast = Ast::let_in(
+        print_val,
+        AstTy::fun(AstTy::named("val"), AstTy::Tuple(vec![])),
+        Ast::lambda(
+            AstTyped::new(v, AstTy::named("val")),
+            Ast::match_with(
+                Ast::var(v),
+                vec![
+                    MatchCase {
+                        pat: Pattern::Cons {
+                            enum_name: "val".into(),
+                            cons: "Int".into(),
+                            arg: Some(Box::new(Pattern::Symbol(int_val, AstTy::Int))),
+                        },
+                        expr: Ast::app(Ast::native("print_int"), Ast::var(int_val)),
+                    },
+                    MatchCase {
+                        pat: Pattern::Cons {
+                            enum_name: "val".into(),
+                            cons: "Str".into(),
+                            arg: Some(Box::new(Pattern::Symbol(str_val, AstTy::String))),
+                        },
+                        expr: Ast::app(Ast::native("print_string"), Ast::var(str_val)),
+                    },
+                ],
+            ),
+        ),
+        Ast::seq(
+            Ast::seq(
+                Ast::app(
+                    Ast::var(print_val),
+                    Ast::cons("val", "Int", Some(Ast::int(123))),
+                ),
+                Ast::app(Ast::native("print_string"), Ast::string("\n")),
+            ),
+            Ast::app(
+                Ast::var(print_val),
+                Ast::cons("val", "Str", Some(Ast::string("Hello, World !\n"))),
+            ),
+        ),
+    );
+
+    (ast, ctx)
+}
+
+#[allow(unused)]
 fn compile_ast<S: ToString>(ast: Ast, prog_name: S) {
     compile_ast_with_ctx(ast, prog_name, AstCtx::default())
 }
@@ -510,6 +587,6 @@ mod tests {
 }
 
 fn main() {
-    let (ast, ctx) = list_test3();
-    compile_ast_with_ctx(ast, "list_test", ctx);
+    let (ast, ctx) = match_ast();
+    compile_ast_with_ctx(ast, "match_test", ctx);
 }
