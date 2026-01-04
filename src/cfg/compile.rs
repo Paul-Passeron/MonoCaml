@@ -1,8 +1,12 @@
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    iter::once,
+};
 
 use crate::{
     ast::{
-        Ast, Var,
+        Ast, MatchCase, Var,
+        pattern::Pattern,
         types::{AstCtx, AstTy, AstTyped, EnumDef},
     },
     cfg::{
@@ -39,8 +43,9 @@ impl Compiler {
     }
 
     pub fn add_named_func<S: ToString>(&mut self, alias: S, fun_name: FunNameUse) {
-        self.prog
-            .add_native_alias(alias.to_string(), fun_name.clone());
+        let alias = alias.to_string();
+        println!("{alias} -> {fun_name}");
+        self.prog.add_native_alias(alias.clone(), fun_name.clone());
         self.ctx.add_native_alias(alias, fun_name);
     }
 
@@ -86,6 +91,7 @@ impl Compiler {
         res.create_borrows();
         res.create_drops();
         res.create_constructors();
+        let _ = res.get_ast_ty_of(&ast);
         let mut b = Builder::new(entry, vec![], Ty::Void, &mut res.ctx);
         res.aux(&ast, &mut b);
         b.ret_void(&mut res.ctx);
@@ -97,6 +103,8 @@ impl Compiler {
     pub fn create_constructors_for_enum(&mut self, enum_def: &EnumDef) {
         let named = AstTy::named(&enum_def.name);
         let ret_ty = self.ast_ty_to_ty(&named);
+        let union_ty = ret_ty.field(1);
+        assert!(union_ty.is_union());
         let is_rec = named.is_recursive(&self.ast_ctx);
         for (i, case) in enum_def.cases.iter().enumerate() {
             let funname = FunName::fresh();
@@ -117,7 +125,8 @@ impl Compiler {
             if !use_params.is_empty() {
                 let val: Value = use_params[0].clone().into();
                 self.borrow_ty(val.clone(), case.arg.as_ref().unwrap(), &mut builder);
-                args.push(val);
+                let union = builder.union(&mut self.ctx, union_ty.clone(), val.clone(), i);
+                args.push(union.into());
             }
             let struct_val = builder.aggregate(&mut self.ctx, args);
 
@@ -178,21 +187,20 @@ impl Compiler {
                 if AstTy::named(ty).is_recursive(&self.ast_ctx) {
                     if r {
                         let enum_def = &self.ast_ctx.types[ty];
-                        let max_case = enum_def
-                            .cases
-                            .iter()
-                            .max_by_key(|x| {
-                                x.arg
-                                    .as_ref()
-                                    .map_or(0, |x| self.ast_ty_to_ty_pro(x, false).get_size())
-                            })
-                            .expect("Enum type requires at least one variant");
-                        let ty_of_case = max_case
-                            .arg
-                            .as_ref()
-                            .map_or(Ty::Void, |x| self.ast_ty_to_ty_pro(x, false));
-                        let fields = if !ty_of_case.is_zero_sized() {
-                            vec![Ty::Int, ty_of_case]
+                        let union_ty = Ty::Union(
+                            enum_def
+                                .cases
+                                .iter()
+                                .map(|x| {
+                                    x.arg
+                                        .as_ref()
+                                        .map_or(Ty::Void, |t| self.ast_ty_to_ty_pro(t, false))
+                                })
+                                .collect(),
+                        );
+
+                        let fields = if !union_ty.is_zero_sized() {
+                            vec![Ty::Int, union_ty]
                         } else {
                             vec![Ty::Int]
                         };
@@ -202,21 +210,20 @@ impl Compiler {
                     }
                 } else {
                     let enum_def = &self.ast_ctx.types[ty];
-                    let max_case = enum_def
-                        .cases
-                        .iter()
-                        .max_by_key(|x| {
-                            x.arg
-                                .as_ref()
-                                .map_or(0, |x| self.ast_ty_to_ty_pro(x, false).get_size())
-                        })
-                        .expect("Enum type requires at least one variant");
-                    let ty_of_case = max_case
-                        .arg
-                        .as_ref()
-                        .map_or(Ty::Void, |x| self.ast_ty_to_ty_pro(x, false));
-                    let fields = if !ty_of_case.is_zero_sized() {
-                        vec![Ty::Int, ty_of_case]
+                    let union_ty = Ty::Union(
+                        enum_def
+                            .cases
+                            .iter()
+                            .map(|x| {
+                                x.arg
+                                    .as_ref()
+                                    .map_or(Ty::Void, |t| self.ast_ty_to_ty_pro(t, false))
+                            })
+                            .collect(),
+                    );
+
+                    let fields = if !union_ty.is_zero_sized() {
+                        vec![Ty::Int, union_ty]
                     } else {
                         vec![Ty::Int]
                     };
@@ -371,6 +378,10 @@ impl Compiler {
                     arg.into_iter().collect(),
                 )
                 .into()
+            }
+            Ast::Match { expr, cases } => {
+                let target = self.get_type_of_case(&cases[0]);
+                self.compile_match(expr, cases, b, target)
             }
         }
     }
@@ -645,7 +656,42 @@ impl Compiler {
                 t
             }
             Ast::Cons { enum_name, .. } => self.ast_ty_to_ty(&AstTy::named(enum_name)),
+            Ast::Match { expr, cases } => {
+                assert!(cases.len() > 0);
+                self.get_type_of_case(&cases[0])
+            }
         }
+    }
+
+    fn collect_types_in_pat(&mut self, pat: &Pattern) {
+        match pat {
+            Pattern::Int(_) => (),
+            Pattern::Symbol(var, ty) => {
+                self.ast_tys.insert(*var, ty.clone());
+                let cfg_ty = self.ast_ty_to_ty(ty);
+                self.type_map.insert(*var, cfg_ty);
+            }
+            Pattern::Cons {
+                enum_name,
+                cons,
+                arg,
+            } => {
+                arg.iter().for_each(|x| self.collect_types_in_pat(x));
+            }
+            Pattern::Tuple(patterns) => {
+                patterns.iter().for_each(|x| self.collect_types_in_pat(x));
+            }
+        }
+    }
+
+    fn get_type_of_case(&mut self, case: &MatchCase) -> Ty {
+        self.collect_types_in_pat(&case.pat);
+        self.get_type_of_ast(&case.expr)
+    }
+
+    fn get_ast_type_of_case(&mut self, case: &MatchCase) -> AstTy {
+        self.collect_types_in_pat(&case.pat);
+        self.get_ast_ty_of(&case.expr)
     }
 
     fn curry_aux(&self, lst: &[Ty], s: &mut HashMap<usize, Ty>) -> Ty {
@@ -787,6 +833,7 @@ impl Compiler {
 
     fn create_native_closure(&mut self, name: String) -> FunNameUse {
         let funname = self.ctx.natives[&name].clone();
+
         // Create the closure tree (all intermediate functions taking a single arg as well as the closure env) of the native function and return the wrapper as a closure
         let sig = self.ctx.sigs[&funname].clone();
         assert!(sig.params.len() > 0);
@@ -953,7 +1000,10 @@ impl Compiler {
         match a {
             Ast::Str(_) => AstTy::String,
             Ast::Int(_) => AstTy::Int,
-            Ast::Var(var) => self.ast_tys[var].clone(),
+            Ast::Var(var) => {
+                println!("Looking for var {}", var);
+                self.ast_tys[var].clone()
+            }
             Ast::Lambda { arg, body } => {
                 self.ast_tys.insert(arg.expr().clone(), arg.ty().clone());
                 let ret = self.get_ast_ty_of(body);
@@ -978,7 +1028,10 @@ impl Compiler {
                     _ => unreachable!(),
                 }
             }
-            Ast::Native(x) => self.ast_ctx.natives[x].clone(),
+            Ast::Native(x) => {
+                println!("Searching for native function {x}");
+                self.ast_ctx.natives[x].clone()
+            }
             Ast::LetBinding {
                 bound,
                 value,
@@ -999,6 +1052,145 @@ impl Compiler {
                 self.get_ast_ty_of(else_e)
             }
             Ast::Cons { enum_name, .. } => AstTy::Named(enum_name.clone()),
+            Ast::Match { expr, cases } => {
+                assert!(cases.len() > 0);
+                self.get_ast_type_of_case(&cases[0])
+            }
+        }
+    }
+
+    fn matches(
+        &mut self,
+        v: CfgVarUse,
+        ty: &AstTy,
+        pat: &Pattern,
+        b: &mut Builder,
+    ) -> (Value, HashMap<Var, CfgVarUse>) {
+        match pat {
+            Pattern::Int(x) => (
+                b.eq(&mut self.ctx, Const::Int(*x).into(), v.into()).into(),
+                HashMap::new(),
+            ),
+            Pattern::Symbol(var, _) => (
+                Const::Int(1).into(),
+                HashMap::from_iter(once((var.clone(), v))),
+            ),
+            Pattern::Cons {
+                enum_name,
+                cons,
+                arg,
+            } => {
+                match ty {
+                    AstTy::Named(n) => {
+                        if n != enum_name {
+                            panic!("Expected type {} but found {}", n, enum_name)
+                        }
+                    }
+                    _ => unreachable!(),
+                };
+                let self_ty = self.ast_ty_to_ty(&AstTy::named(enum_name));
+                let cases = self.ast_ctx.types[enum_name].cases.clone();
+                let pos = cases.iter().position(|x| &x.cons_name == cons).unwrap();
+                println!("POS OF {cons} is {pos}");
+                let marker = b.extract(&mut self.ctx, v.clone().into(), 0);
+                let val = b.eq(&mut self.ctx, Const::Int(pos as i32).into(), marker.into());
+                arg.iter()
+                    .fold((val, HashMap::new()), |(val, mut bindings), x| {
+                        let arg_ty = cases[pos].arg.as_ref().unwrap().clone();
+                        println!("ARG TY OF {cons} is {arg_ty}");
+                        let v = if ty.is_recursive(&self.ast_ctx) {
+                            let ptr = b.get_element_ptr(
+                                &mut self.ctx,
+                                v.clone().into(),
+                                self_ty.clone(),
+                                1,
+                            );
+                            let ptr =
+                                b.get_element_ptr(&mut self.ctx, ptr.into(), self_ty.field(1), pos);
+                            b.load(&mut self.ctx, ptr.into(), self_ty.field(1).field(pos))
+                        } else {
+                            let arg_ty = cases[pos].arg.as_ref().unwrap().clone();
+                            let v = b.extract(&mut self.ctx, v.clone().into(), 1);
+                            b.extract(&mut self.ctx, v.into(), pos)
+                        };
+                        let (new_val, new_bindings) = self.matches(v, &arg_ty, x, b);
+                        bindings.extend(new_bindings.into_iter());
+                        let mat = b.mul(&mut self.ctx, new_val, val);
+                        (mat, bindings)
+                    })
+            }
+            Pattern::Tuple(patterns) => match ty {
+                AstTy::Tuple(items) => {
+                    assert_eq!(items.len(), patterns.len());
+                    items.iter().zip(patterns.iter()).enumerate().fold(
+                        (Value::Const(Const::Int(1)), HashMap::new()),
+                        |(val, mut bindings), (i, (ty, pat))| {
+                            let v = b.extract(&mut self.ctx, v.clone().into(), i);
+                            let (this, new_bindings) = self.matches(v.into(), ty, pat, b);
+                            let new_val = b.mul(&mut self.ctx, this.into(), val);
+                            bindings.extend(new_bindings.into_iter());
+                            (new_val, bindings)
+                        },
+                    )
+                }
+                _ => unreachable!("Not a tuple"),
+            },
+        }
+    }
+
+    fn compile_match(
+        &mut self,
+        expr: &Ast,
+        cases: &[MatchCase],
+        b: &mut Builder,
+        target_ty: Ty,
+    ) -> Value {
+        let ty = self.get_ast_ty_of(expr);
+        let val = self.aux(expr, b);
+        let var = b.make_var(&mut self.ctx, &val);
+        let merge_lbl = Label::fresh();
+        let merge_use = Use::from(&merge_lbl);
+        let cfg_ty = self.ast_ty_to_ty(&ty);
+        let mut vals = vec![];
+        for case in cases {
+            let (mat, bindings) = self.matches(var.clone(), &ty, &case.pat, b);
+
+            for (var, cfg) in bindings {
+                let ty = cfg.get_type(&self.ctx);
+                println!("[VAR] {var} -> {ty}");
+                self.map.insert(var, cfg);
+                self.type_map.insert(var, ty);
+            }
+
+            let case_body_lbl = Label::fresh();
+            let case_body_use = Use::from(&case_body_lbl);
+            let next_check_lbl = Label::fresh();
+            let next_check_use = Use::from(&next_check_lbl);
+            b.branch(
+                &mut self.ctx,
+                mat,
+                case_body_use,
+                next_check_use.clone(),
+                case_body_lbl,
+            );
+            let this_res = self.aux(&case.expr, b);
+            if !target_ty.is_zero_sized() {
+                let cast = b.cast(&mut self.ctx, &this_res, target_ty.clone());
+                vals.push(cast);
+            }
+            b.goto(&mut self.ctx, merge_use.clone(), next_check_lbl);
+        }
+
+        b.goto(&mut self.ctx, merge_use, merge_lbl);
+        if !target_ty.is_zero_sized() {
+            let phi = b.add_phi_target(&mut self.ctx, cfg_ty);
+            for v in vals {
+                println!("PHI BETWEEN {v} and {phi}");
+                b.add_phi(&mut self.ctx, phi.clone(), v);
+            }
+            phi.into()
+        } else {
+            Const::Struct(vec![]).into()
         }
     }
 }

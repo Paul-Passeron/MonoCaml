@@ -1,10 +1,14 @@
 pub mod display;
+pub mod pattern;
 pub mod types;
 mod vars;
 use std::collections::HashSet;
 
 use crate::{
-    ast::types::{AstTy, AstTyped},
+    ast::{
+        pattern::Pattern,
+        types::{AstTy, AstTyped},
+    },
     helpers::unique::Unique,
 };
 
@@ -64,6 +68,16 @@ pub enum Ast {
         case: String,
         arg: Option<Box<Ast>>,
     },
+    Match {
+        expr: Box<Ast>,
+        cases: Vec<MatchCase>,
+    },
+}
+
+#[derive(Clone)]
+pub struct MatchCase {
+    pub pat: Pattern,
+    pub expr: Ast,
 }
 
 impl Ast {
@@ -139,6 +153,13 @@ impl Ast {
         }
     }
 
+    pub fn match_with(expr: Self, cases: Vec<MatchCase>) -> Self {
+        Self::Match {
+            expr: Box::new(expr),
+            cases,
+        }
+    }
+
     pub fn free_vars(&self) -> HashSet<Var> {
         let mut s = HashSet::new();
         self.free_vars_aux(&mut s);
@@ -185,6 +206,15 @@ impl Ast {
                 else_e.free_vars_aux(s);
             }
             Ast::Cons { arg, .. } => arg.iter().for_each(|x| x.free_vars_aux(s)),
+            Ast::Match { expr, cases } => {
+                expr.free_vars_aux(s);
+                cases.iter().for_each(|case| {
+                    case.expr.free_vars_aux(s);
+                    case.pat.vars().iter().for_each(|x| {
+                        s.remove(x);
+                    })
+                });
+            }
         }
     }
 }

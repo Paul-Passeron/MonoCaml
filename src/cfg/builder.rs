@@ -310,6 +310,16 @@ impl Builder {
             }
         }
     }
+
+    pub fn cast(&mut self, ctx: &mut TyCtx, val: &Value, ty: Ty) -> Use<CfgVar> {
+        self.assign(ctx, Expr::cast(ty, val.clone()))
+    }
+
+    pub fn union(&mut self, ctx: &mut TyCtx, ty: Ty, val: Value, field: usize) -> Use<CfgVar> {
+        assert!(ty.is_union());
+        assert!(ty.field(field).matches(&val.get_type(ctx)));
+        self.assign(ctx, Expr::union(ty, val, field))
+    }
 }
 
 impl Program {

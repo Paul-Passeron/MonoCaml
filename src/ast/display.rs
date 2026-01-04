@@ -86,7 +86,7 @@ impl fmt::Display for Ast {
                 case,
             } => write!(
                 f,
-                "{}.{}{}",
+                "({}.{}{})",
                 enum_name,
                 case,
                 match arg {
@@ -94,6 +94,13 @@ impl fmt::Display for Ast {
                     None => "".into(),
                 }
             ),
+            Ast::Match { expr, cases } => {
+                writeln!(f, "match {expr} with").unwrap();
+                for case in cases {
+                    writeln!(f, "| {} -> {}", case.pat, case.expr).unwrap()
+                }
+                Ok(())
+            }
         }
     }
 }

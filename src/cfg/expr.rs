@@ -19,21 +19,26 @@ pub enum Expr {
     Load { ptr: Value, ty: Ty },
 
     Struct(Vec<Value>),
+    Union(Ty, Value, usize),
 
     Malloc(Ty, Value),
+
+    Cast(Ty, Value),
 
     Phi(Ty),
 }
 
 impl Expr {
     fn check_arith(ctx: &TyCtx, lhs: &Value, rhs: &Value, str: &str) {
-        if !lhs.get_type(ctx).is_arith() || !rhs.get_type(ctx).is_arith() {
-            panic!("Cannot {str} non arith")
+        let lhs_t = lhs.get_type(ctx);
+        let rhs_t = rhs.get_type(ctx);
+        if !lhs_t.is_arith() || !rhs_t.is_arith() {
+            panic!("Cannot {str} non arith ({lhs_t} and {rhs_t}")
         }
     }
 
     pub fn eq(ctx: &TyCtx, lhs: Value, rhs: Value) -> Self {
-        Self::check_arith(ctx, &lhs, &rhs, "add");
+        Self::check_arith(ctx, &lhs, &rhs, "eq");
         Self::Eq(lhs, rhs)
     }
 
@@ -117,5 +122,14 @@ impl Expr {
         } else {
             Self::Malloc(ty, v)
         }
+    }
+
+    pub fn cast(ty: Ty, v: Value) -> Self {
+        Self::Cast(ty, v)
+    }
+
+    pub fn union(ty: Ty, val: Value, field: usize) -> Self {
+        assert!(ty.is_union());
+        Self::Union(ty, val, field)
     }
 }

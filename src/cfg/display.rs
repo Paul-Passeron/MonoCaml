@@ -30,6 +30,15 @@ impl fmt::Display for Ty {
                     .join(", ")
             ),
             Ty::FunPtr(sig) => write!(f, "{sig}"),
+            Ty::Union(items) => write!(
+                f,
+                "union {{ {} }}",
+                items
+                    .iter()
+                    .map(|x| x.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
         }
     }
 }
@@ -142,6 +151,8 @@ impl fmt::Display for Expr {
             ),
             Expr::Malloc(ty, count) => write!(f, "malloc {count} {ty}"),
             Expr::Phi(_) => write!(f, "phi"),
+            Expr::Cast(ty, value) => write!(f, "cast {value} to {ty}"),
+            Expr::Union(ty, value, i) => write!(f, "{ty} at {i} {value}"),
         }
     }
 }

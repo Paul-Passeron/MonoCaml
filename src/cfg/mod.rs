@@ -104,6 +104,7 @@ pub enum Ty {
     Void,
     Ptr(Box<Self>),
     Struct(Vec<Self>),
+    Union(Vec<Self>),
     FunPtr(Sig),
 }
 

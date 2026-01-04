@@ -53,6 +53,13 @@ impl<P: AsRef<Path>> ExportC<P> {
                     .collect();
                 format!("{{{}}}", fields.join(", "))
             }
+            Ty::Union(items) => {
+                let fields: Vec<_> = items
+                    .iter()
+                    .map(|item| self.canonical_decayed(item))
+                    .collect();
+                format!("union {{{}}}", fields.join(", "))
+            }
         }
     }
 
@@ -218,6 +225,60 @@ impl<P: AsRef<Path>> ExportC<P> {
                 self.type_names.insert(ty.clone(), name.clone());
                 self.decayed_type_names.insert(ty, name);
             }
+            Ty::Union(items) => {
+                // Define all inner types first
+                for item in items {
+                    self.define_type(item.clone());
+                }
+
+                // Compute canonical decayed representation for equivalence
+                let my_canonical = self.canonical_decayed(&ty);
+
+                // Check for existing equivalent struct
+                let existing = self
+                    .type_names
+                    .iter()
+                    .filter_map(|(existing_ty, existing_name)| {
+                        if let Ty::Struct(_) = existing_ty {
+                            if self.canonical_decayed(existing_ty) == my_canonical {
+                                match self.decayed_type_names.get(existing_ty) {
+                                    Some(decayed_name) => {
+                                        return Some((existing_name.clone(), decayed_name.clone()));
+                                    }
+                                    None => {
+                                        return Some((existing_name.clone(), my_canonical.clone()));
+                                    }
+                                }
+                            }
+                        }
+                        None
+                    })
+                    .next();
+
+                if let Some((existing_name, decayed_name)) = existing {
+                    self.type_names.insert(ty.clone(), existing_name);
+                    self.decayed_type_names.insert(ty, decayed_name);
+                    return;
+                }
+
+                // Create new typedef using decayed field types
+                let name = format!("ty_{}", self.count);
+                self.count += 1;
+
+                let decayed_field_types: Vec<_> = items
+                    .iter()
+                    .map(|item| self.get_decayed_type_name(item))
+                    .collect();
+
+                writeln!(&mut self.f, "typedef union {{").unwrap();
+                for (i, field_ty) in decayed_field_types.iter().enumerate() {
+                    writeln!(&mut self.f, "    {} _{};", field_ty, i).unwrap();
+                }
+                writeln!(&mut self.f, "}} {};\n", name).unwrap();
+
+                self.type_names.insert(ty.clone(), name.clone());
+                self.decayed_type_names.insert(ty, name);
+            }
         }
     }
 
@@ -255,7 +316,7 @@ impl<P: AsRef<Path>> ExportC<P> {
             Ty::String => "const char *".to_string(),
             Ty::Void => "void".to_string(),
             Ty::Ptr(_) => "void*".to_string(),
-            _ => self.canonical_decayed(ty),
+            _ => panic!("No type but there should be !"),
         }
     }
 
@@ -412,16 +473,22 @@ impl<P: AsRef<Path>> ExportC<P> {
                 let val = self.value_as_string(value);
                 write!(&mut self.f, "malloc({} * sizeof({ty_name}))", val).unwrap();
             }
-            Expr::Phi(_) => (),
             Expr::Eq(value, value1) => {
                 let v1 = self.value_as_string(value);
                 let v2 = self.value_as_string(value1);
                 write!(&mut self.f, "{} == {}", v1, v2).unwrap()
             }
+            Expr::Cast(ty, value) => {
+                let ty_name = self.get_type_name(ty);
+                let val = self.value_as_string(value);
+                write!(&mut self.f, "*({ty_name}*)&{val}").unwrap();
+            }
+            Expr::Phi(_) | Expr::Union(_, _, _) => unreachable!(),
         }
     }
 
-    fn write_terminator(&mut self, t: &Terminator) {
+    fn write_terminator(&mut self, t: &Terminator, ty: &Ty) {
+        let ty_name = self.get_type_name(ty);
         let padding = "        ";
         write!(&mut self.f, "{padding}").unwrap();
         match t {
@@ -448,7 +515,7 @@ impl<P: AsRef<Path>> ExportC<P> {
         }
     }
 
-    fn write_cfg(&mut self, cfg: &Cfg) {
+    fn write_cfg(&mut self, cfg: &Cfg, ret: &Ty) {
         for (local, ty) in cfg.locals() {
             if ty.is_zero_sized() || self.var_aliases.contains_key(&Use::from(local)) {
                 continue;
@@ -471,7 +538,23 @@ impl<P: AsRef<Path>> ExportC<P> {
                             .unwrap()
                             .1
                             .clone();
-                        if !matches!(expr, Expr::Phi(_)) {
+                        if matches!(expr, Expr::Phi(_)) {
+                        } else if matches!(expr, Expr::Union(_, _, _)) {
+                            match expr {
+                                Expr::Union(ty, val, field) => {
+                                    let val_str = self.value_as_string(val);
+                                    let t = self.get_type_name(&ty.field(*field));
+                                    writeln!(
+                                        &mut self.f,
+                                        "_v{}._{field} = ({t}){};",
+                                        var.extract(),
+                                        val_str
+                                    )
+                                    .unwrap();
+                                }
+                                _ => unreachable!(),
+                            }
+                        } else {
                             if !var_ty.is_zero_sized() {
                                 let t = self.get_type_name(&var_ty);
                                 if matches!(
@@ -511,7 +594,7 @@ impl<P: AsRef<Path>> ExportC<P> {
                     }
                 }
             }
-            self.write_terminator(b.terminator());
+            self.write_terminator(b.terminator(), ret);
             writeln!(&mut self.f, "    }}").unwrap();
         }
     }
@@ -519,7 +602,7 @@ impl<P: AsRef<Path>> ExportC<P> {
     fn declare(&mut self, f: &Func, alias: Option<String>) {
         self.write_proto(f, alias.clone());
         writeln!(&mut self.f, "{{").unwrap();
-        self.write_cfg(f.cfg().as_ref().unwrap());
+        self.write_cfg(f.cfg().as_ref().unwrap(), f.ret_ty());
         writeln!(&mut self.f, "}}").unwrap();
     }
 
@@ -529,11 +612,11 @@ impl<P: AsRef<Path>> ExportC<P> {
 
     pub fn export(&mut self, prog: &Program) {
         writeln!(&mut self.f, "#include \"runtime.h\"").unwrap();
-        writeln!(
-            &mut self.f,
-            "#pragma clang diagnostic ignored \"-Wincompatible-pointer-types\""
-        )
-        .unwrap();
+        // writeln!(
+        //     &mut self.f,
+        //     "#pragma clang diagnostic ignored \"-Wincompatible-pointer-types\""
+        // )
+        // .unwrap();
         let types = prog.get_all_types();
         for ty in types {
             self.define_type(ty);

@@ -67,11 +67,14 @@ impl Compiler {
                         struct_repr.clone(),
                         1,
                     );
+                    let ptr =
+                        builder.get_element_ptr(&mut self.ctx, ptr.into(), struct_repr.field(1), i);
                     builder.load(&mut self.ctx, ptr.into(), repr.clone()).into()
                 } else {
-                    builder
+                    let union_val = builder
                         .extract(&mut self.ctx, param_use.clone().into(), 1)
-                        .into()
+                        .into();
+                    builder.extract(&mut self.ctx, union_val, i).into()
                 };
                 self.borrow_ty(val, t, &mut builder);
             }
@@ -165,11 +168,14 @@ impl Compiler {
                         struct_repr.clone(),
                         1,
                     );
+                    let ptr =
+                        builder.get_element_ptr(&mut self.ctx, ptr.into(), struct_repr.field(1), i);
                     builder.load(&mut self.ctx, ptr.into(), repr.clone()).into()
                 } else {
-                    builder
+                    let union_val = builder
                         .extract(&mut self.ctx, param_use.clone().into(), 1)
-                        .into()
+                        .into();
+                    builder.extract(&mut self.ctx, union_val, i).into()
                 };
                 self.drop_ty(val, t, &mut builder);
             }

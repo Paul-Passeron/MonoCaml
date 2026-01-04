@@ -10,7 +10,7 @@ impl Ty {
 
     pub fn field(&self, n: usize) -> Ty {
         match self {
-            Ty::Struct(v) if v.len() > n => v[n].clone(),
+            Ty::Union(v) | Ty::Struct(v) if v.len() > n => v[n].clone(),
             x => panic!("Expected struct type with at least {n} field but got {x}",),
         }
     }
@@ -46,9 +46,13 @@ impl Ty {
         matches!(self, Self::Struct(_))
     }
 
+    pub fn is_union(&self) -> bool {
+        matches!(self, Self::Union(_))
+    }
+
     pub fn field_count(&self) -> usize {
         match self {
-            Ty::Struct(fields) => fields.len(),
+            Ty::Union(fields) | Ty::Struct(fields) => fields.len(),
             _ => 0,
         }
     }
@@ -119,7 +123,9 @@ impl Ty {
     pub fn is_zero_sized(&self) -> bool {
         match self {
             Ty::Void => true,
-            Ty::Struct(items) => items.is_empty(),
+            Ty::Struct(items) | Ty::Union(items) => {
+                items.is_empty() | items.iter().all(Self::is_zero_sized)
+            }
             _ => false,
         }
     }
@@ -137,7 +143,7 @@ impl Ty {
             (Ty::Int, Ty::Int) => true,
             (Ty::String, Ty::String) => true,
             (Ty::Void, Ty::Void) => true,
-            (Ty::Struct(items), Ty::Struct(items2)) => {
+            (Ty::Union(items), Ty::Union(items2)) | (Ty::Struct(items), Ty::Struct(items2)) => {
                 if items.len() != items2.len() {
                     return false;
                 }
@@ -169,6 +175,7 @@ impl Ty {
             Ty::Ptr(_) => 8,
             Ty::Struct(items) => items.iter().fold(0, |s, x| s + align_to(x.get_size(), 8)),
             Ty::FunPtr(_) => 8,
+            Ty::Union(items) => items.iter().map(Self::get_size).max().unwrap_or(0),
         }
     }
 }
@@ -233,6 +240,8 @@ impl Expr {
             Expr::Malloc(ty, _) => Ty::Ptr(Box::new(ty.clone())),
             Expr::Phi(ty) => ty.clone(),
             Expr::Eq(_, _) => Ty::Int,
+            Expr::Cast(ty, _) => ty.clone(),
+            Expr::Union(ty, _, _) => ty.clone(),
         }
     }
 }
