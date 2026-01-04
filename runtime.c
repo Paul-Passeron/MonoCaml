@@ -59,6 +59,9 @@ static ints free_refs[REF_COUNT] = {0};
 size_t hash(intptr_t in) { return (in >> 3) % REF_COUNT; }
 
 __inline__ void register_object(void *ptr) {
+#ifdef DEBUG
+  printf("registering %p\n", ptr);
+#endif // DEBUG
   size_t hashed = hash((intptr_t)ptr);
   refs *refs = &references[hashed];
   for (size_t i = 0; i < refs->count; ++i) {
@@ -93,6 +96,10 @@ ref *get_ref(const void *const ptr, size_t *h, size_t *idx) {
 }
 
 __inline__ void borrow_object(void *env) {
+#ifdef DEBUG
+  printf("borrowing %p\n", env);
+#endif // DEBUG
+
   if (!env)
     return;
   ref *ref = get_ref(env, NULL, NULL);
@@ -100,6 +107,9 @@ __inline__ void borrow_object(void *env) {
 }
 
 __inline__ void drop_object(void *env) {
+#ifdef DEBUG
+  printf("dropping %p\n", env);
+#endif // DEBUG
   if (!env)
     return;
   size_t hash, idx;
