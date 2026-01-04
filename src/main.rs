@@ -488,45 +488,42 @@ fn list_test4() -> (Ast, AstCtx) {
     let ast = Ast::let_in(
         rev,
         AstTy::fun(AstTy::named("lst"), AstTy::named("lst")),
-        Ast::lambda(
-            AstTyped::new(l, AstTy::named("lst")),
-            Ast::let_in(
-                aux,
-                AstTy::fun(
-                    AstTy::named("lst"),
-                    AstTy::fun(AstTy::named("lst"), AstTy::named("lst")),
-                ),
+        Ast::let_in(
+            aux,
+            AstTy::fun(
+                AstTy::named("lst"),
+                AstTy::fun(AstTy::named("lst"), AstTy::named("lst")),
+            ),
+            Ast::lambda(
+                AstTyped::new(acc, AstTy::named("lst")),
                 Ast::lambda(
                     AstTyped::new(l2, AstTy::named("lst")),
-                    Ast::lambda(
-                        AstTyped::new(acc, AstTy::named("lst")),
-                        Ast::match_with(
-                            Ast::var(l2),
-                            vec![
-                                MatchCase {
-                                    pat: Pattern::cons("lst", "Nil", None),
-                                    expr: Ast::var(acc),
-                                },
-                                MatchCase {
-                                    pat: Pattern::cons(
-                                        "lst",
-                                        "Cons",
-                                        Some(Pattern::tuple(vec![
-                                            Pattern::symb(hd, AstTy::Int),
-                                            Pattern::symb(tl, AstTy::named("lst")),
-                                        ])),
-                                    ),
-                                    expr: Ast::app(
-                                        Ast::app(Ast::Var(aux), Ast::Var(tl)),
-                                        cons(Ast::Var(hd), Ast::var(acc)),
-                                    ),
-                                },
-                            ],
-                        ),
+                    Ast::match_with(
+                        Ast::var(l2),
+                        vec![
+                            MatchCase {
+                                pat: Pattern::cons("lst", "Nil", None),
+                                expr: Ast::var(acc),
+                            },
+                            MatchCase {
+                                pat: Pattern::cons(
+                                    "lst",
+                                    "Cons",
+                                    Some(Pattern::tuple(vec![
+                                        Pattern::symb(hd, AstTy::Int),
+                                        Pattern::symb(tl, AstTy::named("lst")),
+                                    ])),
+                                ),
+                                expr: Ast::app(
+                                    Ast::app(Ast::Var(aux), cons(Ast::Var(hd), Ast::var(acc))),
+                                    Ast::Var(tl),
+                                ),
+                            },
+                        ],
                     ),
                 ),
-                Ast::app(Ast::app(Ast::Var(aux), Ast::var(l)), nil()),
             ),
+            Ast::app(Ast::Var(aux), nil()),
         ),
         Ast::app(
             Ast::native("print_lst"),
@@ -798,6 +795,6 @@ mod tests {
 }
 
 fn main() {
-    let (ast, ctx) = list_test5();
+    let (ast, ctx) = list_test4();
     compile_ast_with_ctx(ast, "test", ctx);
 }
