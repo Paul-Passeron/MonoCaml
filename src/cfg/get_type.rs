@@ -11,7 +11,10 @@ impl Ty {
     pub fn field(&self, n: usize) -> Ty {
         match self {
             Ty::Union(v) | Ty::Struct(v) if v.len() > n => v[n].clone(),
-            x => panic!("Expected struct type with at least {n} field but got {x}",),
+            x => panic!(
+                "Expected struct type with at least {} field but got {x}",
+                n + 1
+            ),
         }
     }
 

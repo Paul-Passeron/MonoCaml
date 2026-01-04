@@ -103,7 +103,11 @@ impl Compiler {
     pub fn create_constructors_for_enum(&mut self, enum_def: &EnumDef) {
         let named = AstTy::named(&enum_def.name);
         let ret_ty = self.ast_ty_to_ty(&named);
-        let union_ty = ret_ty.field(1);
+        let union_ty = if ret_ty.is_ptr() {
+            ret_ty.into_inner().field(1)
+        } else {
+            ret_ty.field(1)
+        };
         assert!(union_ty.is_union());
         let is_rec = named.is_recursive(&self.ast_ctx);
         for (i, case) in enum_def.cases.iter().enumerate() {
@@ -194,7 +198,7 @@ impl Compiler {
                                 .map(|x| {
                                     x.arg
                                         .as_ref()
-                                        .map_or(Ty::Void, |t| self.ast_ty_to_ty_pro(t, false))
+                                        .map_or(Ty::Int, |t| self.ast_ty_to_ty_pro(t, false))
                                 })
                                 .collect(),
                         );
@@ -217,7 +221,7 @@ impl Compiler {
                             .map(|x| {
                                 x.arg
                                     .as_ref()
-                                    .map_or(Ty::Void, |t| self.ast_ty_to_ty_pro(t, false))
+                                    .map_or(Ty::Int, |t| self.ast_ty_to_ty_pro(t, false))
                             })
                             .collect(),
                     );
@@ -1092,7 +1096,12 @@ impl Compiler {
                 let cases = self.ast_ctx.types[enum_name].cases.clone();
                 let pos = cases.iter().position(|x| &x.cons_name == cons).unwrap();
                 println!("POS OF {cons} is {pos}");
-                let marker = b.extract(&mut self.ctx, v.clone().into(), 0);
+                let marker = if self_ty.is_ptr() {
+                    let v = b.load(&mut self.ctx, v.clone().into(), self_ty.into_inner());
+                    b.extract(&mut self.ctx, v.into(), 0)
+                } else {
+                    b.extract(&mut self.ctx, v.clone().into(), 0)
+                };
                 let val = b.eq(&mut self.ctx, Const::Int(pos as i32).into(), marker.into());
                 arg.iter()
                     .fold((val, HashMap::new()), |(val, mut bindings), x| {
@@ -1102,12 +1111,20 @@ impl Compiler {
                             let ptr = b.get_element_ptr(
                                 &mut self.ctx,
                                 v.clone().into(),
-                                self_ty.clone(),
+                                self_ty.into_inner().clone(),
                                 1,
                             );
-                            let ptr =
-                                b.get_element_ptr(&mut self.ctx, ptr.into(), self_ty.field(1), pos);
-                            b.load(&mut self.ctx, ptr.into(), self_ty.field(1).field(pos))
+                            let ptr = b.get_element_ptr(
+                                &mut self.ctx,
+                                ptr.into(),
+                                self_ty.into_inner().field(1),
+                                pos,
+                            );
+                            b.load(
+                                &mut self.ctx,
+                                ptr.into(),
+                                self_ty.into_inner().field(1).field(pos),
+                            )
                         } else {
                             let arg_ty = cases[pos].arg.as_ref().unwrap().clone();
                             let v = b.extract(&mut self.ctx, v.clone().into(), 1);

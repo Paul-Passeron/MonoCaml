@@ -57,19 +57,20 @@ impl Compiler {
                 case_body_lbl,
             );
 
-            let struct_repr = Ty::Struct(vec![Ty::Int, Ty::Ptr(Box::new(Ty::Void))]);
             for t in case.arg.iter() {
-                let repr = self.ast_ty_to_ty_pro(t, true);
                 let val = if is_rec {
+                    let self_ty = self_ty.into_inner();
                     let ptr = builder.get_element_ptr(
                         &mut self.ctx,
                         param_use.clone().into(),
-                        struct_repr.clone(),
+                        self_ty.clone(),
                         1,
                     );
                     let ptr =
-                        builder.get_element_ptr(&mut self.ctx, ptr.into(), struct_repr.field(1), i);
-                    builder.load(&mut self.ctx, ptr.into(), repr.clone()).into()
+                        builder.get_element_ptr(&mut self.ctx, ptr.into(), self_ty.field(1), i);
+                    builder
+                        .load(&mut self.ctx, ptr.into(), self_ty.field(1).field(i))
+                        .into()
                 } else {
                     let union_val = builder
                         .extract(&mut self.ctx, param_use.clone().into(), 1)
@@ -158,19 +159,21 @@ impl Compiler {
                 case_body_lbl,
             );
 
-            let struct_repr = Ty::Struct(vec![Ty::Int, Ty::Ptr(Box::new(Ty::Void))]);
             for t in case.arg.iter() {
-                let repr = self.ast_ty_to_ty_pro(t, true);
                 let val = if is_rec {
+                    let self_ty = self_ty.into_inner();
+
                     let ptr = builder.get_element_ptr(
                         &mut self.ctx,
                         param_use.clone().into(),
-                        struct_repr.clone(),
+                        self_ty.clone(),
                         1,
                     );
                     let ptr =
-                        builder.get_element_ptr(&mut self.ctx, ptr.into(), struct_repr.field(1), i);
-                    builder.load(&mut self.ctx, ptr.into(), repr.clone()).into()
+                        builder.get_element_ptr(&mut self.ctx, ptr.into(), self_ty.field(1), i);
+                    builder
+                        .load(&mut self.ctx, ptr.into(), self_ty.field(1).field(i))
+                        .into()
                 } else {
                     let union_val = builder
                         .extract(&mut self.ctx, param_use.clone().into(), 1)
