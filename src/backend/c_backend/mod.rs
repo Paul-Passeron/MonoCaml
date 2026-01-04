@@ -487,8 +487,7 @@ impl<P: AsRef<Path>> ExportC<P> {
         }
     }
 
-    fn write_terminator(&mut self, t: &Terminator, ty: &Ty) {
-        let ty_name = self.get_type_name(ty);
+    fn write_terminator(&mut self, t: &Terminator) {
         let padding = "        ";
         write!(&mut self.f, "{padding}").unwrap();
         match t {
@@ -515,7 +514,7 @@ impl<P: AsRef<Path>> ExportC<P> {
         }
     }
 
-    fn write_cfg(&mut self, cfg: &Cfg, ret: &Ty) {
+    fn write_cfg(&mut self, cfg: &Cfg) {
         for (local, ty) in cfg.locals() {
             if ty.is_zero_sized() || self.var_aliases.contains_key(&Use::from(local)) {
                 continue;
@@ -594,7 +593,7 @@ impl<P: AsRef<Path>> ExportC<P> {
                     }
                 }
             }
-            self.write_terminator(b.terminator(), ret);
+            self.write_terminator(b.terminator());
             writeln!(&mut self.f, "    }}").unwrap();
         }
     }
@@ -602,7 +601,7 @@ impl<P: AsRef<Path>> ExportC<P> {
     fn declare(&mut self, f: &Func, alias: Option<String>) {
         self.write_proto(f, alias.clone());
         writeln!(&mut self.f, "{{").unwrap();
-        self.write_cfg(f.cfg().as_ref().unwrap(), f.ret_ty());
+        self.write_cfg(f.cfg().as_ref().unwrap());
         writeln!(&mut self.f, "}}").unwrap();
     }
 
@@ -612,11 +611,6 @@ impl<P: AsRef<Path>> ExportC<P> {
 
     pub fn export(&mut self, prog: &Program) {
         writeln!(&mut self.f, "#include \"runtime.h\"").unwrap();
-        // writeln!(
-        //     &mut self.f,
-        //     "#pragma clang diagnostic ignored \"-Wincompatible-pointer-types\""
-        // )
-        // .unwrap();
         let types = prog.get_all_types();
         for ty in types {
             self.define_type(ty);
