@@ -99,10 +99,55 @@ pub struct EnumDef {
     pub cases: Vec<EnumCase>,
 }
 
-#[derive(Default)]
 pub struct AstCtx {
     pub types: HashMap<String, EnumDef>,
     pub natives: HashMap<String, AstTy>,
+}
+
+impl AstCtx {
+    pub fn new() -> Self {
+        let mut res = Self {
+            types: HashMap::new(),
+            natives: HashMap::new(),
+        };
+
+        res.natives.insert(
+            "print_lst".into(),
+            AstTy::fun(AstTy::named("lst"), AstTy::Tuple(vec![])),
+        );
+        res.natives.insert(
+            "print_string".into(),
+            AstTy::fun(AstTy::String, AstTy::Tuple(vec![])),
+        );
+        res.natives.insert(
+            "print_int".into(),
+            AstTy::fun(AstTy::Int, AstTy::Tuple(vec![])),
+        );
+        res.natives.insert(
+            "add".into(),
+            AstTy::fun(AstTy::Int, AstTy::fun(AstTy::Int, AstTy::Int)),
+        );
+        res.natives.insert(
+            "mul".into(),
+            AstTy::fun(AstTy::Int, AstTy::fun(AstTy::Int, AstTy::Int)),
+        );
+        res.natives.insert(
+            "div".into(),
+            AstTy::fun(AstTy::Int, AstTy::fun(AstTy::Int, AstTy::Int)),
+        );
+        res.natives.insert(
+            "sub".into(),
+            AstTy::fun(AstTy::Int, AstTy::fun(AstTy::Int, AstTy::Int)),
+        );
+
+        res
+    }
+}
+
+impl Default for AstCtx {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 #[cfg(test)]
@@ -111,7 +156,7 @@ mod tests {
 
     #[test]
     pub fn test_list_is_rec() {
-        let mut ctx = AstCtx::default();
+        let mut ctx = AstCtx::new();
         let elem_ty = AstTy::Int;
         let list_ty = EnumDef {
             name: "list".into(),

@@ -1,7 +1,4 @@
-use std::{
-    collections::{HashMap, HashSet},
-    mem,
-};
+use std::{collections::HashMap, mem};
 
 use crate::{
     cfg::{
@@ -19,7 +16,7 @@ pub struct Builder {
     ret_ty: Ty,
     label: Label,
     entry: LabelUse,
-    phis: HashMap<CfgVarUse, HashSet<CfgVarUse>>,
+    // phis: HashMap<CfgVarUse, HashSet<CfgVarUse>>,
     locals: Vec<(CfgVar, Ty)>,
     instrs: Vec<Instr<CfgVar>>,
     blocks: Vec<BasicBlock>,
@@ -29,22 +26,27 @@ impl Builder {
     pub fn new(name: FunName, params: Vec<(CfgVar, Ty)>, ret_ty: Ty, ctx: &mut TyCtx) -> Self {
         let l = Label::fresh();
         let use_l = Use::from(&l);
+        for p in &params {
+            if p.1.is_zero_sized() {
+                panic!("Zero-sized parameter not allowed");
+            }
+        }
         let res = Self {
             name,
             params,
             ret_ty,
             label: l,
             entry: use_l,
-            phis: HashMap::new(),
+            // phis: HashMap::new(),
             locals: vec![],
             instrs: vec![],
             blocks: vec![],
         };
 
-        let sig = Sig {
-            params: res.params.iter().map(|(_, b)| b.clone()).collect(),
-            ret: Box::new(res.ret_ty.clone()),
-        };
+        let sig = Sig::new(
+            res.params.iter().map(|(_, b)| b.clone()).collect(),
+            res.ret_ty.clone(),
+        );
         ctx.sigs.insert(Use::from(&res.name), sig);
         res
     }
@@ -79,31 +81,45 @@ impl Builder {
         (&self.label).into()
     }
 
-    pub fn get_phis(&mut self) -> HashMap<CfgVarUse, HashSet<CfgVarUse>> {
-        let mut phis = HashMap::new();
-        mem::swap(&mut self.phis, &mut phis);
-        phis
-    }
+    // pub fn get_phis(&mut self) -> HashMap<CfgVarUse, HashSet<CfgVarUse>> {
+    //     let mut phis = HashMap::new();
+    //     mem::swap(&mut self.phis, &mut phis);
+    //     phis
+    // }
 
-    pub fn add_phi_target(&mut self, ctx: &mut TyCtx, ty: Ty) -> CfgVarUse {
-        let new_local = self.assign(ctx, Expr::Phi(ty));
-        self.phis.insert(new_local.clone(), HashSet::new());
-        new_local
-    }
+    // pub fn add_phi_target(&mut self, ctx: &mut TyCtx, ty: Ty) -> CfgVarUse {
+    //     assert!(!ty.is_zero_sized(), "phi target cannot be zero-sized");
+    //     let new_local = self.assign(ctx, Expr::Phi(ty));
+    //     self.phis.insert(new_local.clone(), HashSet::new());
+    //     new_local
+    // }
 
-    pub fn add_phi(&mut self, ctx: &mut TyCtx, to: CfgVarUse, val: CfgVarUse) {
-        assert!(to.get_type(ctx).matches(&val.get_type(ctx)));
-        self.phis.get_mut(&to).unwrap().insert(val);
-    }
+    // pub fn add_phi(&mut self, ctx: &mut TyCtx, to: CfgVarUse, val: CfgVarUse) {
+    //     let target_ty = to.get_type(ctx);
+    //     let val_ty = val.get_type(ctx);
+    //     assert!(target_ty.matches(&val_ty), "{} vs {}", target_ty, val_ty);
+    //     if self
+    //         .params
+    //         .iter()
+    //         .map(|x| Use::from(&x.0))
+    //         .find(|x| *x == val)
+    //         .is_some()
+    //     {
+    //         let new_var = self.assign(ctx, Expr::value(val.into()));
+    //         self.phis.get_mut(&to).unwrap().insert(new_var.clone());
+    //     } else {
+    //         self.phis.get_mut(&to).unwrap().insert(val);
+    //     }
+    // }
 
     pub fn finalize_block(&mut self, ctx: &TyCtx, t: Terminator, next: Label) -> LabelUse {
         let old_label = self.replace_lbl(next);
         let use_lbl: Use<_> = (&old_label).into();
         let instrs = self.get_use_instrs(ctx);
-        let phis = self.get_phis();
+        // let phis = self.get_phis();
         let b = BasicBlock {
             label: old_label,
-            phis,
+            // phis,
             instrs,
             terminator: t,
         };
@@ -135,7 +151,7 @@ impl Builder {
     }
 
     pub fn ret(&mut self, ctx: &TyCtx, value: Value) -> LabelUse {
-        if self.ret_ty.is_void() {
+        if self.ret_ty.is_zero_sized() {
             panic!("Cannot return value from void returning function")
         }
         if !self.ret_ty.matches(&value.get_type(ctx)) {
@@ -149,7 +165,7 @@ impl Builder {
     }
 
     pub fn ret_void(&mut self, ctx: &TyCtx) -> LabelUse {
-        if !self.ret_ty.is_void() {
+        if !self.ret_ty.is_zero_sized() {
             panic!(
                 "Cannot return void from function that should return {}",
                 self.ret_ty
@@ -162,16 +178,16 @@ impl Builder {
         if self.instrs.len() > 0 {
             panic!("Cannot finalize builder if there is an unfinished basic block")
         }
-        Func {
-            name: self.name,
-            params: self.params,
-            ret_ty: self.ret_ty,
-            cfg: Some(Cfg {
+        Func::new(
+            self.name,
+            self.params,
+            self.ret_ty,
+            Some(Cfg {
                 locals: self.locals.into_iter().collect(),
                 blocks: self.blocks,
                 entry: self.entry,
             }),
-        }
+        )
     }
 
     pub fn assign_to(&mut self, ctx: &mut TyCtx, var: CfgVar, expr: Expr) -> CfgVarUse {
@@ -257,7 +273,11 @@ impl Builder {
     // }
 
     pub fn native_call(&mut self, ctx: &mut TyCtx, fun: Value, args: Vec<Value>) -> CfgVarUse {
-        self.assign(ctx, Expr::native_call(ctx, fun, args))
+        let new_args = args
+            .into_iter()
+            .filter(|x| !x.get_type(ctx).is_zero_sized())
+            .collect();
+        self.assign(ctx, Expr::native_call(ctx, fun, new_args))
     }
 
     pub fn get_element_ptr(
@@ -319,6 +339,10 @@ impl Builder {
         assert!(ty.is_union());
         assert!(ty.field(field).matches(&val.get_type(ctx)));
         self.assign(ctx, Expr::union(ty, val, field))
+    }
+
+    pub fn alloca(&mut self, ctx: &mut TyCtx, ty: Ty) -> Use<CfgVar> {
+        self.assign(ctx, Expr::alloca(ty))
     }
 }
 

@@ -25,7 +25,7 @@ pub enum Expr {
 
     Cast(Ty, Value),
 
-    Phi(Ty),
+    Alloca(Ty),
 }
 
 impl Expr {
@@ -67,12 +67,21 @@ impl Expr {
         // let params = &ctx.sigs[&name].params;
 
         if params.len() != args.len() {
-            panic!("Native function {fun} expects {} arguments", params.len())
+            panic!(
+                "Native function {fun} expects {} arguments but {} were given ({})",
+                params.len(),
+                args.len(),
+                params
+                    .iter()
+                    .map(|x| x.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            )
         }
 
         for (i, (arg, expected_ty)) in args.iter().zip(params).enumerate() {
             let got_ty = arg.get_type(ctx);
-            if !got_ty.matches(&expected_ty) {
+            if !got_ty.matches(&expected_ty) && !(got_ty.is_ptr() && expected_ty.is_ptr()) {
                 panic!(
                     "Native function {fun} expects argument {i} of type {expected_ty} but got {got_ty}"
                 )
@@ -131,5 +140,9 @@ impl Expr {
     pub fn union(ty: Ty, val: Value, field: usize) -> Self {
         assert!(ty.is_union());
         Self::Union(ty, val, field)
+    }
+
+    pub fn alloca(ty: Ty) -> Self {
+        Self::Alloca(ty)
     }
 }

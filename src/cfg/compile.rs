@@ -10,8 +10,10 @@ use crate::{
         types::{AstCtx, AstTy, AstTyped, EnumDef},
     },
     cfg::{
-        Const, FunName, FunNameUse, Func, Label, Program, Sig, Ty, TyCtx, Value, builder::Builder,
-        expr::Expr, var::CfgVarUse,
+        Const, FunName, FunNameUse, Func, Label, Program, Sig, Ty, TyCtx, Value,
+        builder::Builder,
+        expr::Expr,
+        var::{CfgVar, CfgVarUse},
     },
     helpers::unique::Use,
 };
@@ -50,10 +52,10 @@ impl Compiler {
     }
 
     pub fn add_func(&mut self, f: Func) {
-        let sig = Sig {
-            params: f.params.iter().map(|(_, x)| x.clone()).collect(),
-            ret: Box::new(f.ret_ty.clone()),
-        };
+        let sig = Sig::new(
+            f.params.iter().map(|(_, x)| x.clone()).collect(),
+            f.ret_ty.clone(),
+        );
         let name = Use::from(&f.name);
         self.prog.funcs.insert(f);
         self.ctx.sigs.insert(name, sig);
@@ -119,6 +121,10 @@ impl Compiler {
                 .map(|x| self.ast_ty_to_ty(x))
                 .collect::<Vec<_>>();
             let var_params = self.ctx.make_params(params.clone().into_iter());
+            let var_params = var_params
+                .into_iter()
+                .filter(|x| !x.1.is_zero_sized())
+                .collect::<Vec<_>>();
             let use_params = var_params
                 .iter()
                 .map(|(x, _)| Use::from(x))
@@ -158,11 +164,11 @@ impl Compiler {
 
     fn get_closure(&self, arg: Ty, ret: Ty) -> Ty {
         let void_ptr = Ty::Ptr(Box::new(Ty::Void));
-        let params_ty = vec![void_ptr.clone(), arg];
-        let funptr_ty = Ty::FunPtr(Sig {
-            params: params_ty,
-            ret: Box::new(ret),
-        });
+        let mut params_ty = vec![void_ptr.clone()];
+        if !arg.is_zero_sized() {
+            params_ty.push(arg);
+        }
+        let funptr_ty = Ty::FunPtr(Sig::new(params_ty, ret));
         Ty::Struct(vec![funptr_ty, void_ptr])
     }
 
@@ -414,6 +420,14 @@ impl Compiler {
         let then_bb_use = Use::from(&then_bb);
         let else_bb_use = Use::from(&else_bb);
         let merge_bb_use = Use::from(&merge_bb);
+        let res_ty = self.get_type_of_ast(then_e);
+
+        let res = if !res_ty.is_zero_sized() {
+            Some(b.alloca(&mut self.ctx, res_ty.clone()))
+        } else {
+            None
+        };
+
         b.branch(
             &mut self.ctx,
             compiled_cond.into(),
@@ -425,6 +439,15 @@ impl Compiler {
             Value::Var(v) => v,
             c => b.value(&mut self.ctx, c).into(),
         };
+
+        if res.is_some() {
+            b.store(
+                &mut self.ctx,
+                res.as_ref().unwrap().clone().into(),
+                then_value.into(),
+            );
+        }
+
         b.goto(&mut self.ctx, merge_bb_use.clone(), else_bb);
 
         let else_value = match self.aux(else_e, b) {
@@ -432,12 +455,17 @@ impl Compiler {
             c => b.value(&mut self.ctx, c).into(),
         };
 
+        if res.is_some() {
+            b.store(
+                &mut self.ctx,
+                res.as_ref().unwrap().clone().into(),
+                else_value.into(),
+            );
+        }
         b.goto(&mut self.ctx, merge_bb_use, merge_bb);
-        let res_ty = then_value.get_type(&self.ctx);
-        let res_value_use = b.add_phi_target(&mut self.ctx, res_ty);
-        b.add_phi(&mut self.ctx, res_value_use.clone(), then_value);
-        b.add_phi(&mut self.ctx, res_value_use.clone(), else_value);
-        res_value_use.into()
+        res.map_or(Const::Struct(vec![]).into(), |x| {
+            b.load(&mut self.ctx, x.clone().into(), res_ty).into()
+        })
     }
 
     fn compile_rec_let(
@@ -464,7 +492,12 @@ impl Compiler {
         self.ctx
             .sigs
             .insert(funname_use.clone(), bound_ty.field(0).sig());
-        self.create_initial_closure_for_recursion(bound, b, funname_use, outside_env);
+        self.create_initial_closure_for_recursion(
+            bound.clone(),
+            b,
+            funname_use,
+            outside_env.clone(),
+        );
 
         // Now it's just like building a regular lambda (I think)
 
@@ -473,8 +506,17 @@ impl Compiler {
 
         let sig = bound_ty.field(0).sig();
         let ret_ty = *sig.ret;
+        println!("=== BEFORE CAPTURE ===");
+        println!(
+            "self.map keys: {:?}",
+            self.map.keys().map(|v| v.to_string()).collect::<Vec<_>>()
+        );
+        println!("bound in map: {}", self.map.contains_key(bound.expr()));
 
-        let env = self.capture(&param, &value);
+        // let env = self.capture(&param, &value);
+        // let env: Vec<_> = env.into_iter().filter(|v| v != bound.expr()).collect();
+
+        let env = outside_env.clone();
 
         let new_vars = env
             .iter()
@@ -486,7 +528,7 @@ impl Compiler {
 
         let new_vars_len = new_vars.len();
 
-        let closure_struct = Ty::Struct(new_vars);
+        let closure_struct = Ty::Struct(new_vars.clone());
         let closure_env_ty = Ty::Ptr(Box::new(closure_struct.clone()));
 
         let cfg_arg = self.ctx.new_var(arg_ty.clone());
@@ -496,11 +538,30 @@ impl Compiler {
         self.map.insert(param, cfg_arg_use);
 
         let params = vec![(env_arg, closure_env_ty), (cfg_arg, arg_ty)];
+        let params = params
+            .into_iter()
+            .filter(|x| !x.1.is_zero_sized())
+            .collect();
 
         let mut builder = Builder::new(funname, params, ret_ty.clone(), &mut self.ctx);
         if new_vars_len > 0 {
             let loaded_env =
                 builder.load(&mut self.ctx, env_arg_use.into(), closure_struct.clone());
+
+            println!("=== EXTRACTING FROM ENV DEBUG ===");
+            println!("closure_struct type: {}", closure_struct);
+            println!(
+                "new_vars (types in env): {:?}",
+                new_vars.iter().map(|t| t.to_string()).collect::<Vec<_>>()
+            );
+
+            env.iter().enumerate().for_each(|(i, x)| {
+                println!("  extracting env[{}] for var {}", i, x);
+                let associated = builder.extract(&mut self.ctx, loaded_env.clone().into(), i);
+                println!("  extracted type: {}", associated.get_type(&self.ctx));
+                *self.map.get_mut(x).unwrap() = associated;
+            });
+            println!("=== END DEBUG ===");
 
             env.iter().enumerate().for_each(|(i, x)| {
                 let associated = builder.extract(&mut self.ctx, loaded_env.clone().into(), i);
@@ -538,18 +599,33 @@ impl Compiler {
     ) -> CfgVarUse {
         let mut pos = -1;
 
+        println!("=== create_initial_closure_for_recursion DEBUG ===");
+        println!("looking for bound: {}", bound.expr());
+
         let env_values = outside_env
             .iter()
             .enumerate()
-            .map(|(i, x)| match self.map.get(x) {
-                Some(x) => x.clone().into(),
-                None => {
-                    pos = i as i64;
-                    Const::Struct(vec![Const::FunPtr(funname_use.clone()), Const::NullPtr]).into()
+            .map(|(i, x)| {
+                println!(
+                    "  env[{}] = {}, in map: {}, is_bound: {}",
+                    i,
+                    x,
+                    self.map.contains_key(x),
+                    x == bound.expr()
+                );
+                match self.map.get(x) {
+                    Some(x) => x.clone().into(),
+                    None => {
+                        pos = i as i64;
+                        Const::Struct(vec![Const::FunPtr(funname_use.clone()), Const::NullPtr])
+                            .into()
+                    }
                 }
             })
             .collect::<Vec<_>>();
 
+        println!("pos (recursive var index): {}", pos);
+        println!("=== END DEBUG ===");
         assert!(pos >= 0);
 
         let env_struct = b.aggregate(&mut self.ctx, env_values);
@@ -566,6 +642,11 @@ impl Compiler {
         let initial_closure = b.aggregate(
             &mut self.ctx,
             vec![Const::FunPtr(funname_use.clone()).into(), malloc.into()],
+        );
+
+        println!(
+            "initial_closure type: {}",
+            initial_closure.get_type(&self.ctx)
         );
 
         let malloc = self.malloc_val(initial_closure.clone(), b);
@@ -589,7 +670,16 @@ impl Compiler {
             Ty::Ptr(Box::new(env_ty.clone())),
         );
 
-        let self_ref_addr = b.get_element_ptr(&mut self.ctx, env_ptr.into(), env_ty, pos as usize);
+        let self_ref_addr =
+            b.get_element_ptr(&mut self.ctx, env_ptr.into(), env_ty.clone(), pos as usize);
+
+        println!("env_ty (what we're indexing into): {}", env_ty);
+        println!("pos: {}", pos);
+        println!(
+            "storing initial_closure (type {}) at self_ref_addr",
+            initial_closure.get_type(&self.ctx)
+        );
+        println!("=== END STORING DEBUG ===");
 
         b.store(&mut self.ctx, self_ref_addr.into(), initial_closure.into());
 
@@ -654,8 +744,8 @@ impl Compiler {
                 }
                 let t = self.get_type_of_ast(then_e);
                 let e = self.get_type_of_ast(else_e);
-                if !t.matches(&e) {
-                    panic!("Branches must have the same type");
+                if !t.matches(&e) && !(t.is_zero_sized() && e.is_zero_sized()) {
+                    panic!("Branches must have the same type ({t} vs {e})");
                 }
                 t
             }
@@ -727,6 +817,8 @@ impl Compiler {
     }
 
     fn compile_lambda(&mut self, arg: Var, ty: AstTy, body: Ast, b: &mut Builder) -> Value {
+        println!("Compiling lambda {arg} => {body}");
+
         let old_ctx = self.ctx.clone();
         let old_map = self.map.clone();
 
@@ -754,7 +846,10 @@ impl Compiler {
         self.map.insert(arg, cfg_arg_use);
 
         let params = vec![(env_arg, closure_env_ty), (cfg_arg, arg_ty)];
-
+        let params = params
+            .into_iter()
+            .filter(|x| !x.1.is_zero_sized())
+            .collect();
         let ret_ty = self.get_type_of_ast(&body);
 
         let mut fun_builder = Builder::new(function_name, params, ret_ty.clone(), &mut self.ctx);
@@ -771,7 +866,13 @@ impl Compiler {
         }
         let ret_value = self.aux(&body, &mut fun_builder);
 
-        if ret_ty.is_void() {
+        println!(
+            "[RET] {ret_value}: {} (expected: {})",
+            ret_value.get_type(&self.ctx),
+            ret_ty
+        );
+
+        if ret_ty.is_zero_sized() {
             fun_builder.ret_void(&mut self.ctx);
         } else {
             fun_builder.ret(&mut self.ctx, ret_value);
@@ -867,6 +968,10 @@ impl Compiler {
             let params = self
                 .ctx
                 .make_params([void_ptr, sig.params[param_index].clone()].into_iter());
+            let params: Vec<(CfgVar, Ty)> = params
+                .into_iter()
+                .filter(|x| !x.1.is_zero_sized())
+                .collect();
             let use_params = params.iter().map(|(x, _)| Use::from(x)).collect::<Vec<_>>();
             let mut wrapper_func_builder =
                 Builder::new(wrapper_name, params, ret_ty, &mut self.ctx);
@@ -945,6 +1050,10 @@ impl Compiler {
         let params = self
             .ctx
             .make_params([Ty::Ptr(Box::new(Ty::Void)), last_arg.clone()].into_iter());
+        let params: Vec<(CfgVar, Ty)> = params
+            .into_iter()
+            .filter(|x| !x.1.is_zero_sized())
+            .collect();
         let use_params = params.iter().map(|(x, _)| Use::from(x)).collect::<Vec<_>>();
         let mut innermost_builder =
             Builder::new(innermost_name, params, ret_ty.clone(), &mut self.ctx);
@@ -982,11 +1091,11 @@ impl Compiler {
         );
 
         if let Some(env_ptr) = env_ptr {
-            let drop_closure = Const::FunPtr(self.ctx.natives["drop_closure"].clone());
+            let drop_object = Const::FunPtr(self.ctx.natives["drop_object"].clone());
 
             innermost_builder.native_call(
                 &mut self.ctx,
-                drop_closure.into(),
+                drop_object.into(),
                 vec![env_ptr.clone().into()],
             );
         };
@@ -1017,7 +1126,7 @@ impl Compiler {
                 let f_ty = self.get_ast_ty_of(fun);
                 match f_ty {
                     AstTy::Fun { ret, .. } => *ret,
-                    _ => unreachable!(),
+                    x => unreachable!("{x}"),
                 }
             }
             Ast::Seq { fst, snd } => {
@@ -1169,6 +1278,13 @@ impl Compiler {
         let merge_use = Use::from(&merge_lbl);
         let cfg_ty = self.ast_ty_to_ty(&ty);
         let mut vals = vec![];
+
+        let res = if !target_ty.is_zero_sized() {
+            Some(b.alloca(&mut self.ctx, target_ty.clone()))
+        } else {
+            None
+        };
+
         for case in cases {
             let (mat, bindings) = self.matches(var.clone(), &ty, &case.pat, b);
 
@@ -1198,20 +1314,16 @@ impl Compiler {
                 let cast = b.cast(&mut self.ctx, &this_res, target_ty.clone());
                 vals.push(cast);
             }
+            if let Some(res) = &res {
+                b.store(&mut self.ctx, res.clone().into(), this_res);
+            }
             b.goto(&mut self.ctx, merge_use.clone(), next_check_lbl);
         }
 
         b.goto(&mut self.ctx, merge_use, merge_lbl);
-        if !target_ty.is_zero_sized() {
-            let phi = b.add_phi_target(&mut self.ctx, cfg_ty);
-            for v in vals {
-                println!("PHI BETWEEN {v} and {phi}");
-                b.add_phi(&mut self.ctx, phi.clone(), v);
-            }
-            phi.into()
-        } else {
-            Const::Struct(vec![]).into()
-        }
+        res.map_or(Const::Struct(vec![]).into(), |x| {
+            b.load(&mut self.ctx, x.into(), target_ty).into()
+        })
     }
 }
 

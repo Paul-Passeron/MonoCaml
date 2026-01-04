@@ -142,6 +142,10 @@ impl Ty {
             return true;
         }
 
+        if self.is_zero_sized() && other.is_zero_sized() {
+            return true;
+        }
+
         match (&self, &other) {
             (Ty::Int, Ty::Int) => true,
             (Ty::String, Ty::String) => true,
@@ -241,10 +245,10 @@ impl Expr {
             Expr::Load { ty, .. } => ty.clone(),
             Expr::Struct(values) => Ty::Struct(values.iter().map(|x| x.get_type(ctx)).collect()),
             Expr::Malloc(ty, _) => Ty::Ptr(Box::new(ty.clone())),
-            Expr::Phi(ty) => ty.clone(),
             Expr::Eq(_, _) => Ty::Int,
             Expr::Cast(ty, _) => ty.clone(),
             Expr::Union(ty, _, _) => ty.clone(),
+            Expr::Alloca(ty) => Ty::Ptr(Box::new(ty.clone())),
         }
     }
 }

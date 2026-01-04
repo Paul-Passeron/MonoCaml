@@ -148,16 +148,12 @@ pub enum Terminator {
 
 pub struct BasicBlock {
     label: Label,
-    phis: HashMap<CfgVarUse, HashSet<CfgVarUse>>,
+    // phis: HashMap<CfgVarUse, HashSet<CfgVarUse>>,
     instrs: Vec<Instr<CfgVarUse>>,
     terminator: Terminator,
 }
 
 impl BasicBlock {
-    pub fn phis(&self) -> &HashMap<CfgVarUse, HashSet<CfgVarUse>> {
-        &self.phis
-    }
-
     pub fn label(&self) -> LabelUse {
         Use::from(&self.label)
     }
@@ -200,7 +196,12 @@ pub struct Sig {
 
 impl Sig {
     pub fn new(params: Vec<Ty>, ret: Ty) -> Self {
-        Sig {
+        for param in &params {
+            if param.is_zero_sized() {
+                panic!("Zero-sized parameter not allowed");
+            }
+        }
+        Self {
             params,
             ret: Box::new(ret),
         }
@@ -223,6 +224,21 @@ pub struct Func {
 }
 
 impl Func {
+    pub fn new(name: FunName, params: Vec<(CfgVar, Ty)>, ret_ty: Ty, cfg: Option<Cfg>) -> Self {
+        for p in &params {
+            if p.1.is_zero_sized() {
+                panic!("Zero-sized parameter not allowed");
+            }
+        }
+        let res = Self {
+            name,
+            params,
+            ret_ty,
+            cfg,
+        };
+        res
+    }
+
     pub fn name(&self) -> FunNameUse {
         Use::from(&self.name)
     }

@@ -150,9 +150,9 @@ impl fmt::Display for Expr {
                     .join(", ")
             ),
             Expr::Malloc(ty, count) => write!(f, "malloc {count} {ty}"),
-            Expr::Phi(_) => write!(f, "phi"),
             Expr::Cast(ty, value) => write!(f, "cast {value} to {ty}"),
             Expr::Union(ty, value, i) => write!(f, "{ty} at {i} {value}"),
+            Expr::Alloca(ty) => write!(f, "alloca {ty}"),
         }
     }
 }

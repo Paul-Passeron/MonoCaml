@@ -320,31 +320,6 @@ impl<P: AsRef<Path>> ExportC<P> {
         }
     }
 
-    pub fn create_aliases(&mut self, phis: HashMap<CfgVarUse, HashSet<CfgVarUse>>) {
-        self.var_aliases.clear();
-        self.var_aliases.extend(
-            phis.into_iter()
-                .map(|(x, y)| y.into_iter().zip(repeat(x)))
-                .flatten(),
-        );
-    }
-
-    pub fn get_phis_aux(b: &BasicBlock, s: &mut HashMap<CfgVarUse, HashSet<CfgVarUse>>) {
-        s.extend(b.phis().iter().map(|(a, b)| (a.clone(), b.clone())));
-    }
-
-    pub fn set_phis(&mut self, prog: &Program) {
-        let mut s = HashMap::new();
-        for f in prog.funcs() {
-            if let Some(cfg) = &f.cfg() {
-                for b in cfg.blocks() {
-                    Self::get_phis_aux(b, &mut s);
-                }
-            }
-        }
-        self.create_aliases(s);
-    }
-
     fn write_proto(&mut self, f: &Func, alias: Option<String>) {
         let ret_ty_name = self.get_decayed_type_name(f.ret_ty());
         let param_ty_names = f
@@ -483,7 +458,7 @@ impl<P: AsRef<Path>> ExportC<P> {
                 let val = self.value_as_string(value);
                 write!(&mut self.f, "*({ty_name}*)&{val}").unwrap();
             }
-            Expr::Phi(_) | Expr::Union(_, _, _) => unreachable!(),
+            Expr::Alloca(_) | Expr::Union(_, _, _) => unreachable!(),
         }
     }
 
@@ -514,7 +489,7 @@ impl<P: AsRef<Path>> ExportC<P> {
         }
     }
 
-    fn write_cfg(&mut self, cfg: &Cfg) {
+    fn write_cfg(&mut self, cfg: &Cfg, params: Vec<(CfgVarUse, Ty)>) {
         for (local, ty) in cfg.locals() {
             if ty.is_zero_sized() || self.var_aliases.contains_key(&Use::from(local)) {
                 continue;
@@ -537,7 +512,23 @@ impl<P: AsRef<Path>> ExportC<P> {
                             .unwrap()
                             .1
                             .clone();
-                        if matches!(expr, Expr::Phi(_)) {
+                        if matches!(expr, Expr::Alloca(_)) {
+                            match expr {
+                                Expr::Alloca(ty) => {
+                                    let type_name = self.get_type_name(&ty);
+                                    writeln!(&mut self.f, "{type_name} loc_{};", var.extract())
+                                        .unwrap();
+                                    write!(&mut self.f, "        ").unwrap();
+                                    writeln!(
+                                        &mut self.f,
+                                        "_v{} = &loc_{};",
+                                        var.extract(),
+                                        var.extract()
+                                    )
+                                    .unwrap();
+                                }
+                                _ => unreachable!(),
+                            }
                         } else if matches!(expr, Expr::Union(_, _, _)) {
                             match expr {
                                 Expr::Union(ty, val, field) => {
@@ -577,10 +568,13 @@ impl<P: AsRef<Path>> ExportC<P> {
                     Instr::Store { ptr, value } => {
                         let v1 = self.value_as_string(ptr);
                         let v2 = self.value_as_string(value);
+                        println!("Looking for {value}");
                         let ty = if let Value::Var(v) = value {
                             let var_ty = cfg
                                 .locals()
                                 .iter()
+                                .map(|(x, ty)| (Use::from(x), ty))
+                                .chain(params.iter().map(|(x, y)| (x.clone(), y)))
                                 .find(|(x, _)| x.extract() == v.extract())
                                 .unwrap()
                                 .1
@@ -601,7 +595,13 @@ impl<P: AsRef<Path>> ExportC<P> {
     fn declare(&mut self, f: &Func, alias: Option<String>) {
         self.write_proto(f, alias.clone());
         writeln!(&mut self.f, "{{").unwrap();
-        self.write_cfg(f.cfg().as_ref().unwrap());
+        self.write_cfg(
+            f.cfg().as_ref().unwrap(),
+            f.params()
+                .iter()
+                .map(|(x, y)| (Use::from(x), y.clone()))
+                .collect(),
+        );
         writeln!(&mut self.f, "}}").unwrap();
     }
 
@@ -631,7 +631,6 @@ impl<P: AsRef<Path>> ExportC<P> {
             self.forward_declare(f, rev_map.get(&f.name()).cloned());
         }
 
-        self.set_phis(prog);
         writeln!(&mut self.f, "\n").unwrap();
         for (orig, alias) in &self.var_aliases {
             let alias = self.value_as_string(&Value::Var(alias.clone()));

@@ -39,16 +39,13 @@ impl Compiler {
     pub fn create_print_int(&mut self) {
         let name = FunName::fresh();
         let used = Use::from(&name);
-        let s = Sig {
-            params: vec![Ty::Int],
-            ret: Box::new(Ty::Void),
-        };
-        let print_int_fun = Func {
-            name: name,
-            params: self.ctx.make_params(s.params.into_iter()),
-            ret_ty: *s.ret,
-            cfg: None,
-        };
+        let s = Sig::new(vec![Ty::Int], Ty::Void);
+        let print_int_fun = Func::new(
+            name,
+            self.ctx.make_params(s.params.into_iter()),
+            *s.ret,
+            None,
+        );
         self.add_func(print_int_fun);
         self.add_named_func("print_int", used);
     }
@@ -56,16 +53,13 @@ impl Compiler {
     pub fn create_print_string(&mut self) {
         let name = FunName::fresh();
         let used = Use::from(&name);
-        let s = Sig {
-            params: vec![Ty::String],
-            ret: Box::new(Ty::Void),
-        };
-        let print_string_fun = Func {
-            name: name,
-            params: self.ctx.make_params(s.params.into_iter()),
-            ret_ty: *s.ret,
-            cfg: None,
-        };
+        let s = Sig::new(vec![Ty::String], Ty::Void);
+        let print_string_fun = Func::new(
+            name,
+            self.ctx.make_params(s.params.into_iter()),
+            *s.ret,
+            None,
+        );
         self.add_func(print_string_fun);
         self.add_named_func("print_string", used);
     }
@@ -73,16 +67,13 @@ impl Compiler {
     pub fn create_random_int(&mut self) {
         let name = FunName::fresh();
         let used = Use::from(&name);
-        let s = Sig {
-            params: vec![Ty::Int],
-            ret: Box::new(Ty::Int),
-        };
-        let print_string_fun = Func {
-            name: name,
-            params: self.ctx.make_params(s.params.into_iter()),
-            ret_ty: *s.ret,
-            cfg: None,
-        };
+        let s = Sig::new(vec![Ty::Int], Ty::Int);
+        let print_string_fun = Func::new(
+            name,
+            self.ctx.make_params(s.params.into_iter()),
+            *s.ret,
+            None,
+        );
         self.add_func(print_string_fun);
         self.add_named_func("random_int", used);
     }
@@ -90,14 +81,13 @@ impl Compiler {
     pub fn create_borrow_object(&mut self) {
         let name = FunName::fresh();
         let used = Use::from(&name);
-        let f = Func {
-            name: name,
-            params: self
-                .ctx
+        let f = Func::new(
+            name,
+            self.ctx
                 .make_params([Ty::Ptr(Box::new(Ty::Void))].into_iter()),
-            ret_ty: Ty::Void,
-            cfg: None,
-        };
+            Ty::Void,
+            None,
+        );
         self.add_func(f);
         self.add_named_func("borrow_object", used);
     }
@@ -105,14 +95,13 @@ impl Compiler {
     pub fn create_drop_object(&mut self) {
         let name = FunName::fresh();
         let used = Use::from(&name);
-        let f = Func {
-            name: name,
-            params: self
-                .ctx
+        let f = Func::new(
+            name,
+            self.ctx
                 .make_params([Ty::Ptr(Box::new(Ty::Void))].into_iter()),
-            ret_ty: Ty::Void,
-            cfg: None,
-        };
+            Ty::Void,
+            None,
+        );
         self.add_func(f);
         self.add_named_func("drop_object", used);
     }
@@ -120,14 +109,13 @@ impl Compiler {
     pub fn create_register_object(&mut self) {
         let name = FunName::fresh();
         let used = Use::from(&name);
-        let f = Func {
-            name: name,
-            params: self
-                .ctx
+        let f = Func::new(
+            name,
+            self.ctx
                 .make_params([Ty::Ptr(Box::new(Ty::Void))].into_iter()),
-            ret_ty: Ty::Void,
-            cfg: None,
-        };
+            Ty::Void,
+            None,
+        );
         self.add_func(f);
         self.add_named_func("register_object", used);
     }
@@ -135,14 +123,13 @@ impl Compiler {
     pub fn create_print_lst(&mut self) {
         let name = FunName::fresh();
         let used = Use::from(&name);
-        let f = Func {
-            name: name,
-            params: self
-                .ctx
+        let f = Func::new(
+            name,
+            self.ctx
                 .make_params([Ty::Ptr(Box::new(Ty::Void))].into_iter()),
-            ret_ty: Ty::Void,
-            cfg: None,
-        };
+            Ty::Void,
+            None,
+        );
         self.add_func(f);
         self.add_named_func("print_lst", used);
     }
