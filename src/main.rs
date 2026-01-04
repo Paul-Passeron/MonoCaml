@@ -1,10 +1,14 @@
 #![feature(exit_status_error)]
+#![feature(random)]
 
 use std::{
     io::Read,
     path::PathBuf,
     process::{self, Command, Stdio},
+    random::{self, Distribution},
 };
+
+use rand::{Rng, rngs::ThreadRng};
 
 use crate::{
     ast::{
@@ -448,6 +452,7 @@ fn match_ast() -> (Ast, AstCtx) {
     (ast, ctx)
 }
 
+#[allow(unused)]
 fn list_test4() -> (Ast, AstCtx) {
     let mut ctx = AstCtx::default();
     ctx.natives.insert(
@@ -475,11 +480,11 @@ fn list_test4() -> (Ast, AstCtx) {
     let nil = || constr("Nil", None);
     let rev = Var::fresh();
     let l = Var::fresh();
+    let aux = Var::fresh();
     let l2 = Var::fresh();
+    let acc = Var::fresh();
     let hd = Var::fresh();
     let tl = Var::fresh();
-    let acc = Var::fresh();
-    let aux = Var::fresh();
     let ast = Ast::let_in(
         rev,
         AstTy::fun(AstTy::named("lst"), AstTy::named("lst")),
@@ -528,6 +533,125 @@ fn list_test4() -> (Ast, AstCtx) {
             Ast::app(
                 Ast::var(rev),
                 cons(Ast::Int(123), cons(Ast::Int(456), nil())),
+            ),
+        ),
+    );
+
+    (ast, ctx)
+}
+
+#[allow(unused)]
+fn list_test5() -> (Ast, AstCtx) {
+    let mut ctx = AstCtx::default();
+    ctx.natives.insert(
+        "print_lst".into(),
+        AstTy::fun(AstTy::named("lst"), AstTy::Tuple(vec![])),
+    );
+    ctx.natives.insert(
+        "print_string".into(),
+        AstTy::fun(AstTy::String, AstTy::Tuple(vec![])),
+    );
+    ctx.types.insert(
+        "lst".into(),
+        EnumDef {
+            name: "lst".into(),
+            cases: vec![
+                EnumCase {
+                    cons_name: "Nil".into(),
+                    arg: None,
+                },
+                EnumCase {
+                    cons_name: "Cons".into(),
+                    arg: Some(AstTy::Tuple(vec![AstTy::Int, AstTy::named("lst")])),
+                },
+            ],
+        },
+    );
+    let constr = |name: &str, val| Ast::cons("lst", name, val);
+    let cons = |val, old| constr("Cons", Some(Ast::tuple(vec![val, old])));
+    let nil = || constr("Nil", None);
+    let mut rng = rand::rng();
+    fn create_random_list(i: usize, rng: &mut ThreadRng) -> Ast {
+        if i == 0 {
+            Ast::cons("lst", "Nil", None)
+        } else {
+            Ast::cons(
+                "lst",
+                "Cons",
+                Some(Ast::Tuple(vec![
+                    Ast::Int(rng.random()),
+                    create_random_list(i - 1, rng),
+                ])),
+            )
+        }
+    }
+
+    let mut create_random_list = |i: usize| create_random_list(i, &mut rng);
+
+    let rev = Var::fresh();
+    let l = Var::fresh();
+    let aux = Var::fresh();
+    let l2 = Var::fresh();
+    let acc = Var::fresh();
+    let hd = Var::fresh();
+    let tl = Var::fresh();
+    let l3 = Var::fresh();
+    let ast = Ast::let_in(
+        rev,
+        AstTy::fun(AstTy::named("lst"), AstTy::named("lst")),
+        Ast::lambda(
+            AstTyped::new(l, AstTy::named("lst")),
+            Ast::let_in(
+                aux,
+                AstTy::fun(
+                    AstTy::named("lst"),
+                    AstTy::fun(AstTy::named("lst"), AstTy::named("lst")),
+                ),
+                Ast::lambda(
+                    AstTyped::new(l2, AstTy::named("lst")),
+                    Ast::lambda(
+                        AstTyped::new(acc, AstTy::named("lst")),
+                        Ast::match_with(
+                            Ast::var(l2),
+                            vec![
+                                MatchCase {
+                                    pat: Pattern::cons("lst", "Nil", None),
+                                    expr: Ast::var(acc),
+                                },
+                                MatchCase {
+                                    pat: Pattern::cons(
+                                        "lst",
+                                        "Cons",
+                                        Some(Pattern::tuple(vec![
+                                            Pattern::symb(hd, AstTy::Int),
+                                            Pattern::symb(tl, AstTy::named("lst")),
+                                        ])),
+                                    ),
+                                    expr: Ast::app(
+                                        Ast::app(Ast::Var(aux), Ast::Var(tl)),
+                                        cons(Ast::Var(hd), Ast::var(acc)),
+                                    ),
+                                },
+                            ],
+                        ),
+                    ),
+                ),
+                Ast::app(Ast::app(Ast::Var(aux), Ast::var(l)), nil()),
+            ),
+        ),
+        Ast::let_in(
+            l3,
+            AstTy::named("lst"),
+            create_random_list(150),
+            Ast::seq(
+                Ast::seq(
+                    Ast::app(Ast::native("print_lst"), Ast::var(l3)),
+                    Ast::app(Ast::native("print_string"), Ast::string("\n")),
+                ),
+                Ast::app(
+                    Ast::native("print_lst"),
+                    Ast::app(Ast::var(rev), Ast::var(l3)),
+                ),
             ),
         ),
     );
@@ -674,6 +798,6 @@ mod tests {
 }
 
 fn main() {
-    let (ast, ctx) = list_test4();
-    compile_ast_with_ctx(ast, "match_test", ctx);
+    let (ast, ctx) = list_test5();
+    compile_ast_with_ctx(ast, "test", ctx);
 }
