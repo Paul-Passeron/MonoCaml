@@ -916,9 +916,9 @@ impl Compiler {
             );
 
             if let Some(env_ptr) = env_ptr {
-                let drop_closure = Const::FunPtr(self.ctx.natives["drop_closure"].clone());
+                let drop_object = Const::FunPtr(self.ctx.natives["drop_object"].clone());
 
-                wrapper_func_builder.native_call(&mut self.ctx, drop_closure.into(), vec![env_ptr]);
+                wrapper_func_builder.native_call(&mut self.ctx, drop_object.into(), vec![env_ptr]);
             }
 
             wrapper_func_builder.ret(&mut self.ctx, closure_struct.into());
@@ -1174,7 +1174,6 @@ impl Compiler {
 
             for (var, cfg) in bindings {
                 let ty = cfg.get_type(&self.ctx);
-                println!("[VAR] {var} -> {ty}");
                 self.map.insert(var, cfg);
                 self.type_map.insert(var, ty);
             }
@@ -1190,6 +1189,10 @@ impl Compiler {
                 next_check_use.clone(),
                 case_body_lbl,
             );
+            if cfg_ty.is_ptr() {
+                let drop_object = Const::FunPtr(self.ctx.natives["drop_object"].clone());
+                b.native_call(&mut self.ctx, drop_object.into(), vec![var.clone().into()]);
+            }
             let this_res = self.aux(&case.expr, b);
             if !target_ty.is_zero_sized() {
                 let cast = b.cast(&mut self.ctx, &this_res, target_ty.clone());
