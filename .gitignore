@@ -2,3 +2,4 @@
 test*
 file.c
 *.ll
+Cargo.lock
