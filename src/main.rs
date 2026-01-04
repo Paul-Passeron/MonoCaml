@@ -3,9 +3,9 @@
 
 use std::{
     io::Read,
+    iter::once,
     path::PathBuf,
     process::{self, Command, Stdio},
-    random::{self, Distribution},
 };
 
 use rand::{Rng, rngs::ThreadRng};
@@ -656,6 +656,203 @@ fn list_test5() -> (Ast, AstCtx) {
     (ast, ctx)
 }
 
+fn get_loo<F>(body: F) -> Ast
+where
+    F: FnOnce(Var) -> Ast,
+{
+    let loo = Var::fresh();
+    let n = Var::fresh();
+    let f = Var::fresh();
+    Ast::let_in(
+        loo,
+        AstTy::fun(
+            AstTy::Int,
+            AstTy::fun(
+                AstTy::fun(AstTy::Tuple(vec![]), AstTy::Tuple(vec![])),
+                AstTy::Tuple(vec![]),
+            ),
+        ),
+        Ast::lambda(
+            AstTyped::new(n, AstTy::Int),
+            Ast::lambda(
+                AstTyped::new(f, AstTy::fun(AstTy::Tuple(vec![]), AstTy::Tuple(vec![]))),
+                Ast::ifte(
+                    Ast::var(n),
+                    Ast::seq(
+                        Ast::app(Ast::var(f), Ast::Tuple(vec![])),
+                        Ast::app(
+                            Ast::app(
+                                Ast::var(loo),
+                                Ast::app(Ast::app(Ast::native("add"), Ast::Int(-1)), Ast::var(n)),
+                            ),
+                            Ast::var(f),
+                        ),
+                    ),
+                    Ast::Tuple(vec![]),
+                ),
+            ),
+        ),
+        body(loo),
+    )
+}
+
+fn make_random_list_generator() -> Ast {
+    let g = Var::fresh();
+    let n = Var::fresh();
+    let aux = Var::fresh();
+    let n2 = Var::fresh();
+    let acc = Var::fresh();
+
+    // Define aux at the OUTER level
+    Ast::let_in(
+        aux,
+        AstTy::fun(
+            AstTy::Int,
+            AstTy::fun(AstTy::named("lst"), AstTy::named("lst")),
+        ),
+        Ast::lambda(
+            AstTyped::new(n2, AstTy::Int),
+            Ast::lambda(
+                AstTyped::new(acc, AstTy::named("lst")),
+                Ast::ifte(
+                    Ast::var(n2),
+                    Ast::app(
+                        Ast::app(
+                            Ast::var(aux),
+                            Ast::app(Ast::app(Ast::native("add"), Ast::Int(-1)), Ast::var(n2)),
+                        ),
+                        Ast::cons(
+                            "lst",
+                            "Cons",
+                            Some(Ast::Tuple(vec![
+                                Ast::app(
+                                    Ast::app(Ast::native("add"), Ast::Int(100)),
+                                    Ast::app(Ast::native("random_int"), Ast::Int(899)),
+                                ),
+                                Ast::var(acc),
+                            ])),
+                        ),
+                    ),
+                    Ast::var(acc),
+                ),
+            ),
+        ),
+        // Now define g, using aux
+        Ast::let_in(
+            g,
+            AstTy::fun(AstTy::Int, AstTy::named("lst")),
+            Ast::lambda(
+                AstTyped::new(n, AstTy::Int),
+                Ast::app(
+                    Ast::app(Ast::var(aux), Ast::var(n)),
+                    Ast::cons("lst", "Nil", None),
+                ),
+            ),
+            Ast::var(g),
+        ),
+    )
+}
+
+fn rev_bench(list_size: i32, loop_n: i32) -> (Ast, AstCtx) {
+    let mut ctx = AstCtx::new();
+    ctx.types.insert(
+        "lst".into(),
+        EnumDef {
+            name: "lst".into(),
+            cases: vec![
+                EnumCase {
+                    cons_name: "Nil".into(),
+                    arg: None,
+                },
+                EnumCase {
+                    cons_name: "Cons".into(),
+                    arg: Some(AstTy::Tuple(vec![AstTy::Int, AstTy::named("lst")])),
+                },
+            ],
+        },
+    );
+
+    let constr = |name: &str, val| Ast::cons("lst", name, val);
+    let cons = |val, old| constr("Cons", Some(Ast::tuple(vec![val, old])));
+    let nil = || constr("Nil", None);
+    let l = Var::fresh();
+    let aux = Var::fresh();
+    let l2 = Var::fresh();
+    let acc = Var::fresh();
+    let hd = Var::fresh();
+    let tl = Var::fresh();
+
+    let void_arg = Var::fresh();
+    let l4 = Var::fresh();
+    let rev = Var::fresh();
+
+    let generate_list = Ast::lambda(
+        AstTyped::new(void_arg, AstTy::Tuple(vec![])),
+        Ast::let_in(
+            l4,
+            AstTy::named("lst"),
+            Ast::app(make_random_list_generator(), Ast::int(list_size)),
+            Ast::seq(
+                Ast::seq(
+                    Ast::app(Ast::native("print_lst"), Ast::var(l4)),
+                    Ast::app(
+                        Ast::native("print_lst"),
+                        Ast::app(Ast::var(rev), Ast::var(l4)),
+                    ),
+                ),
+                Ast::Tuple(vec![]),
+            ),
+        ),
+    );
+
+    let ast = Ast::let_in(
+        rev,
+        AstTy::fun(AstTy::named("lst"), AstTy::named("lst")),
+        Ast::lambda(
+            AstTyped::new(l, AstTy::named("lst")),
+            Ast::let_in(
+                aux,
+                AstTy::fun(
+                    AstTy::named("lst"),
+                    AstTy::fun(AstTy::named("lst"), AstTy::named("lst")),
+                ),
+                Ast::lambda(
+                    AstTyped::new(l2, AstTy::named("lst")),
+                    Ast::lambda(
+                        AstTyped::new(acc, AstTy::named("lst")),
+                        Ast::match_with(
+                            Ast::var(l2),
+                            vec![
+                                MatchCase {
+                                    pat: Pattern::cons("lst", "Nil", None),
+                                    expr: Ast::var(acc),
+                                },
+                                MatchCase {
+                                    pat: Pattern::cons(
+                                        "lst",
+                                        "Cons",
+                                        Some(Pattern::tuple(vec![
+                                            Pattern::symb(hd, AstTy::Int),
+                                            Pattern::symb(tl, AstTy::named("lst")),
+                                        ])),
+                                    ),
+                                    expr: Ast::app(
+                                        Ast::app(Ast::Var(aux), Ast::Var(tl)),
+                                        cons(Ast::Var(hd), Ast::var(acc)),
+                                    ),
+                                },
+                            ],
+                        ),
+                    ),
+                ),
+                Ast::app(Ast::app(Ast::Var(aux), Ast::var(l)), nil()),
+            ),
+        ),
+        get_loo(|loo| Ast::app(Ast::app(Ast::var(loo), Ast::Int(loop_n)), generate_list)),
+    );
+    (ast, ctx)
+}
+
 #[allow(unused)]
 fn compile_ast<S: ToString>(ast: Ast, prog_name: S) {
     compile_ast_with_ctx(ast, prog_name, AstCtx::default())
@@ -669,20 +866,28 @@ fn compile_ast_with_ctx<S: ToString>(ast: Ast, prog_name: S, ctx: AstCtx) {
     prog.compile(ExportC::new(PathBuf::from(format!("./{prog_name}.c"))))
         .unwrap();
 
-    process::Command::new("clang")
-        .arg("-g")
+    let mut compile = process::Command::new("gcc");
+    compile
         .arg("-o")
         .arg(format!("{prog_name}"))
         .arg("-I.")
         .arg(format!("{prog_name}.c"))
         .arg("runtime.c")
-        .arg("-O3")
-        .spawn()
-        .unwrap()
-        .wait()
-        .unwrap()
-        .exit_ok()
-        .unwrap();
+        .arg("-O2");
+
+    println!(
+        "[CMD] {}",
+        once(format!("{}", compile.get_program().display()))
+            .chain(
+                compile
+                    .get_args()
+                    .into_iter()
+                    .map(|x| format!("{}", x.display()))
+            )
+            .collect::<Vec<String>>()
+            .join(" ")
+    );
+    compile.spawn().unwrap().wait().unwrap().exit_ok().unwrap();
 
     Var::reset();
     CfgVar::reset();
@@ -795,6 +1000,6 @@ mod tests {
 }
 
 fn main() {
-    let (ast, ctx) = list_test4();
+    let (ast, ctx) = rev_bench(100, 100);
     compile_ast_with_ctx(ast, "test", ctx);
 }
