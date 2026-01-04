@@ -7,10 +7,27 @@
 For the moment, we compile a statically typed lambda calculus-like language to a flat SSA IR, which is then transpiled to C.
 
 ## Memory Management
-Closure environnements are allocated on the stack and reference-counted by a small custom runtime written in C.
+Closure environnements and objects are allocated on the heap and reference-counted by a small custom runtime written in C.
 
-## Example
+## Examples
+
 Pseudo-Code:
+```
+let rev: lst -> lst =
+  let aux: lst -> lst -> lst = λ (acc: lst). λ (l: lst).
+    match l with
+      | Nil -> acc
+      | Cons(hd, tl) -> aux Cons(hd, acc) tl
+    in
+    aux (lst.Nil)
+  in
+  print_lst (rev Cons(123, Cons(456, Nil)))
+```
+Compiles and outputs:
+```
+[456, 123]
+```
+
 ```
 let rec fact: (int -> int) = λb: int.
   if b then
@@ -22,7 +39,7 @@ print_int (fact 6);
 print_string "\n"
 ```
 
-Compiles and executes:
+Compiles and outputs:
 ```
 720
 ```
