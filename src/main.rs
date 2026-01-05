@@ -870,9 +870,9 @@ fn compile_ast_with_ctx<S: ToString>(ast: Ast, prog_name: S, ctx: AstCtx) {
     compile
         .arg("-o")
         .arg(format!("{prog_name}"))
-        .arg("-I.")
+        .arg("-I./runtime")
         .arg(format!("{prog_name}.c"))
-        .arg("runtime.c")
+        .arg("./runtime/runtime.c")
         .arg("-O2");
 
     println!(

@@ -1,15 +1,12 @@
 use crate::backend::Backend;
 use crate::cfg::expr::Expr;
 use crate::cfg::var::CfgVarUse;
-use crate::cfg::{
-    BasicBlock, Cfg, Const, FunNameUse, Func, Instr, Program, Sig, Terminator, Ty, Value,
-};
+use crate::cfg::{Cfg, Const, FunNameUse, Func, Instr, Program, Sig, Terminator, Ty, Value};
 use crate::helpers::unique::{Extractable, Use};
 use std::collections::{HashMap, HashSet};
 use std::fmt::Write as FmtWrite;
 use std::fs::File;
 use std::io::Write;
-use std::iter::repeat;
 use std::path::Path;
 
 pub struct ExportC<P: AsRef<Path>> {
