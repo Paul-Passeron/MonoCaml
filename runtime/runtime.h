@@ -3,6 +3,7 @@
 
 #include "da.h"
 #include "mem.h"
+#include "pool.h"
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
