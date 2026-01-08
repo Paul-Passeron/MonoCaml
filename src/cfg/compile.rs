@@ -92,6 +92,7 @@ impl Compiler {
         let entry = FunName::fresh();
         let entry_use = Use::from(&entry);
         let mut res = Self::new(entry_use, ctx);
+        res.create_boxed_types();
         res.create_borrows();
         res.create_drops();
         res.create_constructors();
@@ -1332,6 +1333,7 @@ impl Program {
             entry,
             natives: HashMap::new(),
             funcs: HashSet::new(),
+            boxed_types: HashSet::new(),
         }
     }
 }

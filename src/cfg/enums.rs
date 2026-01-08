@@ -283,6 +283,13 @@ impl Compiler {
             .for_each(|(x, name)| self.create_borrows_for_enum(x, name));
     }
 
+    pub fn create_boxed_types(&mut self) {
+        self.ast_ctx.types.clone().iter().for_each(|x| {
+            let ty = self.ast_ty_to_ty(&AstTy::named(&x.0));
+            self.prog.boxed_types.insert(ty);
+        });
+    }
+
     pub fn create_constructors(&mut self) {
         self.ast_ctx
             .types

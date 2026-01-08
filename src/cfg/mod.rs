@@ -276,6 +276,7 @@ pub struct Program {
     entry: FunNameUse,
     natives: HashMap<String, FunNameUse>,
     funcs: HashSet<Func>,
+    boxed_types: HashSet<Ty>,
 }
 
 impl Program {
@@ -293,6 +294,10 @@ impl Program {
 
     pub fn compile<B: Backend>(&self, b: B) -> Result<B::Out, B::Err> {
         b.compile(self)
+    }
+
+    pub fn boxed_types(&self) -> &HashSet<Ty> {
+        &self.boxed_types
     }
 }
 

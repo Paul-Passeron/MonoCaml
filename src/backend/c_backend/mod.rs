@@ -612,6 +612,13 @@ impl<P: AsRef<Path>> ExportC<P> {
             "#pragma clang diagnostic ignored \"-Wincompatible-pointer-types\""
         )
         .unwrap();
+
+        for ty in prog.boxed_types() {
+            self.define_type(ty.clone());
+            let tname = self.get_type_name(&ty.into_inner());
+            writeln!(&mut self.f, "setup_pool({tname})").unwrap();
+        }
+
         let types = prog.get_all_types();
         for ty in types {
             self.define_type(ty);
