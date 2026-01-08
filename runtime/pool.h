@@ -23,13 +23,14 @@
     ty *data;                                                                  \
     pooltype(ty) * next;                                                       \
   };                                                                           \
+  pooltype(ty) *ty##_current_pool = NULL;                                      \
   void init_pool(ty)(pooltype(ty) * pool) {                                    \
     pool->capacity = pool_capacity(ty);                                        \
     pool->filled = 0;                                                          \
     pool->data = malloc(sizeof(ty) * pool->capacity);                          \
     register_object(pool->data);                                               \
   }                                                                            \
-  ty *ty##_pool_allocate(pooltype(ty) * pool) {                                \
+  ty *ty##_pool_allocate_internal(pooltype(ty) * pool) {                       \
     if (pool == NULL) {                                                        \
       return NULL;                                                             \
     }                                                                          \
@@ -45,12 +46,23 @@
         register_object(next_pool);                                            \
         init_pool(ty)(next_pool);                                              \
         pool->next = next_pool;                                                \
+        ty##_current_pool = next_pool;                                         \
       }                                                                        \
-      return ty##_pool_allocate(pool->next);                                   \
+      return ty##_pool_allocate_internal(pool->next);                          \
     }                                                                          \
-    return &pool->data[pool->filled++];                                        \
+    ty *res = &pool->data[pool->filled++];                                     \
+    register_object(res);                                                      \
+    return res;                                                                \
   }                                                                            \
-  void ty##_free(pooltype(ty) * pool, void *ptr) {                             \
+  ty *ty##_pool_allocate(void) {                                               \
+    if (ty##_current_pool == NULL) {                                           \
+      ty##_current_pool = malloc(sizeof(*ty##_current_pool));                  \
+      register_object(ty##_current_pool);                                      \
+      init_pool(ty)(ty##_current_pool);                                        \
+    }                                                                          \
+    return ty##_pool_allocate_internal(ty##_current_pool);                     \
+  }                                                                            \
+  void ty##_free_internal(pooltype(ty) * pool, void *ptr) {                    \
     if (pool == NULL || ptr == NULL || pool->data == NULL ||                   \
         pool->capacity <= sizeof(ty)) {                                        \
       return;                                                                  \
@@ -59,8 +71,25 @@
         (intptr_t)ptr < (intptr_t)&pool->data[pool->capacity]) {               \
       da_append(&singles(ty), ptr);                                            \
     } else {                                                                   \
-      ty##_free(pool->next, ptr);                                              \
+      ty##_free_internal(pool->next, ptr);                                     \
     }                                                                          \
+  }                                                                            \
+  void ty##_release_internal(pooltype(ty) * pool, void *ptr) {                 \
+    if (pool == NULL || ptr == NULL || pool->data == NULL ||                   \
+        pool->capacity <= sizeof(ty)) {                                        \
+      return;                                                                  \
+    }                                                                          \
+    int *ref_count = get_ref_count(ptr);                                       \
+    if (!ref_count) {                                                          \
+      return;                                                                  \
+    }                                                                          \
+    *ref_count--;                                                              \
+    if (*ref_count == 0) {                                                     \
+      ty##_free_internal(pool, ptr);                                           \
+    }                                                                          \
+  }                                                                            \
+  void ty##_release(void *ptr) {                                               \
+    return ty##_release_internal(ty##_current_pool, ptr);                      \
   }
 
 #endif // POOL_H
