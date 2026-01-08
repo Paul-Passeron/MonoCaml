@@ -39,7 +39,7 @@ __inline__ void register_object(void *ptr) {
       return;
     }
   }
-  ref ref = {.count = 0, .ptr = ptr};
+  ref ref = {.count = 1, .ptr = ptr};
   if (free_refs[hashed].count > 0) {
     int idx = free_refs[hashed].items[--free_refs[hashed].count];
     refs->items[idx] = ref;
@@ -87,9 +87,22 @@ __inline__ void drop_object(void *env) {
   r->count--;
   if (r->count == 0) {
     free(env);
+    #ifdef DEBUG_FREE
+        printf("FREE %p\n", env);
+    #endif // DEBUG_FREE
     da_append(&free_refs[hash], idx);
     references[hash].items[idx] = (ref){0};
   }
+}
+
+__inline__ size_t *get_ref_count(void *ptr) {
+    size_t hash, idx;
+    ref *r = get_ref(ptr, &hash, &idx);
+    return &r->count;
+}
+
+__inline__ int is_unique(void *ptr) {
+    return *get_ref_count(ptr) == 1;
 }
 
 void cleanup(void) {

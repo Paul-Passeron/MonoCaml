@@ -46,7 +46,7 @@
         init_pool(ty)(next_pool);                                              \
         pool->next = next_pool;                                                \
       }                                                                        \
-      return ty##_pool_allocate(pool->next);                                    \
+      return ty##_pool_allocate(pool->next);                                   \
     }                                                                          \
     return &pool->data[pool->filled++];                                        \
   }                                                                            \
