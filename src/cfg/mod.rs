@@ -276,7 +276,7 @@ pub struct Program {
     entry: FunNameUse,
     natives: HashMap<String, FunNameUse>,
     funcs: HashSet<Func>,
-    boxed_types: HashSet<Ty>,
+    boxed_types: HashMap<String, Ty>,
 }
 
 impl Program {
@@ -296,7 +296,7 @@ impl Program {
         b.compile(self)
     }
 
-    pub fn boxed_types(&self) -> &HashSet<Ty> {
+    pub fn boxed_types(&self) -> &HashMap<String, Ty> {
         &self.boxed_types
     }
 }

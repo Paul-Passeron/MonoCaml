@@ -61,6 +61,10 @@ impl<P: AsRef<Path>> ExportC<P> {
     }
 
     pub fn define_type(&mut self, ty: Ty) {
+        self.define_type_pro(ty, None)
+    }
+
+    pub fn define_type_pro(&mut self, ty: Ty, name: Option<&String>) {
         // Normalize empty struct to void
         let ty = match &ty {
             Ty::Struct(items) if items.is_empty() => Ty::Void,
@@ -74,20 +78,26 @@ impl<P: AsRef<Path>> ExportC<P> {
 
         match &ty {
             Ty::Int => {
+                assert!(name.is_none());
                 self.type_names.insert(ty.clone(), "int".to_string());
                 self.decayed_type_names.insert(ty, "int".to_string());
             }
             Ty::String => {
+                assert!(name.is_none());
                 self.type_names
                     .insert(ty.clone(), "const char *".to_string());
                 self.decayed_type_names
                     .insert(ty, "const char *".to_string());
             }
             Ty::Void => {
+                assert!(name.is_none());
+
                 self.type_names.insert(ty.clone(), "void".to_string());
                 self.decayed_type_names.insert(ty, "void".to_string());
             }
             Ty::Ptr(inner) => {
+                assert!(name.is_none());
+
                 self.define_type((**inner).clone());
                 let inner_name = self.get_type_name(inner);
                 self.type_names
@@ -95,6 +105,8 @@ impl<P: AsRef<Path>> ExportC<P> {
                 self.decayed_type_names.insert(ty, "void*".to_string());
             }
             Ty::FunPtr(sig) => {
+                assert!(name.is_none());
+
                 // Define return and param types first (recursively)
                 self.define_type((sig.ret()).clone());
                 for param in sig.params() {
@@ -199,7 +211,7 @@ impl<P: AsRef<Path>> ExportC<P> {
                 }
 
                 // Create new typedef using decayed field types
-                let name = format!("ty_{}", self.count);
+                let name = name.cloned().unwrap_or(format!("ty_{}", self.count));
                 self.count += 1;
 
                 let decayed_field_types: Vec<_> = items
@@ -613,9 +625,10 @@ impl<P: AsRef<Path>> ExportC<P> {
         )
         .unwrap();
 
-        for ty in prog.boxed_types() {
-            self.define_type(ty.clone());
-            let tname = self.get_type_name(&ty.into_inner());
+        for (name, ty) in prog.boxed_types() {
+            let ty = ty.into_inner();
+            self.define_type_pro(ty.clone(), Some(name));
+            let tname = self.get_type_name(&ty);
             writeln!(&mut self.f, "setup_pool({tname})").unwrap();
         }
 

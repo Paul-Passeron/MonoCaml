@@ -1,6 +1,10 @@
+use std::iter::{empty, repeat_n};
+
 use crate::{
     ast::types::{AstTy, EnumDef},
-    cfg::{Const, FunName, Label, Ty, Value, builder::Builder, compile::Compiler, var::CfgVar},
+    cfg::{
+        Const, FunName, Func, Label, Ty, Value, builder::Builder, compile::Compiler, var::CfgVar,
+    },
     helpers::unique::Use,
 };
 
@@ -286,7 +290,7 @@ impl Compiler {
     pub fn create_boxed_types(&mut self) {
         self.ast_ctx.types.clone().iter().for_each(|x| {
             let ty = self.ast_ty_to_ty(&AstTy::named(&x.0));
-            self.prog.boxed_types.insert(ty);
+            self.prog.boxed_types.insert(x.0.clone(), ty);
         });
     }
 
@@ -298,6 +302,27 @@ impl Compiler {
             .collect::<Vec<_>>()
             .iter()
             .for_each(|x| self.create_constructors_for_enum(x));
+    }
+
+    pub fn create_pool_funs(&mut self) {
+        self.ast_ctx
+            .types
+            .iter()
+            .map(|(_, x)| x.clone())
+            .collect::<Vec<_>>()
+            .iter()
+            .for_each(|x| self.create_pool_funs_for_enum(x));
+    }
+
+    pub fn create_pool_funs_for_enum(&mut self, e: &EnumDef) {
+        let self_ty = self.ast_ty_to_ty(&AstTy::named(&e.name));
+
+        // Allocate type
+        let name = FunName::fresh();
+        let n = Use::from(&name);
+        let f: _ = Func::new(name, self.ctx.make_params(empty()), self_ty, None);
+        self.add_func(f);
+        self.add_named_func(format!("{}_allocate", e.name), n);
     }
 
     pub fn drop_ty(&mut self, val: Value, ty: &AstTy, b: &mut Builder) {
