@@ -37,7 +37,6 @@ impl Builder {
             ret_ty,
             label: l,
             entry: use_l,
-            // phis: HashMap::new(),
             locals: vec![],
             instrs: vec![],
             blocks: vec![],
@@ -49,6 +48,10 @@ impl Builder {
         );
         ctx.sigs.insert(Use::from(&res.name), sig);
         res
+    }
+
+    pub fn funname(&self) -> FunNameUse {
+        Use::from(&self.name)
     }
 
     fn replace_lbl(&mut self, next: Label) -> Label {
@@ -299,11 +302,7 @@ impl Builder {
     }
 
     pub fn aggregate(&mut self, ctx: &mut TyCtx, values: Vec<Value>) -> Value {
-        if values.is_empty() {
-            Value::Const(Const::Struct(vec![]))
-        } else {
-            self.assign(ctx, Expr::aggregate(values)).into()
-        }
+        self.assign(ctx, Expr::aggregate(values)).into()
     }
 
     pub fn value(&mut self, ctx: &mut TyCtx, value: Value) -> CfgVarUse {

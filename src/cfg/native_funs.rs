@@ -92,6 +92,20 @@ impl Compiler {
         self.add_named_func("borrow_object", used);
     }
 
+    pub fn create_is_unique(&mut self) {
+        let name = FunName::fresh();
+        let used = Use::from(&name);
+        let f = Func::new(
+            name,
+            self.ctx
+                .make_params([Ty::Ptr(Box::new(Ty::Void))].into_iter()),
+            Ty::Int,
+            None,
+        );
+        self.add_func(f);
+        self.add_named_func("is_unique", used);
+    }
+
     pub fn create_drop_object(&mut self) {
         let name = FunName::fresh();
         let used = Use::from(&name);

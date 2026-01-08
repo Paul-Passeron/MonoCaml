@@ -1,49 +1,39 @@
 use crate::{
     ast::types::{AstTy, EnumDef},
-    cfg::{Const, FunName, Label, Ty, Value, builder::Builder, compile::Compiler},
+    cfg::{Const, FunName, Label, Ty, Value, builder::Builder, compile::Compiler, var::CfgVar},
     helpers::unique::Use,
 };
 
 impl Compiler {
-    fn create_borrows_for_enum(&mut self, enum_def: &EnumDef, funname: FunName) {
-        let named = AstTy::named(&enum_def.name);
-        let self_ty = self.ast_ty_to_ty(&named);
-        let is_rec = named.is_recursive(&self.ast_ctx);
-        let funname_use = Use::from(&funname);
-        let param_var = self.ctx.new_var(self_ty.clone());
-        let param_use = Use::from(&param_var);
-        let mut builder = Builder::new(
-            funname,
-            vec![(param_var, self_ty.clone())],
-            Ty::Void,
+    // Very simple: we simply retain the current pointer and do not care about
+    // constructor args because their dropping is guarded bythe dropping of this
+    // object
+    fn create_borrow_for_rec_enum(&mut self, param: Use<CfgVar>, builder: &mut Builder) {
+        let borrow_object = self.prog.natives()["borrow_object"].clone();
+        builder.native_call(
             &mut self.ctx,
+            Const::FunPtr(borrow_object).into(),
+            vec![param.into()],
         );
+        builder.ret_void(&mut self.ctx);
+    }
 
-        let discr: Value = if is_rec {
-            let borrow_object = self.prog.natives()["borrow_object"].clone();
-            builder.native_call(
-                &mut self.ctx,
-                Const::FunPtr(borrow_object).into(),
-                vec![param_use.clone().into()],
-            );
-            let ptr = builder.get_element_ptr(
-                &mut self.ctx,
-                param_use.clone().into(),
-                self_ty.into_inner(),
-                0,
-            );
-            builder.load(&mut self.ctx, ptr.into(), Ty::Int).into()
-        } else {
-            builder
-                .extract(&mut self.ctx, param_use.clone().into(), 0)
-                .into()
-        };
-
+    fn create_borrow_for_nonrec_enum(
+        &mut self,
+        param: Use<CfgVar>,
+        enum_def: &EnumDef,
+        builder: &mut Builder,
+    ) {
+        let discr = builder.extract(&mut self.ctx, param.clone().into(), 0);
         let ret_lbl = Label::fresh();
         let ret_use = Use::from(&ret_lbl);
 
         for (i, case) in enum_def.cases.iter().enumerate() {
-            let is_i = builder.eq(&mut self.ctx, discr.clone(), Const::Int(i as i32).into());
+            let is_i = builder.eq(
+                &mut self.ctx,
+                discr.clone().into(),
+                Const::Int(i as i32).into(),
+            );
             let case_body_lbl = Label::fresh();
             let case_body_use = Use::from(&case_body_lbl);
             let next_check_lbl = Label::fresh();
@@ -57,35 +47,41 @@ impl Compiler {
                 case_body_lbl,
             );
 
-            for t in case.arg.iter() {
-                let val = if is_rec {
-                    let self_ty = self_ty.into_inner();
-                    let ptr = builder.get_element_ptr(
-                        &mut self.ctx,
-                        param_use.clone().into(),
-                        self_ty.clone(),
-                        1,
-                    );
-                    let ptr =
-                        builder.get_element_ptr(&mut self.ctx, ptr.into(), self_ty.field(1), i);
-                    builder
-                        .load(&mut self.ctx, ptr.into(), self_ty.field(1).field(i))
-                        .into()
-                } else {
-                    let union_val = builder
-                        .extract(&mut self.ctx, param_use.clone().into(), 1)
-                        .into();
-                    builder.extract(&mut self.ctx, union_val, i).into()
-                };
-                self.borrow_ty(val, t, &mut builder);
+            if let Some(t) = &case.arg {
+                let union_val = builder
+                    .extract(&mut self.ctx, param.clone().into(), 1)
+                    .into();
+                let val = builder.extract(&mut self.ctx, union_val, i).into();
+                self.borrow_ty(val, t, builder);
             }
 
             builder.goto(&mut self.ctx, ret_use.clone(), next_check_lbl);
         }
-
         builder.goto(&mut self.ctx, ret_use, ret_lbl);
-
         builder.ret_void(&mut self.ctx);
+    }
+
+    fn create_borrows_for_enum(&mut self, enum_def: &EnumDef, funname: FunName) {
+        println!("Borrow for {} is {}", enum_def.name, Use::from(&funname));
+        let named = AstTy::named(&enum_def.name);
+        let self_ty = self.ast_ty_to_ty(&named);
+        let is_rec = named.is_recursive(&self.ast_ctx);
+        let funname_use = Use::from(&funname);
+        let param_var = self.ctx.new_var(self_ty.clone());
+        let param_use = Use::from(&param_var);
+        let mut builder = Builder::new(
+            funname,
+            vec![(param_var, self_ty.clone())],
+            Ty::Void,
+            &mut self.ctx,
+        );
+
+        if is_rec {
+            self.create_borrow_for_rec_enum(param_use, &mut builder);
+        } else {
+            self.create_borrow_for_nonrec_enum(param_use, enum_def, &mut builder);
+        };
+
         let f = builder.finalize();
         self.add_func(f);
         self.borrows
@@ -107,45 +103,24 @@ impl Compiler {
         funname
     }
 
-    fn create_drops_for_enum(&mut self, enum_def: &EnumDef, funname: FunName) {
-        let named = AstTy::named(&enum_def.name);
-        let self_ty = self.ast_ty_to_ty(&named);
-        let is_rec = named.is_recursive(&self.ast_ctx);
-        let funname_use = Use::from(&funname);
-        let param_var = self.ctx.new_var(self_ty.clone());
-        let param_use = Use::from(&param_var);
-        let mut builder = Builder::new(
-            funname,
-            vec![(param_var, self_ty.clone())],
-            Ty::Void,
-            &mut self.ctx,
-        );
+    fn create_drops_for_non_rec_enum(
+        &mut self,
+        param: Use<CfgVar>,
+        enum_def: &EnumDef,
+        builder: &mut Builder,
+    ) {
+        // Release constructor fields
 
-        let discr: Value = if is_rec {
-            let drop_object = self.prog.natives()["drop_object"].clone();
-            builder.native_call(
-                &mut self.ctx,
-                Const::FunPtr(drop_object).into(),
-                vec![param_use.clone().into()],
-            );
-            let ptr = builder.get_element_ptr(
-                &mut self.ctx,
-                param_use.clone().into(),
-                self_ty.into_inner(),
-                0,
-            );
-            builder.load(&mut self.ctx, ptr.into(), Ty::Int).into()
-        } else {
-            builder
-                .extract(&mut self.ctx, param_use.clone().into(), 0)
-                .into()
-        };
-
+        let discr = builder.extract(&mut self.ctx, param.clone().into(), 0);
         let ret_lbl = Label::fresh();
         let ret_use = Use::from(&ret_lbl);
 
         for (i, case) in enum_def.cases.iter().enumerate() {
-            let is_i = builder.eq(&mut self.ctx, discr.clone(), Const::Int(i as i32).into());
+            let is_i = builder.eq(
+                &mut self.ctx,
+                discr.clone().into(),
+                Const::Int(i as i32).into(),
+            );
             let case_body_lbl = Label::fresh();
             let case_body_use = Use::from(&case_body_lbl);
             let next_check_lbl = Label::fresh();
@@ -159,36 +134,122 @@ impl Compiler {
                 case_body_lbl,
             );
 
-            for t in case.arg.iter() {
-                let val = if is_rec {
-                    let self_ty = self_ty.into_inner();
-
-                    let ptr = builder.get_element_ptr(
-                        &mut self.ctx,
-                        param_use.clone().into(),
-                        self_ty.clone(),
-                        1,
-                    );
-                    let ptr =
-                        builder.get_element_ptr(&mut self.ctx, ptr.into(), self_ty.field(1), i);
-                    builder
-                        .load(&mut self.ctx, ptr.into(), self_ty.field(1).field(i))
-                        .into()
-                } else {
-                    let union_val = builder
-                        .extract(&mut self.ctx, param_use.clone().into(), 1)
-                        .into();
-                    builder.extract(&mut self.ctx, union_val, i).into()
-                };
-                self.drop_ty(val, t, &mut builder);
+            if let Some(t) = &case.arg {
+                let union_val = builder
+                    .extract(&mut self.ctx, param.clone().into(), 1)
+                    .into();
+                let val = builder.extract(&mut self.ctx, union_val, i).into();
+                self.drop_ty(val, t, builder);
             }
-
             builder.goto(&mut self.ctx, ret_use.clone(), next_check_lbl);
         }
+        builder.goto(&mut self.ctx, ret_use, ret_lbl);
+        builder.ret_void(&mut self.ctx);
+    }
 
+    fn create_drops_for_rec_enum(
+        &mut self,
+        param: Use<CfgVar>,
+        enum_def: &EnumDef,
+        self_ty: Ty,
+        builder: &mut Builder,
+    ) {
+        // Release constructor fields
+
+        let is_unique_function = self.prog.natives["is_unique"].clone();
+        let is_unique = builder.native_call(
+            &mut self.ctx,
+            Const::FunPtr(is_unique_function).into(),
+            vec![param.clone().into()],
+        );
+
+        let if_unique = Label::fresh();
+        let ret_lbl = Label::fresh();
+        let ret_use = Use::from(&ret_lbl);
+        let ifu = Use::from(&if_unique);
+
+        builder.branch(
+            &mut self.ctx,
+            is_unique.into(),
+            ifu,
+            ret_use.clone(),
+            if_unique,
+        );
+
+        let ptr =
+            builder.get_element_ptr(&mut self.ctx, param.clone().into(), self_ty.into_inner(), 0);
+
+        let discr = builder.load(&mut self.ctx, ptr.into(), Ty::Int);
+        for (i, case) in enum_def.cases.iter().enumerate() {
+            let is_i = builder.eq(
+                &mut self.ctx,
+                discr.clone().into(),
+                Const::Int(i as i32).into(),
+            );
+            let case_body_lbl = Label::fresh();
+            let case_body_use = Use::from(&case_body_lbl);
+            let next_check_lbl = Label::fresh();
+            let next_check_use = Use::from(&next_check_lbl);
+
+            builder.branch(
+                &mut self.ctx,
+                is_i,
+                case_body_use,
+                next_check_use.clone(),
+                case_body_lbl,
+            );
+            let union_ptr = builder.get_element_ptr(
+                &mut self.ctx,
+                param.clone().into(),
+                self_ty.into_inner(),
+                1,
+            );
+            if let Some(t) = &case.arg {
+                let union_val = builder
+                    .load(
+                        &mut self.ctx,
+                        union_ptr.clone().into(),
+                        self_ty.into_inner().field(1),
+                    )
+                    .into();
+                let val = builder.extract(&mut self.ctx, union_val, i).into();
+                self.drop_ty(val, t, builder);
+            }
+            builder.goto(&mut self.ctx, ret_use.clone(), next_check_lbl);
+        }
         builder.goto(&mut self.ctx, ret_use, ret_lbl);
 
+        let drop_fun = self.prog.natives["drop_object"].clone();
+        builder.native_call(
+            &mut self.ctx,
+            Const::FunPtr(drop_fun).into(),
+            vec![param.clone().into()],
+        );
+
         builder.ret_void(&mut self.ctx);
+    }
+
+    fn create_drops_for_enum(&mut self, enum_def: &EnumDef, funname: FunName) {
+        println!("Drop for {} is {}", enum_def.name, Use::from(&funname));
+        let named = AstTy::named(&enum_def.name);
+        let self_ty = self.ast_ty_to_ty(&named);
+        let is_rec = named.is_recursive(&self.ast_ctx);
+        let funname_use = Use::from(&funname);
+        let param_var = self.ctx.new_var(self_ty.clone());
+        let param_use = Use::from(&param_var);
+        let mut builder = Builder::new(
+            funname,
+            vec![(param_var, self_ty.clone())],
+            Ty::Void,
+            &mut self.ctx,
+        );
+
+        if is_rec {
+            self.create_drops_for_rec_enum(param_use, enum_def, self_ty, &mut builder);
+        } else {
+            self.create_drops_for_non_rec_enum(param_use, enum_def, &mut builder);
+        }
+
         let f = builder.finalize();
         self.add_func(f);
         self.drops
@@ -233,19 +294,24 @@ impl Compiler {
     }
 
     pub fn drop_ty(&mut self, val: Value, ty: &AstTy, b: &mut Builder) {
+        println!("Ty is {ty}");
+        let cfg_ty = self.ast_ty_to_ty(ty);
+        assert!(cfg_ty.matches(&val.get_type(&self.ctx)));
         match ty {
             AstTy::Tuple(items) => {
                 for (i, item) in items.iter().enumerate() {
-                    let ty_pro = self.ast_ty_to_ty_pro(item, true);
-                    if ty_pro.is_ptr() {
-                        let v = b.extract(&mut self.ctx, val.clone(), i);
-                        self.drop_ty(v.into(), item, b);
-                    }
+                    let v = b.extract(&mut self.ctx, val.clone(), i);
+                    self.drop_ty(v.into(), item, b);
                 }
             }
             AstTy::Fun { .. } => {
                 let drop_object = self.prog.natives()["drop_object"].clone();
-                b.native_call(&mut self.ctx, Const::FunPtr(drop_object).into(), vec![val]);
+                let val = b.extract(&mut self.ctx, val.into(), 1);
+                b.native_call(
+                    &mut self.ctx,
+                    Const::FunPtr(drop_object).into(),
+                    vec![val.into()],
+                );
             }
             AstTy::Named(ty) => {
                 let drop_fun = self.drops[ty].clone();
@@ -256,22 +322,23 @@ impl Compiler {
     }
 
     pub fn borrow_ty(&mut self, val: Value, ty: &AstTy, b: &mut Builder) {
+        println!("Ty is {ty}");
+        let cfg_ty = self.ast_ty_to_ty(ty);
+        assert!(cfg_ty.matches(&val.get_type(&self.ctx)));
         match ty {
             AstTy::Tuple(items) => {
                 for (i, item) in items.iter().enumerate() {
-                    let ty_pro = self.ast_ty_to_ty_pro(item, true);
-                    if ty_pro.is_ptr() {
-                        let v = b.extract(&mut self.ctx, val.clone(), i);
-                        self.borrow_ty(v.into(), item, b);
-                    }
+                    let v = b.extract(&mut self.ctx, val.clone(), i);
+                    self.borrow_ty(v.into(), item, b);
                 }
             }
             AstTy::Fun { .. } => {
                 let borrow_object = self.prog.natives()["borrow_object"].clone();
+                let val = b.extract(&mut self.ctx, val.into(), 1);
                 b.native_call(
                     &mut self.ctx,
                     Const::FunPtr(borrow_object).into(),
-                    vec![val],
+                    vec![val.into()],
                 );
             }
             AstTy::Named(ty) => {

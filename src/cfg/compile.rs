@@ -5,9 +5,9 @@ use std::{
 
 use crate::{
     ast::{
-        Ast, MatchCase, Var,
+        Ast, AstKind, MatchCase, Var,
         pattern::Pattern,
-        types::{AstCtx, AstTy, AstTyped, EnumDef},
+        types::{AstCtx, AstTy, EnumDef},
     },
     cfg::{
         Const, FunName, FunNameUse, Func, Label, Program, Sig, Ty, TyCtx, Value,
@@ -34,6 +34,7 @@ pub struct Compiler {
     pub constructors: HashMap<String, HashMap<String, FunNameUse>>,
     pub borrows: HashMap<String, FunNameUse>,
     pub drops: HashMap<String, FunNameUse>,
+    pub debug: bool,
 }
 
 #[allow(unused)]
@@ -46,7 +47,6 @@ impl Compiler {
 
     pub fn add_named_func<S: ToString>(&mut self, alias: S, fun_name: FunNameUse) {
         let alias = alias.to_string();
-        println!("{alias} -> {fun_name}");
         self.prog.add_native_alias(alias.clone(), fun_name.clone());
         self.ctx.add_native_alias(alias, fun_name);
     }
@@ -73,6 +73,7 @@ impl Compiler {
             constructors: HashMap::new(),
             borrows: HashMap::new(),
             drops: HashMap::new(),
+            debug: false,
         };
         res.create_add();
         res.create_mul();
@@ -83,10 +84,11 @@ impl Compiler {
         res.create_drop_object();
         res.create_register_object();
         res.create_print_lst();
+        res.create_is_unique();
         res
     }
 
-    pub fn compile(ast: Ast, ctx: AstCtx) -> Program {
+    pub fn compile<T: Clone>(ast: Ast<T>, ctx: AstCtx) -> Program {
         let entry = FunName::fresh();
         let entry_use = Use::from(&entry);
         let mut res = Self::new(entry_use, ctx);
@@ -134,6 +136,13 @@ impl Compiler {
             let mut args = vec![Const::Int(i as i32).into()];
             if !use_params.is_empty() {
                 let val: Value = use_params[0].clone().into();
+                self.inject_print(
+                    format!(
+                        "BORROWING from create_constructors_for_enum, in func {}\n",
+                        builder.funname()
+                    ),
+                    &mut builder,
+                );
                 self.borrow_ty(val.clone(), case.arg.as_ref().unwrap(), &mut builder);
                 let union = builder.union(&mut self.ctx, union_ty.clone(), val.clone(), i);
                 args.push(union.into());
@@ -247,37 +256,38 @@ impl Compiler {
         self.ast_ty_to_ty_pro(t, true)
     }
 
-    fn normalize_lambda(&mut self, a: Ast) -> (Option<(Var, Ty)>, Ast) {
+    fn normalize_lambda<T: Clone>(&mut self, a: Ast<T>) -> (Option<(Var, AstTy, Ty)>, Ast<T>) {
         let ty = self.get_type_of_ast(&a);
         if !ty.repr_closure() {
             return (None, a);
         }
-        match a {
-            Ast::Lambda { arg, body } => (
+        match a.extract() {
+            AstKind::Lambda { arg, body, arg_ty } => (
                 {
-                    let arg_ty = self.ast_ty_to_ty(arg.ty());
-                    Some((*arg.expr(), arg_ty))
+                    let cfg_arg_ty = self.ast_ty_to_ty(&arg_ty);
+                    Some((arg, arg_ty, cfg_arg_ty))
                 },
                 *body,
             ),
             _ => {
-                let v = Var::fresh();
-                let orig_t = match self.get_ast_ty_of(&a) {
-                    AstTy::Fun { arg, .. } => *arg,
-                    _ => unreachable!(),
-                };
-                let v_t = ty.field(0).param(1);
-                self.ast_tys.insert(v.clone(), orig_t.clone());
-                self.type_map.insert(v, v_t.clone());
-                (Some((v, v_t)), Ast::app(a, Ast::Var(v)))
+                panic!()
+                // let v = Var::fresh();
+                // let orig_t = match self.get_ast_ty_of(&a) {
+                //     AstTy::Fun { arg, .. } => *arg,
+                //     _ => unreachable!(),
+                // };
+                // let v_t = ty.field(0).param(1);
+                // self.ast_tys.insert(v.clone(), orig_t.clone());
+                // self.type_map.insert(v, v_t.clone());
+                // (Some((v, v_t)), AstKind::app(a, AstKind::var(v)))
             }
         }
     }
 
-    fn is_sat_aux(&self, ast: &Ast, remaining: usize) -> bool {
-        match ast {
-            Ast::App { fun, .. } => match fun.as_ref() {
-                Ast::Native(x) => {
+    fn is_sat_aux<T: Clone>(&self, ast: &Ast<T>, remaining: usize) -> bool {
+        match ast.expr() {
+            AstKind::App { fun, .. } => match fun.as_ref().expr() {
+                AstKind::Native(x) => {
                     let name = &self.ctx.natives[x];
                     let sig = &self.ctx.sigs[name];
                     let l = sig.params.len();
@@ -289,43 +299,40 @@ impl Compiler {
         }
     }
 
-    fn ast_is_saturated(&self, ast: &Ast) -> bool {
-        match ast {
-            Ast::App { .. } => self.is_sat_aux(ast, 1),
+    fn ast_is_saturated<T: Clone>(&self, ast: &Ast<T>) -> bool {
+        match ast.expr() {
+            AstKind::App { .. } => self.is_sat_aux(ast, 1),
             _ => false,
         }
     }
 
-    fn get_sat_aux(&self, ast: Ast, v: &mut Vec<Ast>) -> FunNameUse {
-        match ast {
-            Ast::App { fun, arg } => {
+    fn get_sat_aux<T: Clone>(&self, ast: Ast<T>, v: &mut Vec<Ast<T>>) -> FunNameUse {
+        match ast.extract() {
+            AstKind::App { fun, arg } => {
                 let res = self.get_sat_aux(*fun, v);
                 v.push(*arg);
                 res
             }
-            Ast::Native(x) => self.ctx.natives[&x].clone(),
+            AstKind::Native(x) => self.ctx.natives[&x].clone(),
             _ => panic!("Not a saturated call"),
         }
     }
 
-    fn get_saturated_args_and_fun(&self, ast: Ast) -> (Vec<Ast>, FunNameUse) {
+    fn get_saturated_args_and_fun<T: Clone>(&self, ast: Ast<T>) -> (Vec<Ast<T>>, FunNameUse) {
         let mut v = vec![];
         let f = self.get_sat_aux(ast, &mut v);
         (v, f)
     }
 
-    fn aux(&mut self, ast: &Ast, b: &mut Builder) -> Value {
-        match ast {
-            Ast::Str(s) => Const::String(s.clone()).into(),
-            Ast::Int(i) => Const::Int(*i).into(),
-            Ast::Var(var) => Value::Var(self.map[&var].clone()),
-            Ast::Lambda { arg, body } => self.compile_lambda(
-                arg.expr().clone(),
-                arg.ty().clone(),
-                body.as_ref().clone(),
-                b,
-            ),
-            Ast::App { fun, arg } => {
+    fn aux<T: Clone>(&mut self, ast: &Ast<T>, b: &mut Builder) -> Value {
+        match ast.expr() {
+            AstKind::Str(s) => Const::String(s.clone()).into(),
+            AstKind::Int(i) => Const::Int(*i).into(),
+            AstKind::Var(var) => Value::Var(self.map[&var].clone()),
+            AstKind::Lambda { arg, body, arg_ty } => {
+                self.compile_lambda(arg.clone(), arg_ty.clone(), body.as_ref().clone(), b)
+            }
+            AstKind::App { fun, arg } => {
                 if self.ast_is_saturated(ast) {
                     let (args, name) = self.get_saturated_args_and_fun(ast.clone());
                     let vals = args.iter().map(|x| self.aux(x, b)).collect();
@@ -341,41 +348,39 @@ impl Compiler {
                 b.native_call(&mut self.ctx, fun_ptr.into(), vec![env_ptr.into(), arg_val])
                     .into()
             }
-            Ast::Seq { fst, snd } => {
+            AstKind::Seq { fst, snd } => {
                 let _ = self.aux(fst, b);
                 self.aux(snd, b)
             }
-            Ast::Tuple(asts) => {
+            AstKind::Tuple(asts) => {
                 let vals = asts.into_iter().map(|x| self.aux(x, b)).collect();
                 b.aggregate(&mut self.ctx, vals).into()
             }
-            Ast::Get { from, index } => {
-                let from_val = self.aux(from, b);
-                b.extract(&mut self.ctx, from_val, *index).into()
-            }
-            Ast::Native(name) => self.get_native_closure(name.clone(), b),
-            Ast::LetBinding {
+            AstKind::Native(name) => self.get_native_closure(name.clone(), b),
+            AstKind::LetBinding {
                 bound,
+                bound_ty,
                 value,
                 in_expr,
             } => {
-                if value.free_vars().contains(bound.expr()) {
+                if value.free_vars().contains(&bound) {
                     self.compile_rec_let(
                         bound.clone(),
+                        bound_ty.clone(),
                         value.as_ref().clone(),
                         in_expr.as_ref().clone(),
                         b,
                     )
                 } else {
-                    self.compile_nonrec_let(b, bound, value, in_expr)
+                    self.compile_nonrec_let(b, bound, bound_ty, value, in_expr)
                 }
             }
-            Ast::If {
+            AstKind::If {
                 cond,
                 then_e,
                 else_e,
             } => self.compile_if(b, cond, then_e, else_e),
-            Ast::Cons {
+            AstKind::Cons {
                 enum_name,
                 case,
                 arg,
@@ -389,30 +394,37 @@ impl Compiler {
                 )
                 .into()
             }
-            Ast::Match { expr, cases } => {
+            AstKind::Match { expr, cases } => {
                 let target = self.get_type_of_case(&cases[0]);
                 self.compile_match(expr, cases, b, target)
             }
         }
     }
 
-    fn compile_nonrec_let(
+    fn compile_nonrec_let<T: Clone>(
         &mut self,
         b: &mut Builder,
-        bound: &AstTyped<Var>,
-        value: &Ast,
-        in_expr: &Ast,
+        bound: &Var,
+        bound_ty: &AstTy,
+        value: &Ast<T>,
+        in_expr: &Ast<T>,
     ) -> Value {
         let val = self.aux(value, b);
-        let bound_ty = self.ast_ty_to_ty(bound.ty());
+        let bound_ty = self.ast_ty_to_ty(bound_ty);
         assert!(val.get_type(&self.ctx).matches(&bound_ty));
         let bound_cfg = self.ctx.new_var(bound_ty);
-        self.map.insert(bound.expr().clone(), Use::from(&bound_cfg));
+        self.map.insert(bound.clone(), Use::from(&bound_cfg));
         b.assign_to(&mut self.ctx, bound_cfg, Expr::value(val.into()));
         self.aux(in_expr, b)
     }
 
-    fn compile_if(&mut self, b: &mut Builder, cond: &Ast, then_e: &Ast, else_e: &Ast) -> Value {
+    fn compile_if<T: Clone>(
+        &mut self,
+        b: &mut Builder,
+        cond: &Ast<T>,
+        then_e: &Ast<T>,
+        else_e: &Ast<T>,
+    ) -> Value {
         let compiled_cond = self.aux(cond, b);
         let then_bb = Label::fresh();
         let else_bb = Label::fresh();
@@ -468,18 +480,19 @@ impl Compiler {
         })
     }
 
-    fn compile_rec_let(
+    fn compile_rec_let<T: Clone>(
         &mut self,
-        bound: AstTyped<Var>,
-        value: Ast,
-        in_expr: Ast,
+        bound: Var,
+        bound_ty: AstTy,
+        value: Ast<T>,
+        in_expr: Ast<T>,
         b: &mut Builder,
     ) -> Value {
-        let bound_ty = self.ast_ty_to_ty(bound.ty());
-        assert!(bound_ty.repr_closure());
-        self.type_map.insert(bound.expr().clone(), bound_ty.clone());
+        let cfg_bound_ty = self.ast_ty_to_ty(&bound_ty);
+        assert!(cfg_bound_ty.repr_closure());
+        self.type_map.insert(bound.clone(), cfg_bound_ty.clone());
         let (param, value) = self.normalize_lambda(value);
-        let (param, arg_ty) = param.unwrap();
+        let (param, ast_ty, arg_ty) = param.unwrap();
 
         let funname = FunName::fresh();
         let funname_use = Use::from(&funname);
@@ -491,9 +504,10 @@ impl Compiler {
 
         self.ctx
             .sigs
-            .insert(funname_use.clone(), bound_ty.field(0).sig());
+            .insert(funname_use.clone(), cfg_bound_ty.field(0).sig());
         self.create_initial_closure_for_recursion(
             bound.clone(),
+            bound_ty.clone(),
             b,
             funname_use,
             outside_env.clone(),
@@ -504,17 +518,8 @@ impl Compiler {
         let old_ctx = self.ctx.clone();
         let old_map = self.map.clone();
 
-        let sig = bound_ty.field(0).sig();
+        let sig = cfg_bound_ty.field(0).sig();
         let ret_ty = *sig.ret;
-        println!("=== BEFORE CAPTURE ===");
-        println!(
-            "self.map keys: {:?}",
-            self.map.keys().map(|v| v.to_string()).collect::<Vec<_>>()
-        );
-        println!("bound in map: {}", self.map.contains_key(bound.expr()));
-
-        // let env = self.capture(&param, &value);
-        // let env: Vec<_> = env.into_iter().filter(|v| v != bound.expr()).collect();
 
         let env = outside_env.clone();
 
@@ -535,7 +540,7 @@ impl Compiler {
         let cfg_arg_use = Use::from(&cfg_arg);
         let env_arg = self.ctx.new_var(closure_env_ty.clone());
         let env_arg_use = Use::from(&env_arg);
-        self.map.insert(param, cfg_arg_use);
+        self.map.insert(param, cfg_arg_use.clone());
 
         let params = vec![(env_arg, closure_env_ty), (cfg_arg, arg_ty)];
         let params = params
@@ -544,24 +549,23 @@ impl Compiler {
             .collect();
 
         let mut builder = Builder::new(funname, params, ret_ty.clone(), &mut self.ctx);
+        self.inject_print(
+            format!(
+                "BORROWING from compile_rec_let, in func {}\n",
+                builder.funname()
+            ),
+            &mut builder,
+        );
+        self.borrow_ty(cfg_arg_use.clone().into(), &ast_ty, &mut builder);
+
         if new_vars_len > 0 {
             let loaded_env =
                 builder.load(&mut self.ctx, env_arg_use.into(), closure_struct.clone());
 
-            println!("=== EXTRACTING FROM ENV DEBUG ===");
-            println!("closure_struct type: {}", closure_struct);
-            println!(
-                "new_vars (types in env): {:?}",
-                new_vars.iter().map(|t| t.to_string()).collect::<Vec<_>>()
-            );
-
             env.iter().enumerate().for_each(|(i, x)| {
-                println!("  extracting env[{}] for var {}", i, x);
                 let associated = builder.extract(&mut self.ctx, loaded_env.clone().into(), i);
-                println!("  extracted type: {}", associated.get_type(&self.ctx));
                 *self.map.get_mut(x).unwrap() = associated;
             });
-            println!("=== END DEBUG ===");
 
             env.iter().enumerate().for_each(|(i, x)| {
                 let associated = builder.extract(&mut self.ctx, loaded_env.clone().into(), i);
@@ -570,6 +574,14 @@ impl Compiler {
         }
 
         let ret_value = self.aux(&value, &mut builder);
+        self.inject_print(
+            format!(
+                "BORROWING from compile_rec_let, in func {}\n",
+                builder.funname()
+            ),
+            &mut builder,
+        );
+        self.drop_ty(cfg_arg_use.into(), &ast_ty, &mut builder);
 
         if ret_ty.is_void() {
             builder.ret_void(&mut self.ctx);
@@ -592,40 +604,26 @@ impl Compiler {
 
     fn create_initial_closure_for_recursion(
         &mut self,
-        bound: AstTyped<Var>,
+        bound: Var,
+        bound_ty: AstTy,
         b: &mut Builder,
         funname_use: Use<FunName>,
         outside_env: Vec<Var>,
     ) -> CfgVarUse {
         let mut pos = -1;
 
-        println!("=== create_initial_closure_for_recursion DEBUG ===");
-        println!("looking for bound: {}", bound.expr());
-
         let env_values = outside_env
             .iter()
             .enumerate()
-            .map(|(i, x)| {
-                println!(
-                    "  env[{}] = {}, in map: {}, is_bound: {}",
-                    i,
-                    x,
-                    self.map.contains_key(x),
-                    x == bound.expr()
-                );
-                match self.map.get(x) {
-                    Some(x) => x.clone().into(),
-                    None => {
-                        pos = i as i64;
-                        Const::Struct(vec![Const::FunPtr(funname_use.clone()), Const::NullPtr])
-                            .into()
-                    }
+            .map(|(i, x)| match self.map.get(x) {
+                Some(x) => x.clone().into(),
+                None => {
+                    pos = i as i64;
+                    Const::Struct(vec![Const::FunPtr(funname_use.clone()), Const::NullPtr]).into()
                 }
             })
             .collect::<Vec<_>>();
 
-        println!("pos (recursive var index): {}", pos);
-        println!("=== END DEBUG ===");
         assert!(pos >= 0);
 
         let env_struct = b.aggregate(&mut self.ctx, env_values);
@@ -642,11 +640,6 @@ impl Compiler {
         let initial_closure = b.aggregate(
             &mut self.ctx,
             vec![Const::FunPtr(funname_use.clone()).into(), malloc.into()],
-        );
-
-        println!(
-            "initial_closure type: {}",
-            initial_closure.get_type(&self.ctx)
         );
 
         let malloc = self.malloc_val(initial_closure.clone(), b);
@@ -673,24 +666,13 @@ impl Compiler {
         let self_ref_addr =
             b.get_element_ptr(&mut self.ctx, env_ptr.into(), env_ty.clone(), pos as usize);
 
-        println!("env_ty (what we're indexing into): {}", env_ty);
-        println!("pos: {}", pos);
-        println!(
-            "storing initial_closure (type {}) at self_ref_addr",
-            initial_closure.get_type(&self.ctx)
-        );
-        println!("=== END STORING DEBUG ===");
-
         b.store(&mut self.ctx, self_ref_addr.into(), initial_closure.into());
-
         let res = b.load(&mut self.ctx, malloc, clos_ty);
-
-        self.map.insert(bound.expr().clone(), res.clone());
-
+        self.map.insert(bound.clone(), res.clone());
         res
     }
 
-    fn capture(&self, param: &Var, ast: &Ast) -> Vec<Var> {
+    fn capture<T: Clone>(&self, param: &Var, ast: &Ast<T>) -> Vec<Var> {
         let mut free_vars = ast.free_vars();
         free_vars.remove(param);
         let mut res = free_vars.into_iter().collect::<Vec<_>>();
@@ -698,43 +680,49 @@ impl Compiler {
         res
     }
 
-    fn get_type_of_ast(&mut self, ast: &Ast) -> Ty {
-        match ast {
-            Ast::Str(_) => Ty::String,
-            Ast::Int(_) => Ty::Int,
-            Ast::Var(var) => self.type_map[var].clone(),
-            Ast::Lambda { arg, body } => {
-                let arg_ty = {
-                    if !self.type_map.contains_key(arg.expr()) {
-                        let arg_ty = self.ast_ty_to_ty(arg.ty());
-                        self.type_map.insert(arg.expr().clone(), arg_ty.clone());
-                        arg_ty
+    fn get_type_of_ast<T: Clone>(&mut self, ast: &Ast<T>) -> Ty {
+        match ast.expr() {
+            AstKind::Str(_) => Ty::String,
+            AstKind::Int(_) => Ty::Int,
+            AstKind::Var(var) => self.type_map[var].clone(),
+            AstKind::Lambda { arg, arg_ty, body } => {
+                let cfg_arg_ty = {
+                    if !self.type_map.contains_key(arg) {
+                        let cfg_arg_ty = self.ast_ty_to_ty(arg_ty);
+                        self.type_map.insert(arg.clone(), cfg_arg_ty.clone());
+                        cfg_arg_ty
                     } else {
-                        self.type_map[arg.expr()].clone()
+                        self.type_map[arg].clone()
                     }
                 };
                 let ty = self.get_type_of_ast(body);
 
-                self.get_closure(arg_ty, ty)
+                self.get_closure(cfg_arg_ty, ty)
             }
-            Ast::App { fun, .. } => {
+            AstKind::App { fun, .. } => {
                 let typeof_fun = self.get_type_of_ast(fun);
                 *typeof_fun.field(0).sig().ret.clone()
             }
-            Ast::Seq { snd, .. } => self.get_type_of_ast(snd),
-            Ast::Tuple(asts) => Ty::Struct(asts.iter().map(|x| self.get_type_of_ast(x)).collect()),
-            Ast::Get { from, index } => self.get_type_of_ast(from).field(*index),
-            Ast::Native(name) => {
+            AstKind::Seq { snd, .. } => self.get_type_of_ast(snd),
+            AstKind::Tuple(asts) => {
+                Ty::Struct(asts.iter().map(|x| self.get_type_of_ast(x)).collect())
+            }
+            AstKind::Native(name) => {
                 let f = &self.ctx.natives[name];
                 let sig = &self.ctx.sigs[f];
                 self.curry(sig)
             }
-            Ast::LetBinding { bound, in_expr, .. } => {
-                let bound_ty = self.ast_ty_to_ty(bound.ty());
-                self.type_map.insert(bound.expr().clone(), bound_ty);
+            AstKind::LetBinding {
+                bound,
+                bound_ty,
+                in_expr,
+                ..
+            } => {
+                let bound_ty = self.ast_ty_to_ty(bound_ty);
+                self.type_map.insert(bound.clone(), bound_ty);
                 self.get_type_of_ast(in_expr)
             }
-            Ast::If {
+            AstKind::If {
                 cond,
                 then_e,
                 else_e,
@@ -749,8 +737,8 @@ impl Compiler {
                 }
                 t
             }
-            Ast::Cons { enum_name, .. } => self.ast_ty_to_ty(&AstTy::named(enum_name)),
-            Ast::Match { expr, cases } => {
+            AstKind::Cons { enum_name, .. } => self.ast_ty_to_ty(&AstTy::named(enum_name)),
+            AstKind::Match { expr, cases } => {
                 assert!(cases.len() > 0);
                 self.get_type_of_case(&cases[0])
             }
@@ -778,12 +766,12 @@ impl Compiler {
         }
     }
 
-    fn get_type_of_case(&mut self, case: &MatchCase) -> Ty {
+    fn get_type_of_case<T: Clone>(&mut self, case: &MatchCase<T>) -> Ty {
         self.collect_types_in_pat(&case.pat);
         self.get_type_of_ast(&case.expr)
     }
 
-    fn get_ast_type_of_case(&mut self, case: &MatchCase) -> AstTy {
+    fn get_ast_type_of_case<T: Clone>(&mut self, case: &MatchCase<T>) -> AstTy {
         self.collect_types_in_pat(&case.pat);
         self.get_ast_ty_of(&case.expr)
     }
@@ -816,9 +804,22 @@ impl Compiler {
         map.remove(&l).unwrap()
     }
 
-    fn compile_lambda(&mut self, arg: Var, ty: AstTy, body: Ast, b: &mut Builder) -> Value {
-        println!("Compiling lambda {arg} => {body}");
+    fn inject_print<S: ToString>(&mut self, str: S, b: &mut Builder) {
+        if !self.debug {
+            return;
+        }
+        let print_func = Const::FunPtr(self.prog.natives["print_string"].clone());
+        let print_arg = Const::String(str.to_string());
+        b.native_call(&mut self.ctx, print_func.into(), vec![print_arg.into()]);
+    }
 
+    fn compile_lambda<T: Clone>(
+        &mut self,
+        arg: Var,
+        ty: AstTy,
+        body: Ast<T>,
+        b: &mut Builder,
+    ) -> Value {
         let old_ctx = self.ctx.clone();
         let old_map = self.map.clone();
 
@@ -843,7 +844,7 @@ impl Compiler {
         let env_arg = self.ctx.new_var(closure_env_ty.clone());
         let env_arg_use = Use::from(&env_arg);
         self.type_map.insert(arg, arg_ty.clone());
-        self.map.insert(arg, cfg_arg_use);
+        self.map.insert(arg, cfg_arg_use.clone());
 
         let params = vec![(env_arg, closure_env_ty), (cfg_arg, arg_ty)];
         let params = params
@@ -853,6 +854,14 @@ impl Compiler {
         let ret_ty = self.get_type_of_ast(&body);
 
         let mut fun_builder = Builder::new(function_name, params, ret_ty.clone(), &mut self.ctx);
+        self.inject_print(
+            format!(
+                "BORROWING from compile_lambda, in func {}\n",
+                fun_builder.funname()
+            ),
+            &mut fun_builder,
+        );
+        self.borrow_ty(cfg_arg_use.clone().into(), &ty, &mut fun_builder);
         if new_vars_len > 0 {
             let loaded_env = fun_builder.load(
                 &mut self.ctx,
@@ -866,11 +875,14 @@ impl Compiler {
         }
         let ret_value = self.aux(&body, &mut fun_builder);
 
-        println!(
-            "[RET] {ret_value}: {} (expected: {})",
-            ret_value.get_type(&self.ctx),
-            ret_ty
+        self.inject_print(
+            format!(
+                "DROPPING from compile_lambda, in func {}\n",
+                fun_builder.funname()
+            ),
+            &mut fun_builder,
         );
+        self.drop_ty(cfg_arg_use.into(), &ty, &mut fun_builder);
 
         if ret_ty.is_zero_sized() {
             fun_builder.ret_void(&mut self.ctx);
@@ -1109,53 +1121,42 @@ impl Compiler {
         innermost_use
     }
 
-    fn get_ast_ty_of(&mut self, a: &Ast) -> AstTy {
-        match a {
-            Ast::Str(_) => AstTy::String,
-            Ast::Int(_) => AstTy::Int,
-            Ast::Var(var) => {
-                println!("Looking for var {}", var);
-                self.ast_tys[var].clone()
-            }
-            Ast::Lambda { arg, body } => {
-                self.ast_tys.insert(arg.expr().clone(), arg.ty().clone());
+    fn get_ast_ty_of<T: Clone>(&mut self, a: &Ast<T>) -> AstTy {
+        match a.expr() {
+            AstKind::Str(_) => AstTy::String,
+            AstKind::Int(_) => AstTy::Int,
+            AstKind::Var(var) => self.ast_tys[var].clone(),
+            AstKind::Lambda { arg, arg_ty, body } => {
+                self.ast_tys.insert(arg.clone(), arg_ty.clone());
                 let ret = self.get_ast_ty_of(body);
-                AstTy::fun(arg.ty().clone(), ret)
+                AstTy::fun(arg_ty.clone(), ret)
             }
-            Ast::App { fun, .. } => {
+            AstKind::App { fun, .. } => {
                 let f_ty = self.get_ast_ty_of(fun);
                 match f_ty {
                     AstTy::Fun { ret, .. } => *ret,
                     x => unreachable!("{x}"),
                 }
             }
-            Ast::Seq { fst, snd } => {
+            AstKind::Seq { fst, snd } => {
                 let _ = self.get_ast_ty_of(fst);
                 self.get_ast_ty_of(snd)
             }
-            Ast::Tuple(asts) => AstTy::Tuple(asts.iter().map(|x| self.get_ast_ty_of(x)).collect()),
-            Ast::Get { from, index } => {
-                let tu = self.get_ast_ty_of(from);
-                match tu {
-                    AstTy::Tuple(items) => items[*index].clone(),
-                    _ => unreachable!(),
-                }
+            AstKind::Tuple(asts) => {
+                AstTy::Tuple(asts.iter().map(|x| self.get_ast_ty_of(x)).collect())
             }
-            Ast::Native(x) => {
-                println!("Searching for native function {x}");
-                self.ast_ctx.natives[x].clone()
-            }
-            Ast::LetBinding {
+            AstKind::Native(x) => self.ast_ctx.natives[x].clone(),
+            AstKind::LetBinding {
                 bound,
+                bound_ty,
                 value,
                 in_expr,
             } => {
-                self.ast_tys
-                    .insert(bound.expr().clone(), bound.ty().clone());
+                self.ast_tys.insert(bound.clone(), bound_ty.clone());
                 let _ = self.get_ast_ty_of(value);
                 self.get_ast_ty_of(in_expr)
             }
-            Ast::If {
+            AstKind::If {
                 cond,
                 then_e,
                 else_e,
@@ -1164,8 +1165,8 @@ impl Compiler {
                 let _ = self.get_ast_ty_of(then_e);
                 self.get_ast_ty_of(else_e)
             }
-            Ast::Cons { enum_name, .. } => AstTy::Named(enum_name.clone()),
-            Ast::Match { expr, cases } => {
+            AstKind::Cons { enum_name, .. } => AstTy::Named(enum_name.clone()),
+            AstKind::Match { expr, cases } => {
                 assert!(cases.len() > 0);
                 self.get_ast_type_of_case(&cases[0])
             }
@@ -1204,7 +1205,6 @@ impl Compiler {
                 let self_ty = self.ast_ty_to_ty(&AstTy::named(enum_name));
                 let cases = self.ast_ctx.types[enum_name].cases.clone();
                 let pos = cases.iter().position(|x| &x.cons_name == cons).unwrap();
-                println!("POS OF {cons} is {pos}");
                 let marker = if self_ty.is_ptr() {
                     let v = b.load(&mut self.ctx, v.clone().into(), self_ty.into_inner());
                     b.extract(&mut self.ctx, v.into(), 0)
@@ -1215,7 +1215,6 @@ impl Compiler {
                 arg.iter()
                     .fold((val, HashMap::new()), |(val, mut bindings), x| {
                         let arg_ty = cases[pos].arg.as_ref().unwrap().clone();
-                        println!("ARG TY OF {cons} is {arg_ty}");
                         let v = if ty.is_recursive(&self.ast_ctx) {
                             let ptr = b.get_element_ptr(
                                 &mut self.ctx,
@@ -1264,10 +1263,10 @@ impl Compiler {
         }
     }
 
-    fn compile_match(
+    fn compile_match<T: Clone>(
         &mut self,
-        expr: &Ast,
-        cases: &[MatchCase],
+        expr: &Ast<T>,
+        cases: &[MatchCase<T>],
         b: &mut Builder,
         target_ty: Ty,
     ) -> Value {

@@ -68,26 +68,6 @@ impl AstTy {
 }
 
 #[derive(Clone)]
-pub struct AstTyped<T> {
-    expr: T,
-    ty: AstTy,
-}
-
-impl<T> AstTyped<T> {
-    pub fn new(expr: T, ty: AstTy) -> Self {
-        Self { expr, ty }
-    }
-
-    pub fn ty<'a>(&'a self) -> &'a AstTy {
-        &self.ty
-    }
-
-    pub fn expr<'a>(&'a self) -> &'a T {
-        &self.expr
-    }
-}
-
-#[derive(Clone)]
 pub struct EnumCase {
     pub cons_name: String,
     pub arg: Option<AstTy>,
@@ -175,7 +155,6 @@ mod tests {
             ],
         };
 
-        println!("{list_ty}");
         ctx.types.insert("list".into(), list_ty);
         assert!(AstTy::Named("list".into()).is_recursive(&ctx));
         assert!(!elem_ty.is_recursive(&ctx));

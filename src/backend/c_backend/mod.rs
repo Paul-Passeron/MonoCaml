@@ -565,7 +565,6 @@ impl<P: AsRef<Path>> ExportC<P> {
                     Instr::Store { ptr, value } => {
                         let v1 = self.value_as_string(ptr);
                         let v2 = self.value_as_string(value);
-                        println!("Looking for {value}");
                         let ty = if let Value::Var(v) = value {
                             let var_ty = cfg
                                 .locals()
