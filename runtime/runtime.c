@@ -60,9 +60,14 @@ ref *get_ref(const void *const ptr, size_t *h, size_t *idx) {
       return &refs->items[i];
     }
   }
-  fprintf(stderr, "RUNTIME ERROR: CANNOT FIND REFERENCE TO OBJECT...\n");
+  fprintf(stderr, "RUNTIME ERROR: CANNOT FIND REFERENCE TO OBJECT at %p ...\n",
+          ptr);
   fprintf(stderr, "ABORTING NOW...\n");
+#ifdef DEBUG
+  *NULL;
+#else
   exit(1);
+#endif
 }
 
 __inline__ void borrow_object(void *env) {
@@ -87,23 +92,21 @@ __inline__ void drop_object(void *env) {
   r->count--;
   if (r->count == 0) {
     free(env);
-    #ifdef DEBUG_FREE
-        printf("FREE %p\n", env);
-    #endif // DEBUG_FREE
+#ifdef DEBUG_FREE
+    printf("FREE %p\n", env);
+#endif // DEBUG_FREE
     da_append(&free_refs[hash], idx);
     references[hash].items[idx] = (ref){0};
   }
 }
 
 __inline__ size_t *get_ref_count(void *ptr) {
-    size_t hash, idx;
-    ref *r = get_ref(ptr, &hash, &idx);
-    return &r->count;
+  size_t hash, idx;
+  ref *r = get_ref(ptr, &hash, &idx);
+  return &r->count;
 }
 
-__inline__ int is_unique(void *ptr) {
-    return *get_ref_count(ptr) == 1;
-}
+__inline__ int is_unique(void *ptr) { return *get_ref_count(ptr) == 1; }
 
 void cleanup(void) {
   for (size_t i = 0; i < REF_COUNT; ++i) {

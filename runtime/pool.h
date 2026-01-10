@@ -90,6 +90,19 @@
   }                                                                            \
   void ty##_release(void *ptr) {                                               \
     return ty##_release_internal(ty##_current_pool, ptr);                      \
+  }                                                                            \
+  void ty##_retain_internal(pooltype(ty) * pool, void *ptr) {                  \
+    if (pool == NULL || ptr == NULL || pool->data == NULL ||                   \
+        pool->capacity <= sizeof(ty)) {                                        \
+      return;                                                                  \
+    }                                                                          \
+    int *ref_count = get_ref_count(ptr);                                       \
+    if (!ref_count) {                                                          \
+      return;                                                                  \
+    }                                                                          \
+    *ref_count++;                                                              \
+  }                                                                            \
+  void ty##_retain(void *ptr) {                                               \
+    return ty##_retain_internal(ty##_current_pool, ptr);                      \
   }
-
 #endif // POOL_H
