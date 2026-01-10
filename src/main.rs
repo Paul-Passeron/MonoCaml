@@ -915,8 +915,8 @@ fn compile_ast_with_ctx<S: ToString>(ast: UAst, prog_name: S, ctx: AstCtx) {
         .arg("-I./runtime")
         .arg(format!("{prog_name}.c"))
         .arg("./runtime/runtime.c")
-        // .arg("-D DEBUG")
-        // .arg("-D DEBUG_FREE")
+        .arg("-D DEBUG")
+        .arg("-D DEBUG_FREE")
         .arg("-O3");
 
     println!(

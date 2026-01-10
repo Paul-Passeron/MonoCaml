@@ -1,4 +1,4 @@
-use std::iter::{empty, repeat_n};
+use std::iter::{empty, once};
 
 use crate::{
     ast::types::{AstTy, EnumDef},
@@ -10,10 +10,15 @@ use crate::{
 
 impl Compiler {
     // Very simple: we simply retain the current pointer and do not care about
-    // constructor args because their dropping is guarded bythe dropping of this
+    // constructor args because their dropping is guarded by the dropping of this
     // object
-    fn create_borrow_for_rec_enum(&mut self, param: Use<CfgVar>, builder: &mut Builder) {
-        let borrow_object = self.prog.natives()["borrow_object"].clone();
+    fn create_borrow_for_rec_enum(
+        &mut self,
+        name: &String,
+        param: Use<CfgVar>,
+        builder: &mut Builder,
+    ) {
+        let borrow_object = self.prog.natives()[&format!("{name}_retain")].clone();
         builder.native_call(
             &mut self.ctx,
             Const::FunPtr(borrow_object).into(),
@@ -81,7 +86,7 @@ impl Compiler {
         );
 
         if is_rec {
-            self.create_borrow_for_rec_enum(param_use, &mut builder);
+            self.create_borrow_for_rec_enum(&enum_def.name, param_use, &mut builder);
         } else {
             self.create_borrow_for_nonrec_enum(param_use, enum_def, &mut builder);
         };
@@ -153,6 +158,7 @@ impl Compiler {
 
     fn create_drops_for_rec_enum(
         &mut self,
+        name: &String,
         param: Use<CfgVar>,
         enum_def: &EnumDef,
         self_ty: Ty,
@@ -223,7 +229,7 @@ impl Compiler {
         }
         builder.goto(&mut self.ctx, ret_use, ret_lbl);
 
-        let drop_fun = self.prog.natives["drop_object"].clone();
+        let drop_fun = self.prog.natives[&format!("{name}_release")].clone();
         builder.native_call(
             &mut self.ctx,
             Const::FunPtr(drop_fun).into(),
@@ -249,7 +255,13 @@ impl Compiler {
         );
 
         if is_rec {
-            self.create_drops_for_rec_enum(param_use, enum_def, self_ty, &mut builder);
+            self.create_drops_for_rec_enum(
+                &enum_def.name,
+                param_use,
+                enum_def,
+                self_ty,
+                &mut builder,
+            );
         } else {
             self.create_drops_for_non_rec_enum(param_use, enum_def, &mut builder);
         }
@@ -308,6 +320,7 @@ impl Compiler {
         self.ast_ctx
             .types
             .iter()
+            .filter(|(x, _)| AstTy::named(x).is_recursive(&self.ast_ctx))
             .map(|(_, x)| x.clone())
             .collect::<Vec<_>>()
             .iter()
@@ -320,9 +333,34 @@ impl Compiler {
         // Allocate type
         let name = FunName::fresh();
         let n = Use::from(&name);
-        let f: _ = Func::new(name, self.ctx.make_params(empty()), self_ty, None);
+        let f = Func::new(name, self.ctx.make_params(empty()), self_ty.clone(), None);
         self.add_func(f);
         self.add_named_func(format!("{}_allocate", e.name), n);
+
+        // Retain type
+        let name = FunName::fresh();
+        let n = Use::from(&name);
+        let f = Func::new(
+            name,
+            self.ctx.make_params(once(self_ty.clone())),
+            Ty::Void,
+            None,
+        );
+        self.add_func(f);
+        self.add_named_func(format!("{}_retain", e.name), n);
+
+        // Release type
+        // Retain type
+        let name = FunName::fresh();
+        let n = Use::from(&name);
+        let f = Func::new(
+            name,
+            self.ctx.make_params(once(self_ty.clone())),
+            Ty::Void,
+            None,
+        );
+        self.add_func(f);
+        self.add_named_func(format!("{}_release", e.name), n);
     }
 
     pub fn drop_ty(&mut self, val: Value, ty: &AstTy, b: &mut Builder) {
