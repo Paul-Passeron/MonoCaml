@@ -421,7 +421,7 @@ impl<P: AsRef<Path>> ExportC<P> {
                 let v2 = self.value_as_string(value1);
                 write!(&mut self.f, "{} / {}", v1, v2).unwrap()
             }
-            Expr::NativeCall { fun, args } => {
+            Expr::NativeCall { fun, args, .. } => {
                 let v = self.value_as_string(fun);
                 let vals = args
                     .iter()

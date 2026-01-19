@@ -252,6 +252,13 @@ impl Func {
         &self.ret_ty
     }
 
+    pub fn sig(&self) -> Sig {
+        Sig::new(
+            self.params().iter().map(|(_, x)| x).cloned().collect(),
+            self.ret_ty().clone(),
+        )
+    }
+
     pub fn cfg(&self) -> &Option<Cfg> {
         &self.cfg
     }

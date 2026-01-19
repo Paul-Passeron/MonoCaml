@@ -1,4 +1,4 @@
-use crate::cfg::{Const, Ty, TyCtx, Value};
+use crate::cfg::{Const, Sig, Ty, TyCtx, Value};
 
 pub enum Expr {
     Value(Value),
@@ -10,13 +10,27 @@ pub enum Expr {
     Div(Value, Value),
     Eq(Value, Value),
 
-    NativeCall { fun: Value, args: Vec<Value> },
+    NativeCall {
+        fun: Value,
+        s: Sig,
+        args: Vec<Value>,
+    },
 
-    GetElementPtr { ptr: Value, ty: Ty, index: usize },
+    GetElementPtr {
+        ptr: Value,
+        ty: Ty,
+        index: usize,
+    },
 
-    Extract { value: Value, index: usize },
+    Extract {
+        value: Value,
+        index: usize,
+    },
 
-    Load { ptr: Value, ty: Ty },
+    Load {
+        ptr: Value,
+        ty: Ty,
+    },
 
     Struct(Vec<Value>),
     Union(Ty, Value, usize),
@@ -88,7 +102,13 @@ impl Expr {
             }
         }
 
-        Self::NativeCall { fun: fun, args }
+        let sig = fun.get_type(ctx).sig();
+
+        Self::NativeCall {
+            fun: fun,
+            args,
+            s: sig,
+        }
     }
 
     pub fn get_element_ptr(ctx: &TyCtx, ptr: Value, ty: Ty, index: usize) -> Self {

@@ -126,7 +126,7 @@ impl fmt::Display for Expr {
             Expr::Sub(a, b) => write!(f, "sub {a} {b}"),
             Expr::Div(a, b) => write!(f, "div {a} {b}"),
             Expr::Eq(a, b) => write!(f, "equals {a} {b}"),
-            Expr::NativeCall { fun, args } => write!(
+            Expr::NativeCall { fun, args, .. } => write!(
                 f,
                 "native call {}({})",
                 fun,
