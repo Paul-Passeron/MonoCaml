@@ -16,9 +16,8 @@ use crate::{
         pattern::Pattern,
         types::{AstCtx, AstTy, EnumCase, EnumDef},
     },
-    backend::c_backend::ExportC,
-    cfg::compile::Compiler,
-    cfg::{FunName, Label, var::CfgVar},
+    backend::{c_backend::ExportC, llvm_backend::LLVMBackend},
+    cfg::{FunName, Label, compile::Compiler, var::CfgVar},
 };
 
 pub mod ast;
@@ -905,33 +904,38 @@ fn compile_ast_with_ctx<S: ToString>(ast: UAst, prog_name: S, ctx: AstCtx) {
     println!("{}", ast.display());
     let prog = Compiler::compile(ast, ctx);
     println!("{prog}");
-    prog.compile(ExportC::new(PathBuf::from(format!("./{prog_name}.c"))))
+
+    let _ = prog
+        .compile(LLVMBackend::new(&PathBuf::from(format!("./{prog_name}"))))
         .unwrap();
 
-    let mut compile = process::Command::new("clang");
-    compile
-        .arg("-o")
-        .arg(format!("{prog_name}"))
-        .arg("-I./runtime")
-        .arg(format!("{prog_name}.c"))
-        .arg("./runtime/runtime.c")
-        .arg("-D DEBUG")
-        .arg("-D DEBUG_FREE")
-        .arg("-O3");
+    // prog.compile(ExportC::new(PathBuf::from(format!("./{prog_name}.c"))))
+    //     .unwrap();
 
-    println!(
-        "[CMD] {}",
-        once(format!("{}", compile.get_program().display()))
-            .chain(
-                compile
-                    .get_args()
-                    .into_iter()
-                    .map(|x| format!("{}", x.display()))
-            )
-            .collect::<Vec<String>>()
-            .join(" ")
-    );
-    compile.spawn().unwrap().wait().unwrap().exit_ok().unwrap();
+    // let mut compile = process::Command::new("clang");
+    // compile
+    //     .arg("-o")
+    //     .arg(format!("{prog_name}"))
+    //     .arg("-I./runtime")
+    //     .arg(format!("{prog_name}.c"))
+    //     .arg("./runtime/runtime.c")
+    //     .arg("-D DEBUG")
+    //     .arg("-D DEBUG_FREE")
+    //     .arg("-O3");
+
+    // println!(
+    //     "[CMD] {}",
+    //     once(format!("{}", compile.get_program().display()))
+    //         .chain(
+    //             compile
+    //                 .get_args()
+    //                 .into_iter()
+    //                 .map(|x| format!("{}", x.display()))
+    //         )
+    //         .collect::<Vec<String>>()
+    //         .join(" ")
+    // );
+    // compile.spawn().unwrap().wait().unwrap().exit_ok().unwrap();
 
     Var::reset();
     CfgVar::reset();
