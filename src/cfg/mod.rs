@@ -4,16 +4,10 @@ use std::{
 };
 
 use crate::{
-    // backend::Backend,
     backend::Backend,
     cfg::{
         expr::Expr,
-        var::{
-            // CfgGlobal, CfgGlobalUse,
-            CfgVar,
-            CfgVarUse,
-            VarKind,
-        },
+        var::{CfgVar, CfgVarUse, VarKind},
     },
     helpers::unique::{Unique, Use},
 };
@@ -149,7 +143,6 @@ pub enum Terminator {
 
 pub struct BasicBlock {
     label: Label,
-    // phis: HashMap<CfgVarUse, HashSet<CfgVarUse>>,
     instrs: Vec<Instr<CfgVarUse>>,
     terminator: Terminator,
 }

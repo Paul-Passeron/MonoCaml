@@ -16,7 +16,6 @@ pub struct Builder {
     ret_ty: Ty,
     label: Label,
     entry: LabelUse,
-    // phis: HashMap<CfgVarUse, HashSet<CfgVarUse>>,
     locals: Vec<(CfgVar, Ty)>,
     instrs: Vec<Instr<CfgVar>>,
     blocks: Vec<BasicBlock>,
@@ -84,45 +83,12 @@ impl Builder {
         (&self.label).into()
     }
 
-    // pub fn get_phis(&mut self) -> HashMap<CfgVarUse, HashSet<CfgVarUse>> {
-    //     let mut phis = HashMap::new();
-    //     mem::swap(&mut self.phis, &mut phis);
-    //     phis
-    // }
-
-    // pub fn add_phi_target(&mut self, ctx: &mut TyCtx, ty: Ty) -> CfgVarUse {
-    //     assert!(!ty.is_zero_sized(), "phi target cannot be zero-sized");
-    //     let new_local = self.assign(ctx, Expr::Phi(ty));
-    //     self.phis.insert(new_local.clone(), HashSet::new());
-    //     new_local
-    // }
-
-    // pub fn add_phi(&mut self, ctx: &mut TyCtx, to: CfgVarUse, val: CfgVarUse) {
-    //     let target_ty = to.get_type(ctx);
-    //     let val_ty = val.get_type(ctx);
-    //     assert!(target_ty.matches(&val_ty), "{} vs {}", target_ty, val_ty);
-    //     if self
-    //         .params
-    //         .iter()
-    //         .map(|x| Use::from(&x.0))
-    //         .find(|x| *x == val)
-    //         .is_some()
-    //     {
-    //         let new_var = self.assign(ctx, Expr::value(val.into()));
-    //         self.phis.get_mut(&to).unwrap().insert(new_var.clone());
-    //     } else {
-    //         self.phis.get_mut(&to).unwrap().insert(val);
-    //     }
-    // }
-
     pub fn finalize_block(&mut self, ctx: &TyCtx, t: Terminator, next: Label) -> LabelUse {
         let old_label = self.replace_lbl(next);
         let use_lbl: Use<_> = (&old_label).into();
         let instrs = self.get_use_instrs(ctx);
-        // let phis = self.get_phis();
         let b = BasicBlock {
             label: old_label,
-            // phis,
             instrs,
             terminator: t,
         };
