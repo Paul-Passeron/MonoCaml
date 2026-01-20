@@ -2,107 +2,161 @@
 #define POOL_H
 
 #include "da.h"
-#include "mem.h"
 #include <stdint.h>
+#include <stdlib.h>
+
+// Pool-local reference count stored alongside data
+typedef struct {
+  size_t ref_count;
+} pool_ref_header;
 
 #define pooltype(ty) __##ty##_pool_t
 #define init_pool(ty) __##ty##_init_pool
 #define singles(ty) __##ty##_free_singles
 #define pool_capacity(ty) __##ty##_pool_capacity
-#define da_type(ty) __##ty##_da_t
+
+typedef void (*pool_clean_fun)();
+
+typedef struct {
+  pool_clean_fun *items;
+  size_t count, capacity;
+} __pool_clean_da;
+
+extern __pool_clean_da __pools_to_clean;
+
+void __cleanup_pools(void);
+
 #define setup_pool(ty)                                                         \
-  typedef struct da_type(ty) {                                                 \
+  typedef struct {                                                             \
     void **items;                                                              \
     size_t count, capacity;                                                    \
-  } da_type(ty);                                                               \
+  } __##ty##_freelist_t;                                                       \
+                                                                               \
   typedef struct pooltype(ty) pooltype(ty);                                    \
-  da_type(ty) __##ty##_free_singles = {0};                              \
-  const size_t pool_capacity(ty) = 1024;                                \
   struct pooltype(ty) {                                                        \
     size_t capacity, filled;                                                   \
     ty *data;                                                                  \
+    size_t *ref_counts; /* Parallel array of ref counts */                     \
     pooltype(ty) * next;                                                       \
   };                                                                           \
+                                                                               \
+  __##ty##_freelist_t singles(ty) = {0};                                       \
   pooltype(ty) *ty##_current_pool = NULL;                                      \
+  pooltype(ty) *ty##_first_pool = NULL;                                        \
+                                                                               \
   void init_pool(ty)(pooltype(ty) * pool) {                                    \
-    pool->capacity = pool_capacity(ty);                                        \
+    pool->capacity = 1024;                                                     \
     pool->filled = 0;                                                          \
     pool->data = malloc(sizeof(ty) * pool->capacity);                          \
-    register_object(pool->data);                                               \
+    pool->ref_counts = calloc(pool->capacity, sizeof(size_t));                 \
+    pool->next = NULL;                                                         \
   }                                                                            \
+  void ty##_pool_cleanup(void) {                                               \
+    pooltype(ty) *pool = ty##_first_pool;                                      \
+    while (pool != NULL) {                                                     \
+      pooltype(ty) *next = pool->next;                                         \
+      free(pool->data);                                                        \
+      free(pool->ref_counts);                                                  \
+      free(pool);                                                              \
+      pool = next;                                                             \
+    }                                                                          \
+    free(singles(ty).items);                                                   \
+    singles(ty) = (__##ty##_freelist_t){0};                                    \
+    ty##_first_pool = NULL;                                                    \
+    ty##_current_pool = NULL;                                                  \
+  }                                                                            \
+                                                                               \
+  /* Find which pool owns this pointer and get its ref count */                \
+  size_t *ty##_get_ref_count_internal(pooltype(ty) * pool, void *ptr) {        \
+    while (pool != NULL) {                                                     \
+      if (pool->data != NULL) {                                                \
+        intptr_t base = (intptr_t)pool->data;                                  \
+        intptr_t end = (intptr_t)&pool->data[pool->capacity];                  \
+        intptr_t p = (intptr_t)ptr;                                            \
+        if (p >= base && p < end) {                                            \
+          size_t index = ((ty *)ptr) - pool->data;                             \
+          return &pool->ref_counts[index];                                     \
+        }                                                                      \
+      }                                                                        \
+      pool = pool->next;                                                       \
+    }                                                                          \
+    return NULL;                                                               \
+  }                                                                            \
+                                                                               \
   ty *ty##_pool_allocate_internal(pooltype(ty) * pool) {                       \
-    if (pool == NULL) {                                                        \
+    if (pool == NULL)                                                          \
       return NULL;                                                             \
-    }                                                                          \
+                                                                               \
+    /* Reuse from free list */                                                 \
     if (singles(ty).count > 0) {                                               \
-      return singles(ty).items[--singles(ty).count];                           \
+      ty *reused = singles(ty).items[--singles(ty).count];                     \
+      size_t *rc = ty##_get_ref_count_internal(ty##_first_pool, reused);       \
+      if (rc)                                                                  \
+        *rc = 1;                                                               \
+      return reused;                                                           \
     }                                                                          \
-    if (pool->capacity <= sizeof(int) || pool->data == NULL) {                 \
+                                                                               \
+    /* Ensure pool is initialized */                                           \
+    if (pool->data == NULL) {                                                  \
       init_pool(ty)(pool);                                                     \
     }                                                                          \
-    if (pool->filled + 1 >= pool->capacity) {                                  \
+                                                                               \
+    /* Pool full, go to next */                                                \
+    if (pool->filled >= pool->capacity) {                                      \
       if (pool->next == NULL) {                                                \
-        pooltype(ty) *next_pool = malloc(sizeof(*next_pool));                  \
-        register_object(next_pool);                                            \
-        init_pool(ty)(next_pool);                                              \
-        pool->next = next_pool;                                                \
-        ty##_current_pool = next_pool;                                         \
+        pool->next = malloc(sizeof(*pool->next));                              \
+        init_pool(ty)(pool->next);                                             \
       }                                                                        \
+      ty##_current_pool = pool->next;                                          \
       return ty##_pool_allocate_internal(pool->next);                          \
     }                                                                          \
-    ty *res = &pool->data[pool->filled++];                                     \
-    register_object(res);                                                      \
-    return res;                                                                \
+                                                                               \
+    size_t idx = pool->filled++;                                               \
+    pool->ref_counts[idx] = 1;                                                 \
+    return &pool->data[idx];                                                   \
   }                                                                            \
+                                                                               \
   ty *ty##_pool_allocate(void) {                                               \
-    if (ty##_current_pool == NULL) {                                           \
-      ty##_current_pool = malloc(sizeof(*ty##_current_pool));                  \
-      register_object(ty##_current_pool);                                      \
-      init_pool(ty)(ty##_current_pool);                                        \
+    if (ty##_first_pool == NULL) {                                             \
+      da_append(&__pools_to_clean, &ty##_pool_cleanup);                        \
+      ty##_first_pool = malloc(sizeof(*ty##_first_pool));                      \
+      init_pool(ty)(ty##_first_pool);                                          \
+      ty##_current_pool = ty##_first_pool;                                     \
     }                                                                          \
     return ty##_pool_allocate_internal(ty##_current_pool);                     \
   }                                                                            \
-  void ty##_free_internal(pooltype(ty) * pool, void *ptr) {                    \
-    if (pool == NULL || ptr == NULL || pool->data == NULL ||                   \
-        pool->capacity <= sizeof(ty)) {                                        \
+                                                                               \
+  void ty##_free_internal(void *ptr) {                                         \
+    if (ptr == NULL)                                                           \
       return;                                                                  \
-    }                                                                          \
-    if ((intptr_t)ptr >= (intptr_t)pool->data ||                               \
-        (intptr_t)ptr < (intptr_t)&pool->data[pool->capacity]) {               \
-      da_append(&singles(ty), ptr);                                            \
-    } else {                                                                   \
-      ty##_free_internal(pool->next, ptr);                                     \
-    }                                                                          \
+    da_append(&singles(ty), ptr);                                              \
   }                                                                            \
-  void ty##_release_internal(pooltype(ty) * pool, void *ptr) {                 \
-    if (pool == NULL || ptr == NULL || pool->data == NULL ||                   \
-        pool->capacity <= sizeof(ty)) {                                        \
-      return;                                                                  \
-    }                                                                          \
-    size_t *ref_count = get_ref_count(ptr);                                       \
-    if (!ref_count) {                                                          \
-      return;                                                                  \
-    }                                                                          \
-    *ref_count--;                                                              \
-    if (*ref_count == 0) {                                                     \
-      ty##_free_internal(pool, ptr);                                           \
-    }                                                                          \
-  }                                                                            \
+                                                                               \
   void ty##_release(void *ptr) {                                               \
-    return ty##_release_internal(ty##_current_pool, ptr);                      \
-  }                                                                            \
-  void ty##_retain_internal(pooltype(ty) * pool, void *ptr) {                  \
-    if (pool == NULL || ptr == NULL || pool->data == NULL ||                   \
-        pool->capacity <= sizeof(ty)) {                                        \
+    if (ptr == NULL)                                                           \
       return;                                                                  \
-    }                                                                          \
-    size_t *ref_count = get_ref_count(ptr);                                       \
-    if (!ref_count) {                                                          \
+    size_t *rc = ty##_get_ref_count_internal(ty##_first_pool, ptr);            \
+    if (rc == NULL)                                                            \
       return;                                                                  \
+    if (--(*rc) == 0) {                                                        \
+      ty##_free_internal(ptr);                                                 \
     }                                                                          \
-    *ref_count++;                                                              \
   }                                                                            \
-  void ty##_retain(void *ptr) {                                               \
-    return ty##_retain_internal(ty##_current_pool, ptr);                      \
+                                                                               \
+  void ty##_retain(void *ptr) {                                                \
+    if (ptr == NULL)                                                           \
+      return;                                                                  \
+    size_t *rc = ty##_get_ref_count_internal(ty##_first_pool, ptr);            \
+    if (rc == NULL)                                                            \
+      return;                                                                  \
+    (*rc)++;                                                                   \
+  }                                                                            \
+                                                                               \
+  int ty##_is_unique(void *ptr) {                                              \
+    if (ptr == NULL)                                                           \
+      return 0;                                                                \
+    size_t *rc = ty##_get_ref_count_internal(ty##_first_pool, ptr);            \
+    return rc && *rc == 1;                                                     \
   }
+
 #endif // POOL_H

@@ -4,6 +4,8 @@
 #include <stdlib.h>
 #include <time.h>
 
+__pool_clean_da __pools_to_clean = {0};
+
 typedef struct {
   size_t count;
   void *ptr;
@@ -112,7 +114,7 @@ void cleanup(void) {
   for (size_t i = 0; i < REF_COUNT; ++i) {
     refs da = references[i];
     for (size_t j = 0; j < da.count; ++j) {
-      if (da.items[j].ptr) {
+      if (da.items[j].ptr && da.items[j].count) {
         free(da.items[j].ptr);
         da.items[j] = (ref){0};
       }
@@ -120,6 +122,14 @@ void cleanup(void) {
     da_free(da);
     da_free(free_refs[i]);
   }
+  __cleanup_pools();
+}
+void __cleanup_pools(void)
+{
+  for (size_t i = 0; i < __pools_to_clean.count; i++) {
+    __pools_to_clean.items[i]();
+  }
+  free(__pools_to_clean.items);
 }
 
 void print_int(int x) { printf("%d", x); }
