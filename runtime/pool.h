@@ -16,8 +16,8 @@
     size_t count, capacity;                                                    \
   } da_type(ty);                                                               \
   typedef struct pooltype(ty) pooltype(ty);                                    \
-  static da_type(ty) __##ty##_free_singles = {0};                              \
-  const static size_t pool_capacity(ty) = 1024;                                \
+  da_type(ty) __##ty##_free_singles = {0};                              \
+  const size_t pool_capacity(ty) = 1024;                                \
   struct pooltype(ty) {                                                        \
     size_t capacity, filled;                                                   \
     ty *data;                                                                  \
@@ -79,7 +79,7 @@
         pool->capacity <= sizeof(ty)) {                                        \
       return;                                                                  \
     }                                                                          \
-    int *ref_count = get_ref_count(ptr);                                       \
+    size_t *ref_count = get_ref_count(ptr);                                       \
     if (!ref_count) {                                                          \
       return;                                                                  \
     }                                                                          \
@@ -96,7 +96,7 @@
         pool->capacity <= sizeof(ty)) {                                        \
       return;                                                                  \
     }                                                                          \
-    int *ref_count = get_ref_count(ptr);                                       \
+    size_t *ref_count = get_ref_count(ptr);                                       \
     if (!ref_count) {                                                          \
       return;                                                                  \
     }                                                                          \

@@ -23,8 +23,8 @@ typedef struct {
 
 #define REF_COUNT 256
 
-static refs references[REF_COUNT] = {0};
-static ints free_refs[REF_COUNT] = {0};
+refs references[REF_COUNT] = {0};
+ints free_refs[REF_COUNT] = {0};
 
 size_t hash(intptr_t in) { return (in >> 3) % REF_COUNT; }
 
