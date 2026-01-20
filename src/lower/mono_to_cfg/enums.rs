@@ -165,7 +165,8 @@ impl MonoToCfg {
     ) {
         // Release constructor fields
 
-        let is_unique_function = self.prog.natives()["is_unique"].clone();
+        let is_unique_function =
+            self.prog.natives()[&format!("{}_is_unique", enum_def.name)].clone();
         let is_unique = builder.native_call(
             &mut self.ctx,
             Const::FunPtr(is_unique_function).into(),
@@ -305,6 +306,70 @@ impl MonoToCfg {
         });
     }
 
+    pub fn create_constructors_for_enum(&mut self, enum_def: &EnumDef) {
+        let named = AstTy::named(&enum_def.name);
+        let ret_ty = self.ast_ty_to_ty(&named);
+        let union_ty = if ret_ty.is_ptr() {
+            ret_ty.into_inner().field(1)
+        } else {
+            ret_ty.field(1)
+        };
+        assert!(union_ty.is_union());
+        let is_rec = named.is_recursive(&self.ast_ctx);
+        for (i, case) in enum_def.cases.iter().enumerate() {
+            let funname = FunName::fresh();
+            let funname_use = Use::from(&funname);
+            let params = case
+                .arg
+                .iter()
+                .map(|x| self.ast_ty_to_ty(x))
+                .collect::<Vec<_>>();
+            let var_params = self.ctx.make_params(params.clone().into_iter());
+            let var_params = var_params
+                .into_iter()
+                .filter(|x| !x.1.is_zero_sized())
+                .collect::<Vec<_>>();
+            let use_params = var_params
+                .iter()
+                .map(|(x, _)| Use::from(x))
+                .collect::<Vec<_>>();
+            let mut builder = Builder::new(funname, var_params, ret_ty.clone(), &mut self.ctx);
+
+            let mut args = vec![Const::Int(i as i32).into()];
+            if !use_params.is_empty() {
+                let val: Value = use_params[0].clone().into();
+                self.inject_print(
+                    format!(
+                        "BORROWING from create_constructors_for_enum, in func {}\n",
+                        builder.funname()
+                    ),
+                    &mut builder,
+                );
+                self.borrow_ty(val.clone(), case.arg.as_ref().unwrap(), &mut builder);
+                let union = builder.union(&mut self.ctx, union_ty.clone(), val.clone(), i);
+                args.push(union.into());
+            }
+            let struct_val = builder.aggregate(&mut self.ctx, args);
+
+            if is_rec {
+                let allocate_obj = Const::FunPtr(
+                    self.ctx.natives[&format!("{}_pool_allocate", enum_def.name)].clone(),
+                );
+                let m = builder.native_call(&mut self.ctx, allocate_obj.into(), vec![]);
+                builder.store(&mut self.ctx, m.clone().into(), struct_val);
+                builder.ret(&mut self.ctx, m.into());
+            } else {
+                builder.ret(&mut self.ctx, struct_val);
+            }
+            let f = builder.finalize();
+            self.add_func(f);
+            self.constructors
+                .entry(enum_def.name.clone())
+                .or_default()
+                .insert(case.cons_name.clone(), funname_use);
+        }
+    }
+
     pub fn create_constructors(&mut self) {
         self.ast_ctx
             .types
@@ -334,7 +399,7 @@ impl MonoToCfg {
         let n = Use::from(&name);
         let f = Func::new(name, self.ctx.make_params(empty()), self_ty.clone(), None);
         self.add_func(f);
-        self.add_named_func(format!("{}_allocate", e.name), n);
+        self.add_named_func(format!("{}_pool_allocate", e.name), n);
 
         // Retain type
         let name = FunName::fresh();
@@ -349,7 +414,6 @@ impl MonoToCfg {
         self.add_named_func(format!("{}_retain", e.name), n);
 
         // Release type
-        // Retain type
         let name = FunName::fresh();
         let n = Use::from(&name);
         let f = Func::new(
@@ -360,6 +424,18 @@ impl MonoToCfg {
         );
         self.add_func(f);
         self.add_named_func(format!("{}_release", e.name), n);
+
+        // Is unique
+        let name = FunName::fresh();
+        let n = Use::from(&name);
+        let f = Func::new(
+            name,
+            self.ctx.make_params(once(self_ty.clone())),
+            Ty::Int,
+            None,
+        );
+        self.add_func(f);
+        self.add_named_func(format!("{}_is_unique", e.name), n);
     }
 
     pub fn drop_ty(&mut self, val: Value, ty: &AstTy, b: &mut Builder) {
@@ -368,12 +444,14 @@ impl MonoToCfg {
         assert!(cfg_ty.matches(&val.get_type(&self.ctx)));
         match ty {
             AstTy::Tuple(items) => {
+                self.inject_print("Dropping tuple", b);
                 for (i, item) in items.iter().enumerate() {
                     let v = b.extract(&mut self.ctx, val.clone(), i);
                     self.drop_ty(v.into(), item, b);
                 }
             }
             AstTy::Fun { .. } => {
+                self.inject_print("Dropping closure", b);
                 let drop_object = self.prog.natives()["drop_object"].clone();
                 let val = b.extract(&mut self.ctx, val.into(), 1);
                 b.native_call(
@@ -383,6 +461,7 @@ impl MonoToCfg {
                 );
             }
             AstTy::Named(ty) => {
+                self.inject_print("Dropping {ty}", b);
                 let drop_fun = self.drops[ty].clone();
                 b.native_call(&mut self.ctx, Const::FunPtr(drop_fun).into(), vec![val]);
             }
@@ -398,10 +477,12 @@ impl MonoToCfg {
             AstTy::Tuple(items) => {
                 for (i, item) in items.iter().enumerate() {
                     let v = b.extract(&mut self.ctx, val.clone(), i);
+                    self.inject_print(format!("Borrowing {}\n", item), b);
                     self.borrow_ty(v.into(), item, b);
                 }
             }
             AstTy::Fun { .. } => {
+                self.inject_print("Borrowing closure\n", b);
                 let borrow_object = self.prog.natives()["borrow_object"].clone();
                 let val = b.extract(&mut self.ctx, val.into(), 1);
                 b.native_call(
@@ -412,6 +493,7 @@ impl MonoToCfg {
             }
             AstTy::Named(ty) => {
                 let borrow_fun = self.borrows[ty].clone();
+                self.inject_print(format!("Borrowing {ty} with borrows funcs\n",), b);
                 b.native_call(&mut self.ctx, Const::FunPtr(borrow_fun).into(), vec![val]);
             }
             _ => (),

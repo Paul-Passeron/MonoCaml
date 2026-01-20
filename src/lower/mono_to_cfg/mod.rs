@@ -106,73 +106,6 @@ impl MonoToCfg {
         res.prog
     }
 
-    pub fn create_constructors_for_enum(&mut self, enum_def: &EnumDef) {
-        let named = AstTy::named(&enum_def.name);
-        let ret_ty = self.ast_ty_to_ty(&named);
-        let union_ty = if ret_ty.is_ptr() {
-            ret_ty.into_inner().field(1)
-        } else {
-            ret_ty.field(1)
-        };
-        assert!(union_ty.is_union());
-        let is_rec = named.is_recursive(&self.ast_ctx);
-        for (i, case) in enum_def.cases.iter().enumerate() {
-            let funname = FunName::fresh();
-            let funname_use = Use::from(&funname);
-            let params = case
-                .arg
-                .iter()
-                .map(|x| self.ast_ty_to_ty(x))
-                .collect::<Vec<_>>();
-            let var_params = self.ctx.make_params(params.clone().into_iter());
-            let var_params = var_params
-                .into_iter()
-                .filter(|x| !x.1.is_zero_sized())
-                .collect::<Vec<_>>();
-            let use_params = var_params
-                .iter()
-                .map(|(x, _)| Use::from(x))
-                .collect::<Vec<_>>();
-            let mut builder = Builder::new(funname, var_params, ret_ty.clone(), &mut self.ctx);
-
-            let mut args = vec![Const::Int(i as i32).into()];
-            if !use_params.is_empty() {
-                let val: Value = use_params[0].clone().into();
-                self.inject_print(
-                    format!(
-                        "BORROWING from create_constructors_for_enum, in func {}\n",
-                        builder.funname()
-                    ),
-                    &mut builder,
-                );
-                self.borrow_ty(val.clone(), case.arg.as_ref().unwrap(), &mut builder);
-                let union = builder.union(&mut self.ctx, union_ty.clone(), val.clone(), i);
-                args.push(union.into());
-            }
-            let struct_val = builder.aggregate(&mut self.ctx, args);
-
-            if is_rec {
-                let m = builder.malloc_single(&mut self.ctx, ret_ty.clone().into_inner());
-                let register_object = Const::FunPtr(self.ctx.natives["register_object"].clone());
-                builder.native_call(
-                    &mut self.ctx,
-                    register_object.clone().into(),
-                    vec![m.clone().into()],
-                );
-                builder.store(&mut self.ctx, m.clone().into(), struct_val);
-                builder.ret(&mut self.ctx, m.into());
-            } else {
-                builder.ret(&mut self.ctx, struct_val);
-            }
-            let f = builder.finalize();
-            self.add_func(f);
-            self.constructors
-                .entry(enum_def.name.clone())
-                .or_default()
-                .insert(case.cons_name.clone(), funname_use);
-        }
-    }
-
     fn get_closure(&self, arg: Ty, ret: Ty) -> Ty {
         let void_ptr = Ty::Ptr(Box::new(Ty::Void));
         let mut params_ty = vec![void_ptr.clone()];
@@ -273,15 +206,6 @@ impl MonoToCfg {
             ),
             _ => {
                 panic!()
-                // let v = Var::fresh();
-                // let orig_t = match self.get_ast_ty_of(&a) {
-                //     AstTy::Fun { arg, .. } => *arg,
-                //     _ => unreachable!(),
-                // };
-                // let v_t = ty.field(0).param(1);
-                // self.ast_tys.insert(v.clone(), orig_t.clone());
-                // self.type_map.insert(v, v_t.clone());
-                // (Some((v, v_t)), AstKind::app(a, AstKind::var(v)))
             }
         }
     }
@@ -1035,6 +959,10 @@ impl MonoToCfg {
             );
 
             if let Some(env_ptr) = env_ptr {
+                self.inject_print(
+                    format!("Dropping {}:{}\n", file!(), line!()),
+                    &mut wrapper_func_builder,
+                );
                 let drop_object = Const::FunPtr(self.ctx.natives["drop_object"].clone());
 
                 wrapper_func_builder.native_call(&mut self.ctx, drop_object.into(), vec![env_ptr]);
@@ -1107,6 +1035,10 @@ impl MonoToCfg {
         );
 
         if let Some(env_ptr) = env_ptr {
+            self.inject_print(
+                format!("Dropping {}:{}\n", file!(), line!()),
+                &mut innermost_builder,
+            );
             let drop_object = Const::FunPtr(self.ctx.natives["drop_object"].clone());
 
             innermost_builder.native_call(
@@ -1308,10 +1240,12 @@ impl MonoToCfg {
                 next_check_use.clone(),
                 case_body_lbl,
             );
-            if cfg_ty.is_ptr() {
-                let drop_object = Const::FunPtr(self.ctx.natives["drop_object"].clone());
-                b.native_call(&mut self.ctx, drop_object.into(), vec![var.clone().into()]);
-            }
+            self.drop_ty(var.clone().into(), &ty, b);
+            // if cfg_ty.is_ptr() {
+            //     self.inject_print(format!("Dropping {}:{}\n", file!(), line!()), b);
+            //     let drop_object = Const::FunPtr(self.ctx.natives["drop_object"].clone());
+            //     b.native_call(&mut self.ctx, drop_object.into(), vec![var.clone().into()]);
+            // }
             let this_res = self.aux(&case.expr, b);
             if !target_ty.is_zero_sized() {
                 let cast = b.cast(&mut self.ctx, &this_res, target_ty.clone());
