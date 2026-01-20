@@ -9,6 +9,7 @@ use inkwell::builder::Builder;
 use inkwell::context::Context;
 use inkwell::memory_buffer::MemoryBuffer;
 use inkwell::module::{Linkage, Module};
+use inkwell::passes::{PassManager, PassManagerBuilder};
 use inkwell::targets::{
     CodeModel, FileType, InitializationConfig, RelocMode, Target, TargetMachine,
 };
@@ -26,6 +27,10 @@ struct LLVMBackendImpl<'ctx> {
     pub context: &'ctx Context,
     pub module: Module<'ctx>,
     pub builder: Builder<'ctx>,
+    pub fpm: PassManager<FunctionValue<'ctx>>,
+    pub mam: PassManager<Module<'ctx>>,
+    pub pb: PassManagerBuilder,
+
     pub funs: HashMap<FunNameUse, FunctionValue<'ctx>>,
     pub vals: HashMap<CfgVarUse, AnyValueEnum<'ctx>>,
 
@@ -41,13 +46,36 @@ impl<'ctx> LLVMBackendImpl<'ctx> {
     pub fn new(context: &'ctx Context) -> Self {
         let module = context.create_module("monocaml");
         let builder = context.create_builder();
+        let fpm = PassManager::create(&module);
+        let mam = PassManager::create(());
+
+        fpm.add_instruction_combining_pass();
+        fpm.add_reassociate_pass();
+        fpm.add_gvn_pass();
+        fpm.add_cfg_simplification_pass();
+
+        fpm.initialize();
+
+        mam.add_aggressive_dce_pass();
+        mam.add_function_inlining_pass();
+        mam.add_cfg_simplification_pass();
+
+        let pb = PassManagerBuilder::create();
+        pb.populate_function_pass_manager(&fpm);
+        pb.populate_module_pass_manager(&mam);
+        pb.set_optimization_level(OptimizationLevel::Aggressive);
 
         LLVMBackendImpl {
             context,
             module,
             builder,
+            fpm,
+            mam,
+            pb,
+
             funs: HashMap::new(),
             vals: HashMap::new(),
+
             type_names: HashMap::new(),
             decayed_type_names: HashMap::new(),
             count: 0,
@@ -357,7 +385,11 @@ impl<'ctx> LLVMBackendImpl<'ctx> {
     fn build_const(&mut self, c: &Const) -> AnyValueEnum<'ctx> {
         match c {
             Const::Int(x) => self.context.i32_type().const_int(*x as u64, true).into(),
-            Const::String(s) => self.context.const_string(s.as_bytes(), true).into(),
+            Const::String(s) => self
+                .builder
+                .build_global_string_ptr(s, "")
+                .unwrap()
+                .as_any_value_enum(),
             Const::Struct(items) => {
                 let elems = items
                     .iter()
@@ -476,6 +508,9 @@ impl<'ctx> LLVMBackendImpl<'ctx> {
     fn build_function(&mut self, f: &Func) {
         let f_val = self.funs[&f.name()];
         self.build_cfg(f_val, f);
+        assert!(f_val.verify(true));
+        println!("Function built: {}", f.name());
+        self.fpm.run_on(&f_val);
     }
 
     fn canonical_decayed(&self, ty: &Ty) -> String {
@@ -741,7 +776,7 @@ impl<'ctx> LLVMBackendImpl<'ctx> {
 
         println!("p is {}", p.display());
 
-        let output = Command::new("clang")
+        let output = Command::new("clang-16")
             .arg(p)
             .arg("-S")
             .arg("-emit-llvm")
@@ -792,6 +827,7 @@ impl<'ctx> LLVMBackendImpl<'ctx> {
             }
             self.build_function(f);
         }
+
         Ok(())
     }
 }
@@ -815,6 +851,7 @@ impl Backend for LLVMBackend {
                 .verify()
                 .map_err(|x| println!("{}", x.to_str().unwrap()))
                 .unwrap();
+            backend.mam.run_on(&backend.module);
             println!("{}", backend.module.to_string());
             let triple = TargetMachine::get_default_triple();
             let target = Target::from_triple(&triple).unwrap();
