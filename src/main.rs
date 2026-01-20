@@ -1019,7 +1019,7 @@ mod tests {
 }
 
 fn main() {
-    // let (ast, ctx) = rev_bench(10, 100);
-    let ast = test_ast_7();
-    compile_ast(ast, "llvm_test");
+    let (ast, ctx) = rev_bench(100, 100);
+    // let ast = test_ast_7();
+    compile_ast_with_ctx(ast, "llvm_test", ctx);
 }

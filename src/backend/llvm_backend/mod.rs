@@ -27,9 +27,9 @@ struct LLVMBackendImpl<'ctx> {
     pub context: &'ctx Context,
     pub module: Module<'ctx>,
     pub builder: Builder<'ctx>,
+    pub _pb: PassManagerBuilder,
     pub fpm: PassManager<FunctionValue<'ctx>>,
     pub mam: PassManager<Module<'ctx>>,
-    pub pb: PassManagerBuilder,
 
     pub funs: HashMap<FunNameUse, FunctionValue<'ctx>>,
     pub vals: HashMap<CfgVarUse, AnyValueEnum<'ctx>>,
@@ -52,11 +52,14 @@ impl<'ctx> LLVMBackendImpl<'ctx> {
         fpm.add_instruction_combining_pass();
         fpm.add_reassociate_pass();
         fpm.add_gvn_pass();
+        fpm.add_demote_memory_to_register_pass();
         fpm.add_cfg_simplification_pass();
-
+        fpm.add_sccp_pass();
         fpm.initialize();
 
         mam.add_aggressive_dce_pass();
+        mam.add_merge_functions_pass();
+        mam.add_dead_arg_elimination_pass();
         mam.add_function_inlining_pass();
         mam.add_cfg_simplification_pass();
 
@@ -71,7 +74,7 @@ impl<'ctx> LLVMBackendImpl<'ctx> {
             builder,
             fpm,
             mam,
-            pb,
+            _pb: pb,
 
             funs: HashMap::new(),
             vals: HashMap::new(),
@@ -566,7 +569,7 @@ impl<'ctx> LLVMBackendImpl<'ctx> {
             Ty::String => "const char *".to_string(),
             Ty::Void => "void".to_string(),
             Ty::FunPtr(_) | Ty::Ptr(_) => self.canonical_decayed(ty),
-            _ => panic!("No type but there should be !"),
+            _ => "".into(),
         }
     }
 
@@ -865,8 +868,18 @@ impl Backend for LLVMBackend {
                     CodeModel::Default,
                 )
                 .expect("Failed to create target machine");
+            let dir = temp_dir();
+            let p = dir.as_path().join("temp.o");
+            let _ = File::create(&p).unwrap();
             target_machine
-                .write_to_file(&backend.module, FileType::Object, &self.output_path)
+                .write_to_file(&backend.module, FileType::Object, &p)
+                .unwrap();
+            let _ = Command::new("cc")
+                .arg(p)
+                .arg("-o")
+                .arg(self.output_path)
+                .output()
+                .map_err(|_| format!("Failed to compile runtime library"))
                 .unwrap();
         }
 
