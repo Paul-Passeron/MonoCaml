@@ -4,11 +4,6 @@ use std::{
 };
 
 use crate::{
-    ast::{
-        Ast, AstKind, MatchCase, Var,
-        pattern::Pattern,
-        types::{AstCtx, AstTy, EnumDef},
-    },
     cfg::{
         Const, FunName, FunNameUse, Func, Label, Program, Sig, Ty, TyCtx, Value,
         builder::Builder,
@@ -16,6 +11,11 @@ use crate::{
         var::{CfgVar, CfgVarUse},
     },
     helpers::unique::Use,
+    mono_ir::{
+        Ast, AstKind, MatchCase, Var,
+        pattern::Pattern,
+        types::{AstCtx, AstTy, EnumDef},
+    },
 };
 
 pub enum RecFlag {

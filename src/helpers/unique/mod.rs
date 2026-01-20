@@ -97,15 +97,6 @@ where
     }
 }
 
-impl<T, S> From<T> for Use<T, S>
-where
-    T: Extractable<S>,
-{
-    fn from(value: T) -> Self {
-        Self::from(&value)
-    }
-}
-
 impl<T, S> From<&T> for Use<T, S>
 where
     T: Extractable<S>,

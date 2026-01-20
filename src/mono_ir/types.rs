@@ -132,7 +132,7 @@ impl Default for AstCtx {
 
 #[cfg(test)]
 mod tests {
-    use crate::ast::types::{AstCtx, AstTy, EnumCase, EnumDef};
+    use super::{AstCtx, AstTy, EnumCase, EnumDef};
 
     #[test]
     pub fn test_list_is_rec() {

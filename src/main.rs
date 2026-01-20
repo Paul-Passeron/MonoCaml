@@ -10,19 +10,19 @@ use std::{
 use rand::{Rng, rngs::ThreadRng};
 
 use crate::{
-    ast::{
+    backend::llvm_backend::LLVMBackend,
+    cfg::{FunName, Label, compile::Compiler, var::CfgVar},
+    mono_ir::{
         Ast, MatchCase, Var,
         pattern::Pattern,
         types::{AstCtx, AstTy, EnumCase, EnumDef},
     },
-    backend::llvm_backend::LLVMBackend,
-    cfg::{FunName, Label, compile::Compiler, var::CfgVar},
 };
 
-pub mod ast;
 pub mod backend;
 pub mod cfg;
 pub mod helpers;
+pub mod mono_ir;
 
 type UAst = Ast<()>;
 

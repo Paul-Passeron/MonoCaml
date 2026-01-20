@@ -1,6 +1,6 @@
 use std::{collections::HashSet, fmt};
 
-use crate::ast::{Var, types::AstTy};
+use super::{Var, types::AstTy};
 
 #[derive(Clone)]
 pub enum Pattern {

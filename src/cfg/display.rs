@@ -4,11 +4,7 @@ use crate::{
     cfg::{
         BasicBlock, Cfg, Const, FunName, Func, Instr, Label, Program, Sig, Terminator, Ty, Value,
         expr::Expr,
-        var::{
-            // CfgGlobal,
-            CfgVar,
-            VarKind,
-        },
+        var::{CfgVar, VarKind},
     },
     helpers::unique::{Extractable, UniqueDisplayer, Use},
 };
@@ -22,7 +18,7 @@ impl fmt::Display for Ty {
             Ty::Ptr(ty) => write!(f, "*{ty}"),
             Ty::Struct(items) => write!(
                 f,
-                "{{ {} }}",
+                "{{{}}}",
                 items
                     .iter()
                     .map(|x| x.to_string())
@@ -32,12 +28,12 @@ impl fmt::Display for Ty {
             Ty::FunPtr(sig) => write!(f, "{sig}"),
             Ty::Union(items) => write!(
                 f,
-                "union {{ {} }}",
+                "({})",
                 items
                     .iter()
                     .map(|x| x.to_string())
                     .collect::<Vec<_>>()
-                    .join(", ")
+                    .join("|")
             ),
         }
     }

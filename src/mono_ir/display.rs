@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::ast::{AstTy, Var};
+use super::{AstTy, Var};
 
 pub fn alphabetize(x: usize) -> String {
     let mut x = x + 1;

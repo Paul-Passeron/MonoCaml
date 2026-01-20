@@ -1,11 +1,11 @@
 use std::iter::{empty, once};
 
 use crate::{
-    ast::types::{AstTy, EnumDef},
     cfg::{
         Const, FunName, Func, Label, Ty, Value, builder::Builder, compile::Compiler, var::CfgVar,
     },
     helpers::unique::Use,
+    mono_ir::types::{AstTy, EnumDef},
 };
 
 impl Compiler {

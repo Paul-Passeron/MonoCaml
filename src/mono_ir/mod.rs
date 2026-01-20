@@ -1,13 +1,14 @@
+use std::{collections::HashSet, fmt};
+
+use crate::{
+    helpers::unique::Unique,
+    mono_ir::{pattern::Pattern, types::AstTy},
+};
+
 pub mod display;
 pub mod pattern;
 pub mod types;
 mod vars;
-use std::{collections::HashSet, fmt};
-
-use crate::{
-    ast::{pattern::Pattern, types::AstTy},
-    helpers::unique::Unique,
-};
 
 #[allow(unused)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
