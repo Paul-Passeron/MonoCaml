@@ -11,7 +11,8 @@ use rand::{Rng, rngs::ThreadRng};
 
 use crate::{
     backend::llvm_backend::LLVMBackend,
-    cfg::{FunName, Label, compile::Compiler, var::CfgVar},
+    cfg::{FunName, Label, var::CfgVar},
+    lower::mono_to_cfg::MonoToCfg,
     mono_ir::{
         Ast, MatchCase, Var,
         pattern::Pattern,
@@ -22,6 +23,7 @@ use crate::{
 pub mod backend;
 pub mod cfg;
 pub mod helpers;
+pub mod lower;
 pub mod mono_ir;
 
 type UAst = Ast<()>;
@@ -901,7 +903,7 @@ fn compile_ast<S: ToString>(ast: UAst, prog_name: S) {
 fn compile_ast_with_ctx<S: ToString>(ast: UAst, prog_name: S, ctx: AstCtx) {
     let prog_name = prog_name.to_string();
     println!("{}", ast.display());
-    let prog = Compiler::compile(ast, ctx);
+    let prog = MonoToCfg::compile(ast, ctx);
     println!("{prog}");
 
     let _ = prog

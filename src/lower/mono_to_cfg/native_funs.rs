@@ -1,9 +1,10 @@
 use crate::{
-    cfg::{FunName, Func, Sig, Ty, builder::Builder, compile::Compiler},
+    cfg::{FunName, Func, Sig, Ty, builder::Builder},
     helpers::unique::Use,
+    lower::mono_to_cfg::MonoToCfg,
 };
 
-impl Compiler {
+impl MonoToCfg {
     pub fn create_add(&mut self) {
         let add_name = FunName::fresh();
         let used = Use::from(&add_name);
@@ -42,8 +43,8 @@ impl Compiler {
         let s = Sig::new(vec![Ty::Int], Ty::Void);
         let print_int_fun = Func::new(
             name,
-            self.ctx.make_params(s.params.into_iter()),
-            *s.ret,
+            self.ctx.make_params(s.params().iter().cloned()),
+            s.ret().clone(),
             None,
         );
         self.add_func(print_int_fun);
@@ -56,8 +57,8 @@ impl Compiler {
         let s = Sig::new(vec![Ty::String], Ty::Void);
         let print_string_fun = Func::new(
             name,
-            self.ctx.make_params(s.params.into_iter()),
-            *s.ret,
+            self.ctx.make_params(s.params().iter().cloned()),
+            s.ret().clone(),
             None,
         );
         self.add_func(print_string_fun);
@@ -70,8 +71,8 @@ impl Compiler {
         let s = Sig::new(vec![Ty::Int], Ty::Int);
         let print_string_fun = Func::new(
             name,
-            self.ctx.make_params(s.params.into_iter()),
-            *s.ret,
+            self.ctx.make_params(s.params().iter().cloned()),
+            s.ret().clone(),
             None,
         );
         self.add_func(print_string_fun);

@@ -1,7 +1,4 @@
-use std::{
-    collections::{HashMap, HashSet},
-    iter::once,
-};
+use std::{collections::HashMap, iter::once};
 
 use crate::{
     cfg::{
@@ -18,12 +15,15 @@ use crate::{
     },
 };
 
+pub mod enums;
+pub mod native_funs;
+
 pub enum RecFlag {
     Rec,
     NoRec,
 }
 
-pub struct Compiler {
+pub struct MonoToCfg {
     pub prog: Program,
     pub map: HashMap<Var, CfgVarUse>,
     pub type_map: HashMap<Var, Ty>,
@@ -38,7 +38,7 @@ pub struct Compiler {
 }
 
 #[allow(unused)]
-impl Compiler {
+impl MonoToCfg {
     fn get_enum_repr(m: &HashMap<String, Ty>) -> Ty {
         let discr = Ty::Int;
         let largest = m.values().max_by_key(|x| x.get_size()).unwrap().clone();
@@ -53,11 +53,11 @@ impl Compiler {
 
     pub fn add_func(&mut self, f: Func) {
         let sig = Sig::new(
-            f.params.iter().map(|(_, x)| x.clone()).collect(),
-            f.ret_ty.clone(),
+            f.params().iter().map(|(_, x)| x.clone()).collect(),
+            f.ret_ty().clone(),
         );
-        let name = Use::from(&f.name);
-        self.prog.funcs.insert(f);
+        let name = f.name();
+        self.prog.mut_funcs().insert(f);
         self.ctx.sigs.insert(name, sig);
     }
 
@@ -292,7 +292,7 @@ impl Compiler {
                 AstKind::Native(x) => {
                     let name = &self.ctx.natives[x];
                     let sig = &self.ctx.sigs[name];
-                    let l = sig.params.len();
+                    let l = sig.params().len();
                     l == remaining
                 }
                 _ => self.is_sat_aux(fun, remaining + 1),
@@ -521,7 +521,7 @@ impl Compiler {
         let old_map = self.map.clone();
 
         let sig = cfg_bound_ty.field(0).sig();
-        let ret_ty = *sig.ret;
+        let ret_ty = sig.ret().clone();
 
         let env = outside_env.clone();
 
@@ -703,7 +703,7 @@ impl Compiler {
             }
             AstKind::App { fun, .. } => {
                 let typeof_fun = self.get_type_of_ast(fun);
-                *typeof_fun.field(0).sig().ret.clone()
+                typeof_fun.field(0).sig().ret().clone()
             }
             AstKind::Seq { snd, .. } => self.get_type_of_ast(snd),
             AstKind::Tuple(asts) => {
@@ -798,8 +798,8 @@ impl Compiler {
     }
 
     fn curry(&self, s: &Sig) -> Ty {
-        let mut v = s.params.clone();
-        v.push(s.ret.as_ref().clone());
+        let mut v = s.params().clone();
+        v.push(s.ret().clone());
         let l = v.len();
         let mut map = HashMap::new();
         self.curry_aux(&v[..], &mut map);
@@ -810,7 +810,7 @@ impl Compiler {
         if !self.debug {
             return;
         }
-        let print_func = Const::FunPtr(self.prog.natives["print_string"].clone());
+        let print_func = Const::FunPtr(self.prog.natives()["print_string"].clone());
         let print_arg = Const::String(str.to_string());
         b.native_call(&mut self.ctx, print_func.into(), vec![print_arg.into()]);
     }
@@ -893,7 +893,7 @@ impl Compiler {
         }
 
         let func = fun_builder.finalize();
-        let fun_name = Use::from(&func.name);
+        let fun_name = func.name();
         self.prog.add_func(func);
 
         for (x, y) in old_map {
@@ -955,19 +955,15 @@ impl Compiler {
 
         // Create the closure tree (all intermediate functions taking a single arg as well as the closure env) of the native function and return the wrapper as a closure
         let sig = self.ctx.sigs[&funname].clone();
-        assert!(sig.params.len() > 0);
+        let l = sig.params().len();
+        assert!(l > 0);
 
         let innermost_use = self.create_innermost_closure(name.clone());
-        let mut remaining_args = sig.params.len() - 1;
+        let mut remaining_args = sig.params().len() - 1;
         let mut last = innermost_use.clone();
 
-        let mut current_env_ty = if sig.params.len() > 1 {
-            Ty::Struct(
-                sig.params[0..sig.params.len() - 1]
-                    .iter()
-                    .cloned()
-                    .collect(),
-            )
+        let mut current_env_ty = if l > 1 {
+            Ty::Struct(sig.params()[0..l - 1].iter().cloned().collect())
         } else {
             Ty::Struct(vec![])
         };
@@ -977,11 +973,11 @@ impl Compiler {
             let wrapper_use = Use::from(&wrapper_name);
             let void_ptr = Ty::Ptr(Box::new(Ty::Void));
             let last_sig = self.ctx.sigs.get(&last).unwrap().clone();
-            let param_index = sig.params.len() - remaining_args - 1;
+            let param_index = l - remaining_args - 1;
             let ret_ty = Ty::Struct(vec![Ty::FunPtr(last_sig), void_ptr.clone()]);
             let params = self
                 .ctx
-                .make_params([void_ptr, sig.params[param_index].clone()].into_iter());
+                .make_params([void_ptr, sig.params()[param_index].clone()].into_iter());
             let params: Vec<(CfgVar, Ty)> = params
                 .into_iter()
                 .filter(|x| !x.1.is_zero_sized())
@@ -992,8 +988,12 @@ impl Compiler {
 
             let (mut new_env_values, env_ptr) = if remaining_args > 1 {
                 let env_ptr = use_params[0].clone();
-                let env_ty =
-                    Ty::Struct(sig.params[0..remaining_args - 1].iter().cloned().collect());
+                let env_ty = Ty::Struct(
+                    sig.params()[0..remaining_args - 1]
+                        .iter()
+                        .cloned()
+                        .collect(),
+                );
                 let borrow_object = Const::FunPtr(self.ctx.natives["borrow_object"].clone());
 
                 wrapper_func_builder.native_call(
@@ -1058,9 +1058,11 @@ impl Compiler {
         let innermost_name = FunName::fresh();
         let innermost_use = Use::from(&innermost_name);
         let sig = self.ctx.sigs[&funname].clone();
-        assert!(sig.params.len() > 0);
-        let last_arg = sig.params.last().unwrap();
-        let ret_ty = sig.ret.as_ref();
+        let l = sig.params().len();
+        assert!(l > 0);
+
+        let last_arg = sig.params().last().unwrap();
+        let ret_ty = sig.ret();
         let params = self
             .ctx
             .make_params([Ty::Ptr(Box::new(Ty::Void)), last_arg.clone()].into_iter());
@@ -1071,8 +1073,8 @@ impl Compiler {
         let use_params = params.iter().map(|(x, _)| Use::from(x)).collect::<Vec<_>>();
         let mut innermost_builder =
             Builder::new(innermost_name, params, ret_ty.clone(), &mut self.ctx);
-        let (mut args, env_ptr) = if sig.params.len() > 1 {
-            let env_iter = sig.params[..sig.params.len() - 1].iter();
+        let (mut args, env_ptr) = if l > 1 {
+            let env_iter = sig.params()[..l - 1].iter();
             let env_ty = Ty::Struct(env_iter.clone().cloned().collect::<Vec<_>>());
             let env_ptr = use_params[0].clone();
             let borrow_object = Const::FunPtr(self.ctx.natives["borrow_object"].clone());
@@ -1325,16 +1327,5 @@ impl Compiler {
         res.map_or(Const::Struct(vec![]).into(), |x| {
             b.load(&mut self.ctx, x.into(), target_ty).into()
         })
-    }
-}
-
-impl Program {
-    fn new(entry: FunNameUse) -> Self {
-        Self {
-            entry,
-            natives: HashMap::new(),
-            funcs: HashSet::new(),
-            boxed_types: HashMap::new(),
-        }
     }
 }

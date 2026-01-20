@@ -1,14 +1,13 @@
 use std::iter::{empty, once};
 
 use crate::{
-    cfg::{
-        Const, FunName, Func, Label, Ty, Value, builder::Builder, compile::Compiler, var::CfgVar,
-    },
+    cfg::{Const, FunName, Func, Label, Ty, Value, builder::Builder, var::CfgVar},
     helpers::unique::Use,
+    lower::mono_to_cfg::MonoToCfg,
     mono_ir::types::{AstTy, EnumDef},
 };
 
-impl Compiler {
+impl MonoToCfg {
     // Very simple: we simply retain the current pointer and do not care about
     // constructor args because their dropping is guarded by the dropping of this
     // object
@@ -166,7 +165,7 @@ impl Compiler {
     ) {
         // Release constructor fields
 
-        let is_unique_function = self.prog.natives["is_unique"].clone();
+        let is_unique_function = self.prog.natives()["is_unique"].clone();
         let is_unique = builder.native_call(
             &mut self.ctx,
             Const::FunPtr(is_unique_function).into(),
@@ -229,7 +228,7 @@ impl Compiler {
         }
         builder.goto(&mut self.ctx, ret_use, ret_lbl);
 
-        let drop_fun = self.prog.natives[&format!("{name}_release")].clone();
+        let drop_fun = self.prog.natives()[&format!("{name}_release")].clone();
         builder.native_call(
             &mut self.ctx,
             Const::FunPtr(drop_fun).into(),
@@ -302,7 +301,7 @@ impl Compiler {
     pub fn create_boxed_types(&mut self) {
         self.ast_ctx.types.clone().iter().for_each(|x| {
             let ty = self.ast_ty_to_ty(&AstTy::named(&x.0));
-            self.prog.boxed_types.insert(x.0.clone(), ty);
+            self.prog.mut_boxed_types().insert(x.0.clone(), ty);
         });
     }
 

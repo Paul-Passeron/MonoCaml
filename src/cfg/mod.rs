@@ -13,13 +13,10 @@ use crate::{
 };
 
 pub mod builder;
-pub mod compile;
 pub mod display;
-pub mod enums;
 pub mod expr;
 pub mod extract;
 pub mod get_type;
-pub mod native_funs;
 pub mod token;
 pub mod var;
 
@@ -292,12 +289,29 @@ impl Program {
         &self.funcs
     }
 
+    pub fn mut_funcs(&mut self) -> &mut HashSet<Func> {
+        &mut self.funcs
+    }
+
     pub fn compile<B: Backend>(&self, b: B) -> Result<B::Out, B::Err> {
         b.compile(self)
     }
 
     pub fn boxed_types(&self) -> &HashMap<String, Ty> {
         &self.boxed_types
+    }
+
+    pub fn mut_boxed_types(&mut self) -> &mut HashMap<String, Ty> {
+        &mut self.boxed_types
+    }
+
+    pub fn new(entry: FunNameUse) -> Self {
+        Self {
+            entry,
+            natives: HashMap::new(),
+            funcs: HashSet::new(),
+            boxed_types: HashMap::new(),
+        }
     }
 }
 
