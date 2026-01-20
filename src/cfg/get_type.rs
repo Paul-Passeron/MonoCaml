@@ -180,9 +180,33 @@ impl Ty {
             Ty::String => 8,
             Ty::Void => 0,
             Ty::Ptr(_) => 8,
-            Ty::Struct(items) => items.iter().fold(0, |s, x| s + align_to(x.get_size(), 8)),
             Ty::FunPtr(_) => 8,
-            Ty::Union(items) => items.iter().map(Self::get_size).max().unwrap_or(0),
+            Ty::Struct(items) => {
+                let mut offset = 0;
+                for item in items {
+                    let align = item.get_align();
+                    offset = align_to(offset, align);
+                    offset += item.get_size();
+                }
+                // Final size must be aligned to struct's alignment
+                align_to(offset, self.get_align())
+            }
+            Ty::Union(items) => {
+                let max_size = items.iter().map(Self::get_size).max().unwrap_or(0);
+                align_to(max_size, self.get_align())
+            }
+        }
+    }
+
+    pub fn get_align(&self) -> usize {
+        match self {
+            Ty::Int => 4,
+            Ty::String => 8,
+            Ty::Void => 1,
+            Ty::Ptr(_) => 8,
+            Ty::FunPtr(_) => 8,
+            Ty::Struct(items) => items.iter().map(Self::get_align).max().unwrap_or(1),
+            Ty::Union(items) => items.iter().map(Self::get_align).max().unwrap_or(1),
         }
     }
 }
