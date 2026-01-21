@@ -798,7 +798,7 @@ impl<'ctx> LLVMBackendImpl<'ctx> {
             .arg(p)
             .arg("-S")
             .arg("-emit-llvm")
-            .arg("-I/home/paulpasseron/monocaml_playground/runtime")
+            .arg("-I./runtime")
             .arg("-o")
             .arg("./runtime.llvm");
         let output = cmd
