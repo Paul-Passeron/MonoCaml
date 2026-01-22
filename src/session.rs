@@ -1,34 +1,40 @@
-use std::cell::RefCell;
-
 use crate::lexer::interner::{Interner, StrLit, Symbol};
 
 /// Session informations, shared between all passes
 pub struct Session<'src> {
-    pub symbol_interner: RefCell<Interner<'src, Symbol>>,
-    pub strlit_interner: RefCell<Interner<'src, StrLit>>,
+    pub symbol_interner: Interner<'src, Symbol>,
+    pub strlit_interner: Interner<'src, StrLit>,
 }
 
 impl<'src> Session<'src> {
     pub fn new() -> Self {
         Self {
-            symbol_interner: RefCell::new(Interner::new()),
-            strlit_interner: RefCell::new(Interner::new()),
+            symbol_interner: Interner::new(),
+            strlit_interner: Interner::new(),
         }
     }
 
-    pub fn intern_symbol(&self, symbol: &'src str) -> Symbol {
-        self.symbol_interner.borrow_mut().intern(symbol)
+    pub fn intern_symbol(&mut self, symbol: &'src str) -> Symbol {
+        self.symbol_interner.intern(symbol)
     }
 
     pub fn resolve_symbol(&self, symbol: Symbol) -> &'src str {
-        self.symbol_interner.borrow().resolve(symbol)
+        self.symbol_interner.resolve(symbol)
     }
 
-    pub fn intern_strlit(&self, strlit: &'src str) -> StrLit {
-        self.strlit_interner.borrow_mut().intern(strlit)
+    pub fn lookup_symbol(&mut self, symbol: &'src str) -> Option<Symbol> {
+        self.symbol_interner.lookup(symbol)
+    }
+
+    pub fn intern_strlit(&mut self, strlit: &'src str) -> StrLit {
+        self.strlit_interner.intern(strlit)
     }
 
     pub fn resolve_strlit(&self, strlit: StrLit) -> &'src str {
-        self.strlit_interner.borrow().resolve(strlit)
+        self.strlit_interner.resolve(strlit)
+    }
+
+    pub fn lookup_strlit(&mut self, strlit: &'src str) -> Option<StrLit> {
+        self.strlit_interner.lookup(strlit)
     }
 }
