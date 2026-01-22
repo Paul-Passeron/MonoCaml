@@ -1,42 +1,42 @@
 use std::{collections::HashMap, fmt};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct Symbol(u32);
+struct SymbToken(u32);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct StrLit(u32);
+pub struct Symbol(SymbToken);
 
-mod symbs {
-    use super::{StrLit, Symbol};
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct StrLit(SymbToken);
 
-    impl From<u32> for StrLit {
-        fn from(value: u32) -> Self {
-            Self(value)
-        }
+trait ExtractSymbToken {
+    fn extract(&self) -> SymbToken;
+    fn from(t: SymbToken) -> Self;
+}
+
+impl ExtractSymbToken for StrLit {
+    fn extract(&self) -> SymbToken {
+        self.0
     }
 
-    impl Into<u32> for StrLit {
-        fn into(self) -> u32 {
-            self.0
-        }
-    }
-
-    impl From<u32> for Symbol {
-        fn from(value: u32) -> Self {
-            Self(value)
-        }
-    }
-
-    impl Into<u32> for Symbol {
-        fn into(self) -> u32 {
-            self.0
-        }
+    fn from(t: SymbToken) -> Self {
+        Self(t)
     }
 }
 
+impl ExtractSymbToken for Symbol {
+    fn extract(&self) -> SymbToken {
+        self.0
+    }
+    fn from(t: SymbToken) -> Self {
+        Self(t)
+    }
+}
+
+#[allow(private_bounds)]
 pub struct Interner<'src, S>
 where
-    S: Copy + From<u32> + Into<u32>,
+    S: Copy + ExtractSymbToken,
 {
     map: HashMap<&'src str, S>,
     strings: Vec<&'src str>,
@@ -65,9 +65,10 @@ impl Symbol {
     }
 }
 
+#[allow(private_bounds)]
 impl<'src, S> Interner<'src, S>
 where
-    S: Copy + From<u32> + Into<u32>,
+    S: Copy + ExtractSymbToken,
 {
     pub fn new() -> Self {
         Self {
@@ -82,14 +83,14 @@ where
         } else {
             let idx = self.strings.len();
             self.strings.push(s);
-            let symbol = S::from(idx as u32);
+            let symbol = S::from(SymbToken(idx as u32));
             self.map.insert(s, symbol);
             symbol
         }
     }
 
     pub fn resolve(&self, s: S) -> &'src str {
-        self.strings[s.into() as usize]
+        self.strings[s.extract().0 as usize]
     }
 
     pub fn lookup(&self, s: &'src str) -> Option<S> {
