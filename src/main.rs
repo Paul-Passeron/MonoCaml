@@ -19,8 +19,10 @@ pub mod backend;
 pub mod cfg;
 pub mod examples;
 pub mod helpers;
+pub mod lexer;
 pub mod lower;
 pub mod mono_ir;
+pub mod session;
 
 #[allow(unused)]
 fn compile_ast<S: ToString>(ast: Ast<()>, prog_name: S) {
