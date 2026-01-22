@@ -11,7 +11,7 @@ use crate::{
     mono_ir::{
         Ast, AstKind, MatchCase, Var,
         pattern::Pattern,
-        types::{AstCtx, AstTy, EnumDef},
+        types::{AstCtx, AstTy},
     },
 };
 

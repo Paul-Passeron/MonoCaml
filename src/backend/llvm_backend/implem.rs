@@ -47,40 +47,34 @@ impl<'ctx> LLVMBackendImpl<'ctx> {
         fpm.add_instruction_combining_pass();
         fpm.add_reassociate_pass();
 
-        // Memory to registers (CRITICAL for functional languages)
-        fpm.add_promote_memory_to_register_pass(); // NOT demote!
+        fpm.add_promote_memory_to_register_pass();
 
-        // Scalar optimizations
-        fpm.add_sccp_pass(); // Constant propagation
-        fpm.add_aggressive_dce_pass(); // Dead code elimination
-        fpm.add_instruction_combining_pass(); // Clean up after SCCP
+        fpm.add_sccp_pass();
+        fpm.add_aggressive_dce_pass();
+        fpm.add_instruction_combining_pass();
 
-        // GVN after mem2reg for better results
         fpm.add_gvn_pass();
 
-        // Loop optimizations (if you have any loops/recursion compiled to loops)
-        fpm.add_licm_pass(); // Loop invariant code motion
-        fpm.add_ind_var_simplify_pass(); // Induction variable simplification
-        fpm.add_loop_unroll_pass(); // Loop unrolling
+        fpm.add_licm_pass();
+        fpm.add_ind_var_simplify_pass();
+        fpm.add_loop_unroll_pass();
 
-        // Tail call optimization (CRITICAL for functional languages)
         fpm.add_tail_call_elimination_pass();
 
-        // Final cleanup
         fpm.add_cfg_simplification_pass();
         fpm.add_instruction_combining_pass();
         fpm.initialize();
 
-        mpm.add_function_inlining_pass(); // Inline first
-        mpm.add_global_optimizer_pass(); // Optimize globals
-        mpm.add_internalize_pass(true); // Mark non-main as internal
-        mpm.add_ipsccp_pass(); // Interprocedural constant prop
-        mpm.add_dead_arg_elimination_pass(); // Remove unused args
-        mpm.add_function_inlining_pass(); // Inline again after optimizations
-        mpm.add_global_dce_pass(); // Remove dead globals
-        mpm.add_merge_functions_pass(); // Merge identical functions
-        mpm.add_strip_dead_prototypes_pass(); // Clean up prototypes
-        mpm.add_aggressive_dce_pass(); // Final DCE
+        mpm.add_function_inlining_pass();
+        mpm.add_global_optimizer_pass();
+        mpm.add_internalize_pass(true);
+        mpm.add_ipsccp_pass();
+        mpm.add_dead_arg_elimination_pass();
+        mpm.add_function_inlining_pass();
+        mpm.add_global_dce_pass();
+        mpm.add_merge_functions_pass();
+        mpm.add_strip_dead_prototypes_pass();
+        mpm.add_aggressive_dce_pass();
         mpm.add_cfg_simplification_pass();
 
         LLVMBackendImpl {
