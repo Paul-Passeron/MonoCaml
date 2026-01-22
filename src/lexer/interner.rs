@@ -91,4 +91,8 @@ where
     pub fn resolve(&self, s: S) -> &'src str {
         self.strings[s.into() as usize]
     }
+
+    pub fn lookup(&self, s: &'src str) -> Option<S> {
+        self.map.get(s).copied()
+    }
 }
