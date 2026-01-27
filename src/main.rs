@@ -2,6 +2,7 @@
 #![feature(random)]
 
 use std::{
+    fs::File,
     io::Read,
     path::PathBuf,
     process::{Command, Stdio},
@@ -67,10 +68,12 @@ fn main() {
     // compile_ast_with_ctx(ast, "llvm_test", ctx);
     let sm = SourceManager::new();
     let mut session = Session::new(sm);
-    let contents = r#"let _ = print_endline "Hello, World!"
-let rec rev l = match l with
-    | a :: b -> (rev b) @ a
-    | [] -> []"#;
+    let contents = {
+        let mut s = String::new();
+        let mut f = File::open("examples/hello_world.ml").unwrap();
+        f.read_to_string(&mut s).unwrap();
+        s
+    };
     let id = session.source_manager.add_file(
         PathBuf::from("examples/hello_world.ml"),
         contents.to_string(),
