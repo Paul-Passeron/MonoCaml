@@ -25,6 +25,7 @@ pub mod helpers;
 pub mod lexer;
 pub mod lower;
 pub mod mono_ir;
+pub mod parse_tree;
 pub mod session;
 pub mod source_manager;
 
