@@ -62,8 +62,8 @@ impl<'a> fmt::Display for SpanDisplay<'a> {
         let li2 = self.1.loc_infos(l2);
         write!(
             f,
-            "{}:{}:{}..{}:{}",
-            li1.path, li1.line, li1.col, li2.line, li2.col
+            "{}:{}:{} {}:{}:{}",
+            li1.path, li1.line, li1.col, li2.path, li2.line, li2.col
         )
     }
 }

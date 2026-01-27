@@ -1,5 +1,5 @@
 use loc::Loc;
-use std::path::Path;
+use std::{iter::once, path::Path};
 
 pub mod loc;
 
@@ -17,11 +17,14 @@ pub struct FileInfo {
 
 impl FileInfo {
     pub fn new(kind: FileKind, contents: String) -> Self {
-        let lines = contents
-            .chars()
-            .into_iter()
-            .enumerate()
-            .filter_map(|(i, c)| if c == '\n' { Some(i) } else { None })
+        let lines = once(0)
+            .chain(
+                contents
+                    .chars()
+                    .into_iter()
+                    .enumerate()
+                    .filter_map(|(i, c)| if c == '\n' { Some(i) } else { None }),
+            )
             .collect();
 
         Self {
@@ -95,13 +98,13 @@ impl SourceManager {
             .iter()
             .copied()
             .enumerate()
-            .find(|(_, off)| *off >= loc.offset)
-            .unwrap_or_else(|| (f.lines.len(), loc.offset));
+            .find(|(_, off)| *off > loc.offset)
+            .unwrap_or_else(|| (f.lines.len(), *f.lines.last().unwrap()));
         let col = loc.offset - offset;
         LocInfo {
             offset,
-            line,
-            col,
+            line: line,
+            col: col + 1,
             path: &f.kind.get_name(),
         }
     }
