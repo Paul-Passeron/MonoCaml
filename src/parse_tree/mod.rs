@@ -14,3 +14,14 @@ pub enum LongIdent {
     Dot(Box<LongIdent>, Symbol),           // M.x
     Apply(Box<LongIdent>, Box<LongIdent>), // F(x) Functor application
 }
+
+pub struct RecordField<T> {
+    pub name: LongIdent,
+    pub pat: T,
+}
+
+pub enum ArgLabel<T = ()> {
+    NoLabel,             // f x
+    Labelled(Symbol, T), // f ~x
+    Optional(Symbol, T), // f ?x
+}

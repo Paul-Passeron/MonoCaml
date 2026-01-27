@@ -1,6 +1,6 @@
 use crate::{
     lexer::interner::Symbol,
-    parse_tree::{Located, LongIdent},
+    parse_tree::{ArgLabel, Located, LongIdent},
 };
 
 pub type TypeExpr = Located<TypeExprDesc>;
@@ -14,10 +14,4 @@ pub enum TypeExprDesc {
     Alias(Box<TypeExpr>, Symbol),                  // t as 'a
 
                                                    // TODO: other type expressions: Which one do we need / want to support ?
-}
-
-pub enum ArgLabel {
-    NoLabel,          // f x
-    Labelled(Symbol), // f ~x
-    Optional(Symbol), // f ?x
 }
