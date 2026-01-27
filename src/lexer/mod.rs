@@ -241,9 +241,10 @@ impl<'session> Lexer<'session> {
             "function" => Ok(Token::new(TokenKind::Function, l.span(&self.loc()))),
             "let" => {
                 if self.is_operator_start(true) {
+                    let start = self.loc().offset;
                     let _ = self.lex_operator(session)?;
                     let loc = self.loc();
-                    let s = &self.contents[l.offset..loc.offset];
+                    let s = &self.contents[start..loc.offset];
                     let symbol = session.intern_symbol(s);
                     Ok(Token::new(TokenKind::LetOp(symbol), l.span(&loc)))
                 } else {
