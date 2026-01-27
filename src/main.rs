@@ -11,8 +11,11 @@ use crate::{
     backend::llvm_backend::LLVMBackend,
     cfg::{FunName, Label, var::CfgVar},
     examples::rev_bench,
+    lexer::Lexer,
     lower::mono_to_cfg::MonoToCfg,
     mono_ir::{Ast, Var, types::AstCtx},
+    session::Session,
+    source_manager::SourceManager,
 };
 
 pub mod backend;
@@ -61,6 +64,18 @@ fn run_and_check_output(program: &str, args: &[&str], expected: &str) -> std::io
 }
 
 fn main() {
-    let (ast, ctx) = rev_bench(100, 100);
-    compile_ast_with_ctx(ast, "llvm_test", ctx);
+    // let (ast, ctx) = rev_bench(100, 100);
+    // compile_ast_with_ctx(ast, "llvm_test", ctx);
+    let sm = SourceManager::new();
+    let mut session = Session::new(sm);
+    let contents = "let _ = print_endline \"Hello, World !\"";
+    let id = session.source_manager.add_file(
+        PathBuf::from("examples/hello_world.ml"),
+        contents.to_string(),
+    );
+    let l = Lexer::new(&session.source_manager, id);
+    let toks = l.no_skip(&mut session).collect::<Vec<_>>();
+    for tok in toks {
+        println!("{}", tok.debug(&session));
+    }
 }
