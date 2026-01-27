@@ -14,5 +14,5 @@ pub type StructureItem = Located<StructureItemDesc>;
 pub enum StructureItemDesc {
     Eval(Expression),
     Value(RecFlag, Vec<ValueBinding>),
-    Type(RecFlag, Vec<TypeDeclaration>),
+    Type(Vec<TypeDeclaration>),
 }
