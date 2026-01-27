@@ -253,6 +253,25 @@ impl<'session> Lexer<'session> {
         }
     }
 
+    fn lex_string(&mut self, session: &mut Session) -> LexRes {
+        let l = self.loc();
+        if self.peek_or_eof()? != '"' {
+            Err(LexingError::UnexpectedChar(l))
+        } else {
+            self.advance();
+            while let Some(c) = self.peek() {
+                if c == '"' {
+                    self.advance();
+                    break;
+                }
+                self.advance();
+            }
+            let s = &self.contents[l.offset..self.loc().offset];
+            let strlit = session.intern_strlit(s);
+            Ok(Token::new(TokenKind::Strlit(strlit), l.span(&self.loc())))
+        }
+    }
+
     fn next_token(&mut self, session: &mut Session) -> LexRes {
         self.skip_whitespace();
         let l = self.loc();
@@ -270,6 +289,7 @@ impl<'session> Lexer<'session> {
                     // This is an operator
                     self.lex_operator(session)
                 }
+                '"' => self.lex_string(session),
                 '?' | '~' => todo!(),
                 _ if is_identifier_start(c) => self.lex_identifier(session),
                 _ => Err(LexingError::UnexpectedChar(l)),
