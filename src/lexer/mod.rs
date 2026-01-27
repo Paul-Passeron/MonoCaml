@@ -1,3 +1,6 @@
 pub mod interner;
-pub mod loc;
 pub mod token;
+
+pub struct Lexer<'src> {
+    pub contents: &'src str,
+}

@@ -1,4 +1,4 @@
-#![feature(exit_status_error)]
+#![feature(normalize_lexically, exit_status_error)]
 #![feature(random)]
 
 use std::{
@@ -23,6 +23,7 @@ pub mod lexer;
 pub mod lower;
 pub mod mono_ir;
 pub mod session;
+pub mod source_manager;
 
 #[allow(unused)]
 fn compile_ast<S: ToString>(ast: Ast<()>, prog_name: S) {

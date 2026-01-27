@@ -1,6 +1,7 @@
-use crate::lexer::interner::{StrLit, Symbol};
-
-use super::loc::Span;
+use crate::{
+    lexer::interner::{StrLit, Symbol},
+    source_manager::loc::Span,
+};
 
 pub enum TokenKind {
     Ident(Symbol),

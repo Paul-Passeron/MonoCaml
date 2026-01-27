@@ -1,16 +1,21 @@
-use crate::lexer::interner::{Interner, StrLit, Symbol};
+use crate::{
+    lexer::interner::{Interner, StrLit, Symbol},
+    source_manager::SourceManager,
+};
 
 /// Session informations, shared between all passes
 pub struct Session<'src> {
+    pub source_manager: &'src mut SourceManager,
     pub symbol_interner: Interner<'src, Symbol>,
     pub strlit_interner: Interner<'src, StrLit>,
 }
 
 impl<'src> Session<'src> {
-    pub fn new() -> Self {
+    pub fn new(source_manager: &'src mut SourceManager) -> Self {
         Self {
             symbol_interner: Interner::new(),
             strlit_interner: Interner::new(),
+            source_manager,
         }
     }
 
