@@ -31,6 +31,13 @@ impl Loc {
         }
     }
 
+    pub fn previous(&self) -> Self {
+        Self {
+            file: self.file,
+            offset: if self.offset == 0 { 0 } else { self.offset - 1 },
+        }
+    }
+
     pub fn display<'a>(&self, source_manager: &'a SourceManager) -> LocDisplay<'a> {
         LocDisplay(*self, source_manager)
     }
