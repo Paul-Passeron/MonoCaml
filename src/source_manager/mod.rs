@@ -1,5 +1,5 @@
 use loc::Loc;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 pub mod loc;
 
@@ -34,18 +34,25 @@ impl FileInfo {
 
 pub enum FileKind {
     StdIn,
-    File(PathBuf),
+    File(String),
 }
 
 pub struct SourceManager {
     files: Vec<FileInfo>,
 }
 
+pub struct LocInfo<'a> {
+    pub offset: usize,
+    pub line: usize,
+    pub col: usize,
+    pub path: &'a str,
+}
+
 impl FileKind {
-    pub fn get_name(&self) -> String {
+    pub fn get_name(&self) -> &str {
         match self {
-            FileKind::StdIn => "stdin".into(),
-            FileKind::File(path_buf) => path_buf.display().to_string(),
+            FileKind::StdIn => "stdin",
+            FileKind::File(s) => &s,
         }
     }
 }
@@ -66,7 +73,7 @@ impl SourceManager {
             .unwrap_or(path.as_ref().to_path_buf());
 
         let id = self.fresh_id();
-        let file_info = FileInfo::new(FileKind::File(p), contents);
+        let file_info = FileInfo::new(FileKind::File(p.display().to_string()), contents);
         self.files.push(file_info);
         id
     }
@@ -79,6 +86,24 @@ impl SourceManager {
 
     pub fn get_file(&self, id: FileId) -> &FileInfo {
         &self.files[id.0.0 as usize]
+    }
+
+    pub fn loc_infos(&self, loc: Loc) -> LocInfo<'_> {
+        let f = self.get_file(loc.file);
+        let (line, offset) = f
+            .lines
+            .iter()
+            .copied()
+            .enumerate()
+            .find(|(_, off)| *off >= loc.offset)
+            .unwrap_or_else(|| (f.lines.len(), loc.offset));
+        let col = loc.offset - offset;
+        LocInfo {
+            offset,
+            line,
+            col,
+            path: &f.kind.get_name(),
+        }
     }
 
     pub fn loc_to_string(&self, loc: Loc) -> String {

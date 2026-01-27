@@ -34,30 +34,27 @@ impl ExtractSymbToken for Symbol {
 }
 
 #[allow(private_bounds)]
-pub struct Interner<'src, S>
+pub struct Interner<S>
 where
     S: Copy + ExtractSymbToken,
 {
-    map: HashMap<&'src str, S>,
-    strings: Vec<&'src str>,
+    map: HashMap<String, S>,
+    strings: Vec<String>,
 }
 
-pub struct SymbolDisplayer<'a, 'src> {
-    interner: &'a Interner<'src, Symbol>,
+pub struct SymbolDisplayer<'a> {
+    interner: &'a Interner<Symbol>,
     symbol: Symbol,
 }
 
-impl<'a, 'src> fmt::Display for SymbolDisplayer<'a, 'src> {
+impl<'a> fmt::Display for SymbolDisplayer<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.interner.resolve(self.symbol))
     }
 }
 
 impl Symbol {
-    pub fn display<'a, 'src>(
-        &self,
-        interner: &'a Interner<'src, Symbol>,
-    ) -> SymbolDisplayer<'a, 'src> {
+    pub fn display<'a>(&self, interner: &'a Interner<Symbol>) -> SymbolDisplayer<'a> {
         SymbolDisplayer {
             interner,
             symbol: *self,
@@ -66,7 +63,7 @@ impl Symbol {
 }
 
 #[allow(private_bounds)]
-impl<'src, S> Interner<'src, S>
+impl<S> Interner<S>
 where
     S: Copy + ExtractSymbToken,
 {
@@ -77,23 +74,23 @@ where
         }
     }
 
-    pub fn intern(&mut self, s: &'src str) -> S {
+    pub fn intern(&mut self, s: &str) -> S {
         if let Some(symb) = self.map.get(s) {
             *symb
         } else {
             let idx = self.strings.len();
-            self.strings.push(s);
+            self.strings.push(s.into());
             let symbol = S::from(SymbToken(idx as u32));
-            self.map.insert(s, symbol);
+            self.map.insert(s.into(), symbol);
             symbol
         }
     }
 
-    pub fn resolve(&self, s: S) -> &'src str {
-        self.strings[s.extract().0 as usize]
+    pub fn resolve(&self, s: S) -> &String {
+        &self.strings[s.extract().0 as usize]
     }
 
-    pub fn lookup(&self, s: &'src str) -> Option<S> {
+    pub fn lookup(&self, s: &str) -> Option<S> {
         self.map.get(s).copied()
     }
 }
