@@ -25,6 +25,7 @@ pub enum TokenKind {
     LetOp(Symbol),
     Rec,
     Fun,
+    Function,
     For,
     While,
     Open,
@@ -119,8 +120,6 @@ impl<'a, 'b> fmt::Display for DebugTokenDisplay<'a, 'b> {
 
 impl<'a, 'b> fmt::Display for DebugTokenKindDisplay<'a, 'b> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let s = &self.1;
-
         match self.0 {
             TokenKind::Ident(_) => write!(f, "Ident: ")?,
             TokenKind::Intlit(_) => write!(f, "Intlit: ")?,
@@ -140,6 +139,7 @@ impl<'a, 'b> fmt::Display for DebugTokenKindDisplay<'a, 'b> {
             TokenKind::Let => write!(f, "Let: ")?,
             TokenKind::Rec => write!(f, "Rec: ")?,
             TokenKind::Fun => write!(f, "Fun: ")?,
+            TokenKind::Function => write!(f, "Function: ")?,
             TokenKind::For => write!(f, "For: ")?,
             TokenKind::While => write!(f, "While: ")?,
             TokenKind::Open => write!(f, "Open: ")?,
@@ -173,64 +173,7 @@ impl<'a, 'b> fmt::Display for DebugTokenKindDisplay<'a, 'b> {
             TokenKind::RSqr => write!(f, "RSQr: ")?,
         };
 
-        match self.0 {
-            TokenKind::Op(symbol) => {
-                write!(f, "{}", s.resolve_symbol(*symbol))
-            }
-            TokenKind::Ident(symbol) => {
-                write!(f, "{}", s.resolve_symbol(*symbol))
-            }
-            TokenKind::Intlit(x) => write!(f, "{x}"),
-            TokenKind::Strlit(str_lit) => {
-                let lit = s.resolve_strlit(*str_lit);
-                write!(f, "\"{}\"", lit.escape_debug())
-            }
-            TokenKind::True => write!(f, "true"),
-            TokenKind::False => write!(f, "false"),
-            TokenKind::If => write!(f, "if"),
-            TokenKind::Then => write!(f, "then"),
-            TokenKind::Else => write!(f, "else"),
-            TokenKind::Match => write!(f, "match"),
-            TokenKind::With => write!(f, "with"),
-            TokenKind::Begin => write!(f, "begin"),
-            TokenKind::End => write!(f, "end"),
-            TokenKind::Let => write!(f, "let"),
-            TokenKind::LetOp(symbol) => write!(f, "let{}", s.resolve_symbol(*symbol)),
-            TokenKind::Rec => write!(f, "rec"),
-            TokenKind::Fun => write!(f, "fun"),
-            TokenKind::For => write!(f, "for"),
-            TokenKind::While => write!(f, "while"),
-            TokenKind::Open => write!(f, "open"),
-            TokenKind::Do => write!(f, "do"),
-            TokenKind::Done => write!(f, "done"),
-            TokenKind::To => write!(f, "to"),
-            TokenKind::Plus => write!(f, "+"),
-            TokenKind::Minus => write!(f, "-"),
-            TokenKind::Star => write!(f, "*"),
-            TokenKind::Div => write!(f, "/"),
-            TokenKind::Eq => write!(f, "="),
-            TokenKind::Exclam => write!(f, "!"),
-            TokenKind::NEq => write!(f, "<>"),
-            TokenKind::LT => write!(f, "<"),
-            TokenKind::GT => write!(f, ">"),
-            TokenKind::GEq => write!(f, ">="),
-            TokenKind::LEq => write!(f, "<="),
-            TokenKind::LOr => write!(f, "||"),
-            TokenKind::Cons => write!(f, "::"),
-            TokenKind::Pipe => write!(f, "|"),
-            TokenKind::Arrow => write!(f, "->"),
-            TokenKind::Pound => write!(f, "&"),
-            TokenKind::Semi => write!(f, ";"),
-            TokenKind::Comma => write!(f, ","),
-            TokenKind::Dot => write!(f, "."),
-            TokenKind::LPar => write!(f, "("),
-            TokenKind::RPar => write!(f, ")"),
-            TokenKind::LBra => write!(f, "{{"),
-            TokenKind::RBra => write!(f, "}}"),
-            TokenKind::LSqr => write!(f, "["),
-            TokenKind::RSqr => write!(f, "]"),
-            TokenKind::Comment(s) => write!(f, "{}", s.escape_debug()),
-        }
+        write!(f, "{}", self.0.display(self.1))
     }
 }
 
@@ -259,6 +202,7 @@ impl<'a, 'b> fmt::Display for TokenKindDisplay<'a, 'b> {
             TokenKind::LetOp(symbol) => write!(f, "let{}", s.resolve_symbol(*symbol)),
             TokenKind::Rec => write!(f, "rec"),
             TokenKind::Fun => write!(f, "fun"),
+            TokenKind::Function => write!(f, "function"),
             TokenKind::For => write!(f, "for"),
             TokenKind::While => write!(f, "while"),
             TokenKind::Open => write!(f, "open"),

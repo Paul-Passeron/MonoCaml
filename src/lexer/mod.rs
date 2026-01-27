@@ -21,6 +21,7 @@ pub enum LexingError {
     UnexpectedChar(Loc),
     UnmatchedCommentStart(Loc),
     NotAnOperator(Loc),
+    UnterminatedString(Loc),
 }
 
 pub type LexRes = Result<Token, LexingError>;
@@ -235,6 +236,9 @@ impl<'session> Lexer<'session> {
             "do" => Ok(Token::new(TokenKind::Do, l.span(&self.loc()))),
             "done" => Ok(Token::new(TokenKind::Done, l.span(&self.loc()))),
             "to" => Ok(Token::new(TokenKind::To, l.span(&self.loc()))),
+            "rec" => Ok(Token::new(TokenKind::Rec, l.span(&self.loc()))),
+            "fun" => Ok(Token::new(TokenKind::Fun, l.span(&self.loc()))),
+            "function" => Ok(Token::new(TokenKind::Function, l.span(&self.loc()))),
             "let" => {
                 if self.is_operator_start(true) {
                     let _ = self.lex_operator(session)?;
@@ -260,11 +264,15 @@ impl<'session> Lexer<'session> {
         } else {
             self.advance();
             while let Some(c) = self.peek() {
+                if c == '\n' {
+                    return Err(LexingError::UnterminatedString(l));
+                }
                 if c == '"' {
                     self.advance();
                     break;
                 }
                 self.advance();
+                self.peek_or_eof()?;
             }
             let s = &self.contents[l.offset + 1..self.loc().offset - 1];
             let strlit = session.intern_strlit(s);
