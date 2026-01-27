@@ -93,19 +93,29 @@ impl SourceManager {
 
     pub fn loc_infos(&self, loc: Loc) -> LocInfo<'_> {
         let f = self.get_file(loc.file);
-        let (line, offset) = f
-            .lines
-            .iter()
-            .copied()
-            .enumerate()
-            .find(|(_, off)| *off > loc.offset)
-            .unwrap_or_else(|| (f.lines.len(), *f.lines.last().unwrap()));
-        let col = loc.offset - offset;
-        LocInfo {
-            offset,
-            line: line,
-            col: col + 1,
-            path: &f.kind.get_name(),
+        if loc.offset == 0 {
+            LocInfo {
+                offset: 0,
+                line: 1,
+                col: 1,
+                path: &f.kind.get_name(),
+            }
+        } else {
+            let (line, offset) = f
+                .lines
+                .iter()
+                .copied()
+                .enumerate()
+                .filter(|(_, off)| *off < loc.offset)
+                .last()
+                .unwrap();
+            let col = loc.offset - offset;
+            LocInfo {
+                offset,
+                line: line + 1,
+                col: col + if line == 0 { 1 } else { 0 },
+                path: &f.kind.get_name(),
+            }
         }
     }
 

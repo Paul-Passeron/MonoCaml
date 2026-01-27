@@ -58,8 +58,8 @@ pub enum TokenKind {
     RPar,
     LBra,
     RBra,
-    LSQr,
-    RSQr,
+    LSqr,
+    RSqr,
 
     Comment(String),
 }
@@ -169,8 +169,8 @@ impl<'a, 'b> fmt::Display for DebugTokenKindDisplay<'a, 'b> {
             TokenKind::RPar => write!(f, "RPar: ")?,
             TokenKind::LBra => write!(f, "LBra: ")?,
             TokenKind::RBra => write!(f, "RBra: ")?,
-            TokenKind::LSQr => write!(f, "LSQr: ")?,
-            TokenKind::RSQr => write!(f, "RSQr: ")?,
+            TokenKind::LSqr => write!(f, "LSQr: ")?,
+            TokenKind::RSqr => write!(f, "RSQr: ")?,
         };
 
         match self.0 {
@@ -227,8 +227,8 @@ impl<'a, 'b> fmt::Display for DebugTokenKindDisplay<'a, 'b> {
             TokenKind::RPar => write!(f, ")"),
             TokenKind::LBra => write!(f, "{{"),
             TokenKind::RBra => write!(f, "}}"),
-            TokenKind::LSQr => write!(f, "["),
-            TokenKind::RSQr => write!(f, "]"),
+            TokenKind::LSqr => write!(f, "["),
+            TokenKind::RSqr => write!(f, "]"),
             TokenKind::Comment(s) => write!(f, "{}", s.escape_debug()),
         }
     }
@@ -288,8 +288,8 @@ impl<'a, 'b> fmt::Display for TokenKindDisplay<'a, 'b> {
             TokenKind::RPar => write!(f, ")"),
             TokenKind::LBra => write!(f, "{{"),
             TokenKind::RBra => write!(f, "}}"),
-            TokenKind::LSQr => write!(f, "["),
-            TokenKind::RSQr => write!(f, "]"),
+            TokenKind::LSqr => write!(f, "["),
+            TokenKind::RSqr => write!(f, "]"),
             TokenKind::Comment(s) => write!(f, "{}", s.escape_debug()),
         }
     }

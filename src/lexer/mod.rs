@@ -285,6 +285,8 @@ impl<'session> Lexer<'session> {
                     }
                 }
                 ')' => Ok(self.create_single_char_token(TokenKind::RPar)),
+                '[' => Ok(self.create_single_char_token(TokenKind::LSqr)),
+                ']' => Ok(self.create_single_char_token(TokenKind::RSqr)),
                 _ if self.is_operator_start(true) => {
                     // This is an operator
                     self.lex_operator(session)

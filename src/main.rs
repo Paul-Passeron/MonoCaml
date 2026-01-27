@@ -67,7 +67,10 @@ fn main() {
     // compile_ast_with_ctx(ast, "llvm_test", ctx);
     let sm = SourceManager::new();
     let mut session = Session::new(sm);
-    let contents = "let _ = print_endline \"Hello, World !\"";
+    let contents = r#"let _ = print_endline "Hello, World!"
+let rec rev l = match l with
+    | a :: b -> (rev b) @ a
+    | [] -> []"#;
     let id = session.source_manager.add_file(
         PathBuf::from("examples/hello_world.ml"),
         contents.to_string(),
