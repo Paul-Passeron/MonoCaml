@@ -10,6 +10,7 @@ pub enum TokenKind {
     Ident(Symbol),
     Intlit(i64),
     Strlit(StrLit),
+    Charlit(char),
 
     True,
     False,
@@ -54,6 +55,7 @@ pub enum TokenKind {
     Semi,
     Comma,
     Dot,
+    Colon,
 
     LPar,
     RPar,
@@ -63,6 +65,7 @@ pub enum TokenKind {
     RSqr,
 
     Comment(String),
+    PolyTypeName(Symbol),
 }
 
 impl TokenKind {
@@ -77,12 +80,12 @@ impl TokenKind {
         self.is_comment()
     }
 
-    pub fn display<'a, 'b>(&'a self, sm: &'b Session) -> TokenKindDisplay<'a, 'b> {
-        TokenKindDisplay(self, sm)
+    pub fn display<'a, 'b>(&'a self, s: &'b Session) -> TokenKindDisplay<'a, 'b> {
+        TokenKindDisplay(self, s)
     }
 
-    pub fn debug<'a, 'b>(&'a self, sm: &'b Session) -> DebugTokenKindDisplay<'a, 'b> {
-        DebugTokenKindDisplay(self, sm)
+    pub fn debug<'a, 'b>(&'a self, s: &'b Session) -> DebugTokenKindDisplay<'a, 'b> {
+        DebugTokenKindDisplay(self, s)
     }
 }
 
@@ -124,9 +127,11 @@ impl<'a, 'b> fmt::Display for DebugTokenKindDisplay<'a, 'b> {
             TokenKind::Ident(_) => write!(f, "Ident: ")?,
             TokenKind::Intlit(_) => write!(f, "Intlit: ")?,
             TokenKind::Strlit(_) => write!(f, "Strlit: ")?,
+            TokenKind::Charlit(_) => write!(f, "Charlit: ")?,
             TokenKind::LetOp(_) => write!(f, "LetOp: ")?,
             TokenKind::Op(_) => write!(f, "Op: ")?,
             TokenKind::Comment(_) => write!(f, "Comment: ")?,
+            TokenKind::PolyTypeName(_) => write!(f, "PolyTypeName: ")?,
             TokenKind::True => write!(f, "True: ")?,
             TokenKind::False => write!(f, "False: ")?,
             TokenKind::If => write!(f, "If: ")?,
@@ -165,6 +170,7 @@ impl<'a, 'b> fmt::Display for DebugTokenKindDisplay<'a, 'b> {
             TokenKind::Semi => write!(f, "Semi: ")?,
             TokenKind::Comma => write!(f, "Comma: ")?,
             TokenKind::Dot => write!(f, "Dot: ")?,
+            TokenKind::Colon => write!(f, "Colon: ")?,
             TokenKind::LPar => write!(f, "LPar: ")?,
             TokenKind::RPar => write!(f, "RPar: ")?,
             TokenKind::LBra => write!(f, "LBra: ")?,
@@ -189,6 +195,8 @@ impl<'a, 'b> fmt::Display for TokenKindDisplay<'a, 'b> {
                 let lit = s.resolve_strlit(*str_lit);
                 write!(f, "\"{}\"", lit.escape_debug())
             }
+            TokenKind::PolyTypeName(symbol) => write!(f, "'{}", s.resolve_symbol(*symbol)),
+            TokenKind::Charlit(c) => write!(f, "'{}'", c.escape_debug()),
             TokenKind::True => write!(f, "true"),
             TokenKind::False => write!(f, "false"),
             TokenKind::If => write!(f, "if"),
@@ -228,6 +236,7 @@ impl<'a, 'b> fmt::Display for TokenKindDisplay<'a, 'b> {
             TokenKind::Semi => write!(f, ";"),
             TokenKind::Comma => write!(f, ","),
             TokenKind::Dot => write!(f, "."),
+            TokenKind::Colon => write!(f, ":"),
             TokenKind::LPar => write!(f, "("),
             TokenKind::RPar => write!(f, ")"),
             TokenKind::LBra => write!(f, "{{"),
