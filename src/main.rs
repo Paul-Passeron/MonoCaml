@@ -10,7 +10,6 @@ use std::{
 use crate::{
     backend::llvm_backend::LLVMBackend,
     cfg::{FunName, Label, var::CfgVar},
-    examples::rev_bench,
     lexer::Lexer,
     lower::mono_to_cfg::MonoToCfg,
     mono_ir::{Ast, Var, types::AstCtx},

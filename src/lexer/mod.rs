@@ -266,7 +266,7 @@ impl<'session> Lexer<'session> {
                 }
                 self.advance();
             }
-            let s = &self.contents[l.offset..self.loc().offset];
+            let s = &self.contents[l.offset + 1..self.loc().offset - 1];
             let strlit = session.intern_strlit(s);
             Ok(Token::new(TokenKind::Strlit(strlit), l.span(&self.loc())))
         }
