@@ -11,7 +11,7 @@ use std::{
 use crate::{
     backend::llvm_backend::LLVMBackend,
     cfg::{FunName, Label, var::CfgVar},
-    lexer::Lexer,
+    lexer::{Lexer, LexingError},
     lower::mono_to_cfg::MonoToCfg,
     mono_ir::{Ast, Var, types::AstCtx},
     session::Session,
@@ -78,9 +78,28 @@ fn main() {
         PathBuf::from("examples/hello_world.ml"),
         contents.to_string(),
     );
-    let l = Lexer::new(&session.source_manager, id);
-    let toks = l.no_skip(&mut session).collect::<Vec<_>>();
-    for tok in toks {
-        println!("{}", tok.debug(&session));
+    let mut l = Lexer::new(&session.source_manager, id);
+    let mut tokens = vec![];
+    let mut error: Option<LexingError> = None;
+    loop {
+        let t = l.next_token(&mut session);
+        match t {
+            Ok(x) => tokens.push(x),
+            Err(LexingError::EOF) => {
+                break;
+            }
+            Err(e) => {
+                error = Some(e);
+                break;
+            }
+        }
+    }
+
+    for t in tokens {
+        println!("{}", t.display(&session));
+    }
+
+    if error.is_some() {
+        println!("Lexing error: {}", error.unwrap().display(&session))
     }
 }
