@@ -1,4 +1,4 @@
-use std::marker::PhantomData;
+use std::{fmt, marker::PhantomData};
 
 use crate::{
     lexer::token::{Token, TokenKind},
@@ -22,16 +22,115 @@ pub enum LexingError {
     UnmatchedCommentStart(Loc),
     NotAnOperator(Loc),
     UnterminatedString(Loc),
+    KeywordInPolyTypeName(Token),
+    InvalidCharLiteral(Loc),
+    EmptyCharLiteral(Loc),
+    InvalidEscape(Loc, char),
+    InvalidUnicodeEscape(Loc, String),
+    InvalidAsciiEscape(Loc, String),
+    InvalidCodePoint(Loc, u32),
+    UnterminatedChar(Loc),
+}
+
+pub struct LexingErrorDisplay<'a, 'b>(&'a LexingError, &'b Session);
+
+impl<'a, 'b> fmt::Display for LexingErrorDisplay<'a, 'b> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.0 {
+            LexingError::EOF => write!(f, "EOF"),
+            LexingError::UnexpectedChar(loc) => {
+                write!(
+                    f,
+                    "{}: Unexpected characted",
+                    loc.display(&self.1.source_manager)
+                )
+            }
+            LexingError::UnmatchedCommentStart(loc) => write!(
+                f,
+                "{}: Unmatched comment start",
+                loc.display(&self.1.source_manager)
+            ),
+            LexingError::NotAnOperator(loc) => write!(
+                f,
+                "{}: Expected an operator",
+                loc.display(&self.1.source_manager)
+            ),
+            LexingError::UnterminatedString(loc) => write!(
+                f,
+                "{}: String literal is not terminated",
+                loc.display(&self.1.source_manager)
+            ),
+            LexingError::KeywordInPolyTypeName(token) => write!(
+                f,
+                "{}: Reserved keyword used in polymorphic type name ({})",
+                token.span.split().0.display(&self.1.source_manager),
+                token.kind.display(&self.1)
+            ),
+            LexingError::InvalidCharLiteral(loc) => write!(
+                f,
+                "{}: Invalid character literal",
+                loc.display(&self.1.source_manager)
+            ),
+            LexingError::EmptyCharLiteral(loc) => write!(
+                f,
+                "{}: Empty character literal",
+                loc.display(&self.1.source_manager)
+            ),
+            LexingError::InvalidEscape(loc, c) => {
+                write!(
+                    f,
+                    "{}: Invalid escape character '{}'",
+                    loc.display(&self.1.source_manager),
+                    c.escape_debug()
+                )
+            }
+            LexingError::InvalidUnicodeEscape(loc, s) => write!(
+                f,
+                "{}: Invalid unicode escape {}",
+                loc.display(&self.1.source_manager),
+                s
+            ),
+            LexingError::InvalidAsciiEscape(loc, s) => write!(
+                f,
+                "{}: Invalid ascii escape {}",
+                loc.display(&self.1.source_manager),
+                s
+            ),
+            LexingError::InvalidCodePoint(loc, cp) => write!(
+                f,
+                "{}: Invalid code point {}",
+                loc.display(&self.1.source_manager),
+                cp
+            ),
+            LexingError::UnterminatedChar(loc) => {
+                write!(
+                    f,
+                    "{}: Unterminated char literal",
+                    loc.display(&self.1.source_manager),
+                )
+            }
+        }
+    }
+}
+
+impl LexingError {
+    pub fn display<'a, 'b>(&'a self, s: &'b Session) -> LexingErrorDisplay<'a, 'b> {
+        LexingErrorDisplay(self, s)
+    }
 }
 
 pub type LexRes = Result<Token, LexingError>;
 
 fn is_identifier_start(c: char) -> bool {
-    c.is_alphabetic() || c == '_'
+    is_identifier(c, true)
 }
 
 fn is_identifier_continue(c: char) -> bool {
-    is_identifier_start(c) || c.is_numeric()
+    is_identifier(c, false)
+}
+
+fn is_identifier(c: char, is_first: bool) -> bool {
+    c.is_alphabetic() || c == '_' || (!is_first && c.is_numeric())
 }
 
 impl<'session> Lexer<'session> {
@@ -197,6 +296,7 @@ impl<'session> Lexer<'session> {
             ">=" => Ok(Token::new(TokenKind::GEq, l.span(&self.loc()))),
             "<=" => Ok(Token::new(TokenKind::LEq, l.span(&self.loc()))),
             "||" => Ok(Token::new(TokenKind::LOr, l.span(&self.loc()))),
+            ":" => Ok(Token::new(TokenKind::Colon, l.span(&self.loc()))),
             "::" => Ok(Token::new(TokenKind::Cons, l.span(&self.loc()))),
             "|" => Ok(Token::new(TokenKind::Pipe, l.span(&self.loc()))),
             "->" => Ok(Token::new(TokenKind::Arrow, l.span(&self.loc()))),
@@ -281,7 +381,153 @@ impl<'session> Lexer<'session> {
         }
     }
 
-    fn next_token(&mut self, session: &mut Session) -> LexRes {
+    pub fn parse_char_content(&mut self) -> Result<char, LexingError> {
+        match self.advance() {
+            None => Err(LexingError::EmptyCharLiteral(self.loc().previous())),
+            Some('\\') => self.parse_escape_sequence(),
+            Some(c) => Ok(c),
+        }
+    }
+
+    fn parse_escape_sequence(&mut self) -> Result<char, LexingError> {
+        match self.advance() {
+            None => Err(LexingError::InvalidEscape(self.loc().previous(), ' ')),
+            Some('n') => Ok('\n'),
+            Some('r') => Ok('\r'),
+            Some('t') => Ok('\t'),
+            Some('\\') => Ok('\\'),
+            Some('0') => Ok('\0'),
+            Some('\'') => Ok('\''),
+            Some('"') => Ok('"'),
+            Some('x') => self.parse_ascii_escape(),
+            Some('u') => self.parse_unicode_escape(),
+            Some(c) => Err(LexingError::InvalidEscape(self.loc(), c)),
+        }
+    }
+
+    fn parse_ascii_escape(&mut self) -> Result<char, LexingError> {
+        let l = self.loc();
+        // Expect exactly 2 hex digits
+        let mut hex = String::with_capacity(2);
+
+        for _ in 0..2 {
+            match self.advance() {
+                Some(c) if c.is_ascii_hexdigit() => hex.push(c),
+                Some(c) => {
+                    return Err(LexingError::InvalidAsciiEscape(
+                        self.loc().previous(),
+                        format!("\\x{hex}{c}"),
+                    ));
+                }
+                None => {
+                    return Err(LexingError::InvalidAsciiEscape(
+                        self.loc().previous(),
+                        format!("\\x{hex}"),
+                    ));
+                }
+            }
+        }
+
+        let value = u8::from_str_radix(&hex, 16)
+            .map_err(|_| LexingError::InvalidAsciiEscape(l, format!("\\x{hex}")))?;
+
+        // ASCII escape must be in range 0x00-0x7F
+        if value > 0x7F {
+            return Err(LexingError::InvalidAsciiEscape(
+                l,
+                format!("\\x{hex} (value {value:#x} exceeds 0x7F)"),
+            ));
+        }
+
+        Ok(value as char)
+    }
+
+    fn parse_unicode_escape(&mut self) -> Result<char, LexingError> {
+        // Expect opening brace
+        match self.advance() {
+            Some('{') => {}
+            Some(c) => {
+                return Err(LexingError::InvalidUnicodeEscape(
+                    self.loc().previous(),
+                    format!("\\u{c}"),
+                ));
+            }
+            None => {
+                return Err(LexingError::InvalidUnicodeEscape(
+                    self.loc().previous(),
+                    "\\u".to_string(),
+                ));
+            }
+        }
+
+        // Collect 1-6 hex digits
+        let mut hex = String::with_capacity(6);
+
+        let l = self.loc();
+
+        loop {
+            match self.peek() {
+                Some('}') => {
+                    self.advance();
+                    break;
+                }
+                Some(c) if c.is_ascii_hexdigit() && hex.len() < 6 => {
+                    hex.push(c);
+                    self.advance();
+                }
+                Some(c) if c.is_ascii_hexdigit() => {
+                    return Err(LexingError::InvalidUnicodeEscape(
+                        self.loc().previous(),
+                        format!("\\u{{{hex}... (too many digits)"),
+                    ));
+                }
+                Some(c) => {
+                    return Err(LexingError::InvalidUnicodeEscape(
+                        self.loc().previous(),
+                        format!("\\u{{{hex}{c}"),
+                    ));
+                }
+                None => {
+                    return Err(LexingError::InvalidUnicodeEscape(
+                        self.loc().previous(),
+                        format!("\\u{{{hex} (missing closing brace)"),
+                    ));
+                }
+            }
+        }
+
+        if hex.is_empty() {
+            return Err(LexingError::InvalidUnicodeEscape(
+                l,
+                "\\u{} (empty)".to_string(),
+            ));
+        }
+
+        let code_point = u32::from_str_radix(&hex, 16)
+            .map_err(|_| LexingError::InvalidUnicodeEscape(l, format!("\\u{{{hex}}}")))?;
+
+        char::from_u32(code_point).ok_or(LexingError::InvalidCodePoint(l, code_point))
+    }
+
+    fn lex_char_literal(&mut self) -> LexRes {
+        if self.peek_or_eof()? != '\'' {
+            return Err(LexingError::UnexpectedChar(self.loc()));
+        }
+
+        let l = self.loc();
+        self.advance();
+
+        let c = self.parse_char_content()?;
+
+        if self.peek_or_eof()? != '\'' {
+            return Err(LexingError::UnterminatedChar(self.loc()));
+        }
+        self.advance();
+
+        Ok(Token::new(TokenKind::Charlit(c), l.span(&self.loc())))
+    }
+
+    pub fn next_token(&mut self, session: &mut Session) -> LexRes {
         self.skip_whitespace();
         let l = self.loc();
         if let Some(c) = self.peek() {
@@ -301,6 +547,44 @@ impl<'session> Lexer<'session> {
                     self.lex_operator(session)
                 }
                 '"' => self.lex_string(session),
+                '\'' => {
+                    // We need to handle char lit and polymorphic type name
+                    let mut length = 0;
+                    while let Some(x) = self.peek_n(length + 1)
+                        && x != '\''
+                        && !x.is_whitespace()
+                    {
+                        length += 1;
+                    }
+                    if length == 0 {
+                        return Err(LexingError::UnexpectedChar(l));
+                    }
+
+                    if self.peek_n(length + 1) == Some('\'') {
+                        // We have a char literal
+                        return self.lex_char_literal();
+                    }
+
+                    let slice = &self.contents[self.pos + 1..self.pos + length + 1];
+                    if slice
+                        .chars()
+                        .enumerate()
+                        .all(|(i, x)| is_identifier(x, i == 0))
+                    {
+                        self.advance();
+                        let iden = self.lex_identifier(session)?;
+                        let symb = match &iden.kind {
+                            TokenKind::Ident(x) => *x,
+                            _ => return Err(LexingError::KeywordInPolyTypeName(iden)),
+                        };
+                        Ok(Token::new(
+                            TokenKind::PolyTypeName(symb),
+                            l.span(&self.loc()),
+                        ))
+                    } else {
+                        Err(LexingError::UnexpectedChar(l))
+                    }
+                }
                 '?' | '~' => todo!(),
                 _ if is_identifier_start(c) => self.lex_identifier(session),
                 _ => Err(LexingError::UnexpectedChar(l)),
