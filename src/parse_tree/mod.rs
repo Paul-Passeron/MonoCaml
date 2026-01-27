@@ -2,6 +2,8 @@ use crate::{lexer::interner::Symbol, source_manager::loc::Loc};
 
 pub mod expression;
 pub mod pattern;
+pub mod structure;
+pub mod type_declaration;
 pub mod type_expr;
 
 pub struct Located<T> {
