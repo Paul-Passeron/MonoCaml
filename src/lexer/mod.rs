@@ -1,125 +1,24 @@
-use std::{fmt, marker::PhantomData};
-
 use crate::{
-    lexer::token::{Token, TokenKind},
+    lexer::{
+        error::{LexRes, LexingError},
+        token::{Token, TokenKind},
+    },
     session::Session,
     source_manager::{FileId, SourceManager, loc::Loc},
 };
 
+pub mod char_lit;
+pub mod error;
 pub mod interner;
+pub mod iter;
+pub mod operator;
 pub mod token;
 
-pub struct Lexer<'session> {
+pub struct Lexer {
     pub contents: String,
     pub file: FileId,
     pub pos: usize,
-    _session: PhantomData<&'session ()>,
 }
-
-pub enum LexingError {
-    EOF,
-    UnexpectedChar(Loc),
-    UnmatchedCommentStart(Loc),
-    NotAnOperator(Loc),
-    UnterminatedString(Loc),
-    KeywordInPolyTypeName(Token),
-    InvalidCharLiteral(Loc),
-    EmptyCharLiteral(Loc),
-    InvalidEscape(Loc, char),
-    InvalidUnicodeEscape(Loc, String),
-    InvalidAsciiEscape(Loc, String),
-    InvalidCodePoint(Loc, u32),
-    UnterminatedChar(Loc),
-}
-
-pub struct LexingErrorDisplay<'a, 'b>(&'a LexingError, &'b Session);
-
-impl<'a, 'b> fmt::Display for LexingErrorDisplay<'a, 'b> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match &self.0 {
-            LexingError::EOF => write!(f, "EOF"),
-            LexingError::UnexpectedChar(loc) => {
-                write!(
-                    f,
-                    "{}: Unexpected characted",
-                    loc.display(&self.1.source_manager)
-                )
-            }
-            LexingError::UnmatchedCommentStart(loc) => write!(
-                f,
-                "{}: Unmatched comment start",
-                loc.display(&self.1.source_manager)
-            ),
-            LexingError::NotAnOperator(loc) => write!(
-                f,
-                "{}: Expected an operator",
-                loc.display(&self.1.source_manager)
-            ),
-            LexingError::UnterminatedString(loc) => write!(
-                f,
-                "{}: String literal is not terminated",
-                loc.display(&self.1.source_manager)
-            ),
-            LexingError::KeywordInPolyTypeName(token) => write!(
-                f,
-                "{}: Reserved keyword used in polymorphic type name ({})",
-                token.span.split().0.display(&self.1.source_manager),
-                token.kind.display(&self.1)
-            ),
-            LexingError::InvalidCharLiteral(loc) => write!(
-                f,
-                "{}: Invalid character literal",
-                loc.display(&self.1.source_manager)
-            ),
-            LexingError::EmptyCharLiteral(loc) => write!(
-                f,
-                "{}: Empty character literal",
-                loc.display(&self.1.source_manager)
-            ),
-            LexingError::InvalidEscape(loc, c) => {
-                write!(
-                    f,
-                    "{}: Invalid escape character '{}'",
-                    loc.display(&self.1.source_manager),
-                    c.escape_debug()
-                )
-            }
-            LexingError::InvalidUnicodeEscape(loc, s) => write!(
-                f,
-                "{}: Invalid unicode escape {}",
-                loc.display(&self.1.source_manager),
-                s
-            ),
-            LexingError::InvalidAsciiEscape(loc, s) => write!(
-                f,
-                "{}: Invalid ascii escape {}",
-                loc.display(&self.1.source_manager),
-                s
-            ),
-            LexingError::InvalidCodePoint(loc, cp) => write!(
-                f,
-                "{}: Invalid code point {}",
-                loc.display(&self.1.source_manager),
-                cp
-            ),
-            LexingError::UnterminatedChar(loc) => {
-                write!(
-                    f,
-                    "{}: Unterminated char literal",
-                    loc.display(&self.1.source_manager),
-                )
-            }
-        }
-    }
-}
-
-impl LexingError {
-    pub fn display<'a, 'b>(&'a self, s: &'b Session) -> LexingErrorDisplay<'a, 'b> {
-        LexingErrorDisplay(self, s)
-    }
-}
-
-pub type LexRes = Result<Token, LexingError>;
 
 fn is_identifier_start(c: char) -> bool {
     is_identifier(c, true)
@@ -133,13 +32,12 @@ fn is_identifier(c: char, is_first: bool) -> bool {
     c.is_alphabetic() || c == '_' || (!is_first && c.is_numeric())
 }
 
-impl<'session> Lexer<'session> {
+impl Lexer {
     pub fn new(sm: &SourceManager, file: FileId) -> Self {
         Self {
             contents: sm.get_file(file).contents.clone(),
             file,
             pos: 0,
-            _session: PhantomData,
         }
     }
 
@@ -216,96 +114,9 @@ impl<'session> Lexer<'session> {
         }
 
         if depth != 0 {
-            return Err(LexingError::UnmatchedCommentStart(opens.pop().unwrap_or(l)));
+            Err(LexingError::UnmatchedCommentStart(opens.pop().unwrap_or(l)))
         } else {
-        }
-
-        Ok(Token::new(TokenKind::Comment(s), l.span(&self.loc())))
-    }
-
-    fn create_single_char_token(&mut self, kind: TokenKind) -> Token {
-        let l = self.loc();
-        self.advance();
-        let span = l.span(&self.loc());
-        Token::new(kind, span)
-    }
-
-    fn is_operator_char(c: char) -> bool {
-        matches!(
-            c,
-            '!' | '$'
-                | '%'
-                | '&'
-                | '*'
-                | '+'
-                | '-'
-                | '.'
-                | '/'
-                | ':'
-                | '<'
-                | '='
-                | '>'
-                | '?'
-                | '@'
-                | '^'
-                | '|'
-                | '~'
-        )
-    }
-
-    fn is_operator_start(&self, is_first: bool) -> bool {
-        if let Some(c) = self.peek() {
-            match c {
-                '?' | '~' if is_first => self.peek_n(1).map_or(false, Self::is_operator_char),
-                '!' | '$' | '%' | '&' | '*' | '+' | '-' | '.' | '/' | ':' | '<' | '=' | '>'
-                | '@' | '^' | '|' => true,
-                '?' | '~' => true, // valid as continuation
-                _ => false,
-            }
-        } else {
-            false
-        }
-    }
-
-    fn lex_operator(&mut self, session: &mut Session) -> LexRes {
-        if !self.is_operator_start(true) {
-            return Err(LexingError::UnexpectedChar(self.loc()));
-        }
-        let l = self.loc();
-
-        while self.is_operator_start(false) {
-            self.advance();
-        }
-
-        let s = &self.contents[l.offset..self.loc().offset];
-
-        match s {
-            "?" | "~" => {
-                return Err(LexingError::NotAnOperator(l));
-            }
-            // Reserved tokens
-            "+" => Ok(Token::new(TokenKind::Plus, l.span(&self.loc()))),
-            "-" => Ok(Token::new(TokenKind::Minus, l.span(&self.loc()))),
-            "*" => Ok(Token::new(TokenKind::Star, l.span(&self.loc()))),
-            "/" => Ok(Token::new(TokenKind::Div, l.span(&self.loc()))),
-            "!" => Ok(Token::new(TokenKind::Exclam, l.span(&self.loc()))),
-            "=" => Ok(Token::new(TokenKind::Eq, l.span(&self.loc()))),
-            "<>" => Ok(Token::new(TokenKind::NEq, l.span(&self.loc()))),
-            ">" => Ok(Token::new(TokenKind::GT, l.span(&self.loc()))),
-            "<" => Ok(Token::new(TokenKind::LT, l.span(&self.loc()))),
-            ">=" => Ok(Token::new(TokenKind::GEq, l.span(&self.loc()))),
-            "<=" => Ok(Token::new(TokenKind::LEq, l.span(&self.loc()))),
-            "||" => Ok(Token::new(TokenKind::LOr, l.span(&self.loc()))),
-            ":" => Ok(Token::new(TokenKind::Colon, l.span(&self.loc()))),
-            "::" => Ok(Token::new(TokenKind::Cons, l.span(&self.loc()))),
-            "|" => Ok(Token::new(TokenKind::Pipe, l.span(&self.loc()))),
-            "->" => Ok(Token::new(TokenKind::Arrow, l.span(&self.loc()))),
-            "$" => Ok(Token::new(TokenKind::Pound, l.span(&self.loc()))),
-
-            _ => {
-                let op_symbol = session.intern_symbol(s);
-                Ok(Token::new(TokenKind::Op(op_symbol), l.span(&self.loc())))
-            }
+            Ok(Token::new(TokenKind::Comment(s), l.span(&self.loc())))
         }
     }
 
@@ -364,6 +175,7 @@ impl<'session> Lexer<'session> {
             Err(LexingError::UnexpectedChar(l))
         } else {
             self.advance();
+            let mut contents = String::new();
             while let Some(c) = self.peek() {
                 if c == '\n' {
                     return Err(LexingError::UnterminatedString(l));
@@ -372,176 +184,35 @@ impl<'session> Lexer<'session> {
                     self.advance();
                     break;
                 }
-                self.advance();
+                contents.push(self.parse_char_content()?);
                 self.peek_or_eof()?;
             }
-            let s = &self.contents[l.offset + 1..self.loc().offset - 1];
-            let strlit = session.intern_strlit(s);
+            let strlit = session.intern_strlit(&contents);
             Ok(Token::new(TokenKind::Strlit(strlit), l.span(&self.loc())))
         }
-    }
-
-    pub fn parse_char_content(&mut self) -> Result<char, LexingError> {
-        match self.advance() {
-            None => Err(LexingError::EmptyCharLiteral(self.loc().previous())),
-            Some('\\') => self.parse_escape_sequence(),
-            Some(c) => Ok(c),
-        }
-    }
-
-    fn parse_escape_sequence(&mut self) -> Result<char, LexingError> {
-        match self.advance() {
-            None => Err(LexingError::InvalidEscape(self.loc().previous(), ' ')),
-            Some('n') => Ok('\n'),
-            Some('r') => Ok('\r'),
-            Some('t') => Ok('\t'),
-            Some('\\') => Ok('\\'),
-            Some('0') => Ok('\0'),
-            Some('\'') => Ok('\''),
-            Some('"') => Ok('"'),
-            Some('x') => self.parse_ascii_escape(),
-            Some('u') => self.parse_unicode_escape(),
-            Some(c) => Err(LexingError::InvalidEscape(self.loc(), c)),
-        }
-    }
-
-    fn parse_ascii_escape(&mut self) -> Result<char, LexingError> {
-        let l = self.loc();
-        // Expect exactly 2 hex digits
-        let mut hex = String::with_capacity(2);
-
-        for _ in 0..2 {
-            match self.advance() {
-                Some(c) if c.is_ascii_hexdigit() => hex.push(c),
-                Some(c) => {
-                    return Err(LexingError::InvalidAsciiEscape(
-                        self.loc().previous(),
-                        format!("\\x{hex}{c}"),
-                    ));
-                }
-                None => {
-                    return Err(LexingError::InvalidAsciiEscape(
-                        self.loc().previous(),
-                        format!("\\x{hex}"),
-                    ));
-                }
-            }
-        }
-
-        let value = u8::from_str_radix(&hex, 16)
-            .map_err(|_| LexingError::InvalidAsciiEscape(l, format!("\\x{hex}")))?;
-
-        // ASCII escape must be in range 0x00-0x7F
-        if value > 0x7F {
-            return Err(LexingError::InvalidAsciiEscape(
-                l,
-                format!("\\x{hex} (value {value:#x} exceeds 0x7F)"),
-            ));
-        }
-
-        Ok(value as char)
-    }
-
-    fn parse_unicode_escape(&mut self) -> Result<char, LexingError> {
-        // Expect opening brace
-        match self.advance() {
-            Some('{') => {}
-            Some(c) => {
-                return Err(LexingError::InvalidUnicodeEscape(
-                    self.loc().previous(),
-                    format!("\\u{c}"),
-                ));
-            }
-            None => {
-                return Err(LexingError::InvalidUnicodeEscape(
-                    self.loc().previous(),
-                    "\\u".to_string(),
-                ));
-            }
-        }
-
-        // Collect 1-6 hex digits
-        let mut hex = String::with_capacity(6);
-
-        let l = self.loc();
-
-        loop {
-            match self.peek() {
-                Some('}') => {
-                    self.advance();
-                    break;
-                }
-                Some(c) if c.is_ascii_hexdigit() && hex.len() < 6 => {
-                    hex.push(c);
-                    self.advance();
-                }
-                Some(c) if c.is_ascii_hexdigit() => {
-                    return Err(LexingError::InvalidUnicodeEscape(
-                        self.loc().previous(),
-                        format!("\\u{{{hex}... (too many digits)"),
-                    ));
-                }
-                Some(c) => {
-                    return Err(LexingError::InvalidUnicodeEscape(
-                        self.loc().previous(),
-                        format!("\\u{{{hex}{c}"),
-                    ));
-                }
-                None => {
-                    return Err(LexingError::InvalidUnicodeEscape(
-                        self.loc().previous(),
-                        format!("\\u{{{hex} (missing closing brace)"),
-                    ));
-                }
-            }
-        }
-
-        if hex.is_empty() {
-            return Err(LexingError::InvalidUnicodeEscape(
-                l,
-                "\\u{} (empty)".to_string(),
-            ));
-        }
-
-        let code_point = u32::from_str_radix(&hex, 16)
-            .map_err(|_| LexingError::InvalidUnicodeEscape(l, format!("\\u{{{hex}}}")))?;
-
-        char::from_u32(code_point).ok_or(LexingError::InvalidCodePoint(l, code_point))
-    }
-
-    fn lex_char_literal(&mut self) -> LexRes {
-        if self.peek_or_eof()? != '\'' {
-            return Err(LexingError::UnexpectedChar(self.loc()));
-        }
-
-        let l = self.loc();
-        self.advance();
-
-        let c = self.parse_char_content()?;
-
-        if self.peek_or_eof()? != '\'' {
-            return Err(LexingError::UnterminatedChar(self.loc()));
-        }
-        self.advance();
-
-        Ok(Token::new(TokenKind::Charlit(c), l.span(&self.loc())))
     }
 
     pub fn next_token(&mut self, session: &mut Session) -> LexRes {
         self.skip_whitespace();
         let l = self.loc();
+        let create_single_char_token = |this: &mut Lexer, kind| {
+            let l = this.loc();
+            this.advance();
+            let span = l.span(&this.loc());
+            Token::new(kind, span)
+        };
         if let Some(c) = self.peek() {
             match c {
                 '(' => {
                     if let Some('*') = self.peek_n(1) {
                         self.lex_comment()
                     } else {
-                        Ok(self.create_single_char_token(TokenKind::LPar))
+                        Ok(create_single_char_token(self, TokenKind::LPar))
                     }
                 }
-                ')' => Ok(self.create_single_char_token(TokenKind::RPar)),
-                '[' => Ok(self.create_single_char_token(TokenKind::LSqr)),
-                ']' => Ok(self.create_single_char_token(TokenKind::RSqr)),
+                ')' => Ok(create_single_char_token(self, TokenKind::RPar)),
+                '[' => Ok(create_single_char_token(self, TokenKind::LSqr)),
+                ']' => Ok(create_single_char_token(self, TokenKind::RSqr)),
                 _ if self.is_operator_start(true) => {
                     // This is an operator
                     self.lex_operator(session)
@@ -591,56 +262,6 @@ impl<'session> Lexer<'session> {
             }
         } else {
             Err(LexingError::EOF)
-        }
-    }
-}
-// ======================
-/// Iterator utilities
-// ======================
-
-pub struct SkipLexer<'session> {
-    session: &'session mut Session,
-    inner: Lexer<'session>,
-}
-
-pub struct LexerIter<'session> {
-    session: &'session mut Session,
-    inner: Lexer<'session>,
-}
-
-impl<'session> Iterator for LexerIter<'session> {
-    type Item = Token;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        self.inner.next_token(self.session).ok()
-    }
-}
-
-impl<'session> Iterator for SkipLexer<'session> {
-    type Item = Token;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        while let Ok(tok) = self.inner.next_token(self.session) {
-            if !tok.is_skip() {
-                return Some(tok);
-            }
-        }
-
-        None
-    }
-}
-
-impl<'session> Lexer<'session> {
-    pub fn no_skip(self, session: &'session mut Session) -> LexerIter<'session> {
-        LexerIter {
-            inner: self,
-            session,
-        }
-    }
-    pub fn skip(self, session: &'session mut Session) -> SkipLexer<'session> {
-        SkipLexer {
-            inner: self,
-            session,
         }
     }
 }
