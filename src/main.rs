@@ -11,7 +11,7 @@ use std::{
 use crate::{
     backend::llvm_backend::LLVMBackend,
     cfg::{FunName, Label, var::CfgVar},
-    lexer::{Lexer, LexingError},
+    lexer::{Lexer, error::LexingError},
     lower::mono_to_cfg::MonoToCfg,
     mono_ir::{Ast, Var, types::AstCtx},
     session::Session,
@@ -26,6 +26,7 @@ pub mod lexer;
 pub mod lower;
 pub mod mono_ir;
 pub mod parse_tree;
+pub mod parser;
 pub mod session;
 pub mod source_manager;
 
