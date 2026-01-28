@@ -91,3 +91,17 @@ pub struct Case {
     pub guard: Option<Expression>,
     pub expr: Expression,
 }
+
+impl ExpressionDesc {
+    pub fn if_then_else(
+        cond: Expression,
+        then_expr: Expression,
+        else_expr: Option<Expression>,
+    ) -> Self {
+        Self::IfThenElse {
+            cond: Box::new(cond),
+            then_expr: Box::new(then_expr),
+            else_expr: else_expr.map(Box::new),
+        }
+    }
+}
