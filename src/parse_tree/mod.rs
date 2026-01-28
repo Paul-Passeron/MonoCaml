@@ -1,4 +1,4 @@
-use crate::{lexer::interner::Symbol, source_manager::loc::Loc};
+use crate::{lexer::interner::Symbol, source_manager::loc::Span};
 
 pub mod expression;
 pub mod pattern;
@@ -8,7 +8,7 @@ pub mod type_expr;
 
 pub struct Located<T> {
     pub desc: T,
-    pub loc: Loc,
+    pub span: Span,
 }
 
 pub enum LongIdent {
