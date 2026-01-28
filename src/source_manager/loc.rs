@@ -79,3 +79,15 @@ pub enum LocKind {
     Span(Span),
     Loc(Loc),
 }
+
+impl Into<LocKind> for Loc {
+    fn into(self) -> LocKind {
+        LocKind::Loc(self)
+    }
+}
+
+impl Into<LocKind> for Span {
+    fn into(self) -> LocKind {
+        LocKind::Span(self)
+    }
+}
