@@ -3,7 +3,7 @@ use crate::{
     parse_tree::{
         ArgLabel, Located, LongIdent, RecordField, pattern::Pattern, type_expr::TypeExpr,
     },
-    source_manager::loc::Loc,
+    source_manager::loc::Span,
 };
 
 pub enum Constant {
@@ -78,7 +78,23 @@ pub struct ValueBinding {
     pub pat: Pattern,                        // The pattern being bound
     pub expr: Box<Expression>,               // The expression
     pub constraint: Option<ValueConstraint>, // Optional type constraint
-    pub loc: Loc,
+    pub span: Span,
+}
+
+impl ValueBinding {
+    pub fn new(
+        pat: Pattern,
+        expr: Expression,
+        constraint: Option<ValueConstraint>,
+        span: Span,
+    ) -> Self {
+        Self {
+            pat,
+            expr: Box::new(expr),
+            constraint,
+            span,
+        }
+    }
 }
 
 pub struct ValueConstraint {
