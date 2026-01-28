@@ -74,3 +74,8 @@ impl<'a> fmt::Display for SpanDisplay<'a> {
         )
     }
 }
+
+pub enum LocKind {
+    Span(Span),
+    Loc(Loc),
+}
