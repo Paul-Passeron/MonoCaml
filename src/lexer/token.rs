@@ -6,6 +6,7 @@ use crate::{
     source_manager::loc::Span,
 };
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum TokenKind {
     Ident(Symbol),
     Intlit(i64),
@@ -89,6 +90,7 @@ impl TokenKind {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct Token {
     pub kind: TokenKind,
     pub span: Span,
