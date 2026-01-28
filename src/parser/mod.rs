@@ -10,25 +10,17 @@ use crate::{
 
 pub mod error;
 pub mod expression;
+pub mod pattern;
 pub mod structure;
 pub mod type_expr;
+pub mod value_binding;
+pub mod value_constraint;
 
 pub struct Parser<'a> {
     pub src: FileId,
     pub toks: &'a [Token],
     pub pos: usize,
 }
-
-// #[macro_export]
-// macro_rules! try_parse {
-//     ($parser: expr, $($x:expr),+) => {
-//         let mut v: Vec<Box<dyn FnMut(&mut Parser<'a>) -> ParseRes<_>>>  = vec![];
-//         $(
-//             v.push(Box::new($x));
-//         )+
-//         $parser.try_parse(v)
-//     };
-// }
 
 impl<'a> Parser<'a> {
     pub fn new(src: FileId, toks: &'a [Token]) -> Option<Self> {
@@ -73,6 +65,7 @@ impl<'a> Parser<'a> {
         self.peek().map_or_else(|| false, |x| x.kind == kind)
     }
 
+    #[allow(unused)]
     fn try_parse<T>(
         &mut self,
         funs: Vec<Box<dyn FnMut(&mut Parser) -> ParseRes<T>>>,
