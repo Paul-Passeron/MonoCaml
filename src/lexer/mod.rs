@@ -147,6 +147,7 @@ impl Lexer {
             "do" => Ok(Token::new(TokenKind::Do, l.span(&self.loc()))),
             "done" => Ok(Token::new(TokenKind::Done, l.span(&self.loc()))),
             "to" => Ok(Token::new(TokenKind::To, l.span(&self.loc()))),
+            "type" => Ok(Token::new(TokenKind::Type, l.span(&self.loc()))),
             "rec" => Ok(Token::new(TokenKind::Rec, l.span(&self.loc()))),
             "fun" => Ok(Token::new(TokenKind::Fun, l.span(&self.loc()))),
             "function" => Ok(Token::new(TokenKind::Function, l.span(&self.loc()))),
