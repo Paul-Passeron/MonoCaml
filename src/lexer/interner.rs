@@ -4,14 +4,39 @@ use std::{collections::HashMap, fmt};
 struct SymbToken(u32);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct Symbol(SymbToken);
+pub struct ConsSymbol(SymbToken);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct IdentSymbol(SymbToken);
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Symbol {
+    Ident(IdentSymbol),
+    Cons(ConsSymbol),
+}
+
+impl Symbol {
+    pub fn is_constructor(&self) -> bool {
+        match self {
+            Symbol::Ident(_) => false,
+            Symbol::Cons(_) => true,
+        }
+    }
+
+    pub fn is_identifier(&self) -> bool {
+        match self {
+            Symbol::Ident(_) => true,
+            Symbol::Cons(_) => false,
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct StrLit(SymbToken);
 
 trait ExtractSymbToken {
     fn extract(&self) -> SymbToken;
-    fn from(t: SymbToken) -> Self;
+    fn new(id: u32, src: &str) -> Self;
 }
 
 impl ExtractSymbToken for StrLit {
@@ -19,17 +44,45 @@ impl ExtractSymbToken for StrLit {
         self.0
     }
 
-    fn from(t: SymbToken) -> Self {
-        Self(t)
+    fn new(id: u32, _: &str) -> Self {
+        Self(SymbToken(id))
+    }
+}
+
+impl ExtractSymbToken for ConsSymbol {
+    fn extract(&self) -> SymbToken {
+        self.0
+    }
+    fn new(id: u32, _: &str) -> Self {
+        Self(SymbToken(id))
+    }
+}
+
+impl ExtractSymbToken for IdentSymbol {
+    fn extract(&self) -> SymbToken {
+        self.0
+    }
+    fn new(id: u32, _: &str) -> Self {
+        Self(SymbToken(id))
     }
 }
 
 impl ExtractSymbToken for Symbol {
     fn extract(&self) -> SymbToken {
-        self.0
+        match self {
+            Symbol::Ident(ident) => ident.extract(),
+            Symbol::Cons(cons) => cons.extract(),
+        }
     }
-    fn from(t: SymbToken) -> Self {
-        Self(t)
+
+    fn new(id: u32, src: &str) -> Self {
+        assert!(!src.is_empty());
+        let c = src.chars().next().unwrap();
+        if c.is_ascii_alphabetic() && c.is_ascii_uppercase() {
+            Self::Cons(ConsSymbol::new(id, src))
+        } else {
+            Self::Ident(IdentSymbol::new(id, src))
+        }
     }
 }
 
@@ -80,7 +133,7 @@ where
         } else {
             let idx = self.strings.len();
             self.strings.push(s.into());
-            let symbol = S::from(SymbToken(idx as u32));
+            let symbol = S::new(idx as u32, s);
             self.map.insert(s.into(), symbol);
             symbol
         }

@@ -194,6 +194,14 @@ impl Lexer {
         }
     }
 
+    fn at_intlit_start(&self) -> bool {
+        match self.peek() {
+            Some('-') if self.peek_n(1).iter().all(|x| x.is_ascii_digit()) => true,
+            Some(c) if c.is_ascii_digit() => true,
+            _ => false,
+        }
+    }
+
     pub fn next_token(&mut self, session: &mut Session) -> LexRes {
         self.skip_whitespace();
         let l = self.loc();
@@ -215,6 +223,21 @@ impl Lexer {
                 ')' => Ok(create_single_char_token(self, TokenKind::RPar)),
                 '[' => Ok(create_single_char_token(self, TokenKind::LSqr)),
                 ']' => Ok(create_single_char_token(self, TokenKind::RSqr)),
+                _ if self.at_intlit_start() => {
+                    let l = self.loc();
+                    if c == '-' {
+                        self.advance();
+                    }
+                    while let Some(d) = self.peek()
+                        && d.is_ascii_digit()
+                    {
+                        self.advance();
+                    }
+                    let end_loc = self.loc();
+                    let s = &self.contents[l.offset..end_loc.offset];
+                    let parsed = s.parse::<i64>().unwrap();
+                    Ok(Token::new(TokenKind::Intlit(parsed), l.span(&end_loc)))
+                }
                 _ if self.is_operator_start(true) => {
                     // This is an operator
                     self.lex_operator(session)
