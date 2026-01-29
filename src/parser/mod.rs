@@ -69,7 +69,7 @@ impl<'a> Parser<'a> {
     #[allow(unused)]
     fn try_parse<T>(
         &mut self,
-        funs: Vec<Box<dyn FnMut(&mut Parser) -> ParseRes<T>>>,
+        funs: Vec<Box<dyn FnMut(&mut Parser<'a>) -> ParseRes<T>>>,
     ) -> ParseRes<T> {
         assert!(!funs.is_empty());
         let mut error = None;
