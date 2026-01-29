@@ -1,39 +1,11 @@
 use crate::{
-    lexer::token::TokenKind,
-    parse_tree::{
-        LongIdent,
-        expression::{Constant, Expression, ExpressionDesc, RecFlag},
-    },
+    lexer::{interner::Symbol, token::TokenKind},
+    parse_tree::expression::{Constant, Expression, ExpressionDesc},
     parser::{
-        Parser,
+        Assoc, Parser,
         error::{ParseError, ParseRes},
     },
 };
-
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
-pub enum Assoc {
-    Left,
-    Right,
-}
-
-impl TokenKind {
-    pub fn assoc(&self) -> Option<(u8, Assoc)> {
-        match self {
-            TokenKind::LOr => Some((1, Assoc::Right)),
-            TokenKind::LAnd => Some((2, Assoc::Right)),
-            TokenKind::Eq
-            | TokenKind::NEq
-            | TokenKind::LT
-            | TokenKind::GT
-            | TokenKind::GEq
-            | TokenKind::LEq => Some((3, Assoc::Left)),
-            TokenKind::Plus | TokenKind::Minus => Some((4, Assoc::Left)),
-            TokenKind::Star | TokenKind::Div => Some((5, Assoc::Left)),
-            TokenKind::Op(_) => todo!("Custom operators"),
-            _ => None,
-        }
-    }
-}
 
 impl<'a> Parser<'a> {
     pub(super) fn parse_expression(&mut self) -> ParseRes<Expression> {
@@ -71,8 +43,15 @@ impl<'a> Parser<'a> {
                 };
                 Ok(Expression::new(desc, span))
             }
+            Some(TokenKind::Ident(Symbol::Ident(_))) => {
+                let start = self.loc();
+                let desc = ExpressionDesc::Ident(self.parse_long_ident()?);
+                let end = self.span().split().1;
+                let span = start.span(&end);
+                Ok(Expression::new(desc, span))
+            }
             None => Err(ParseError::eof(self.loc())),
-            _ => Err(ParseError::todo("other atoms", self.loc())),
+            x => Err(ParseError::todo(format!("other atoms {x:?}",), self.loc())),
         }
     }
 
@@ -97,25 +76,6 @@ impl<'a> Parser<'a> {
         }
 
         Ok(expr)
-    }
-
-    fn parse_long_ident(&mut self) -> ParseRes<LongIdent> {
-        let start = self.loc();
-        match self.peek().map(|x| x.kind.clone()) {
-            Some(TokenKind::Ident(s)) => {
-                let end = self.span().split().1;
-                let span = start.span(&end);
-                Ok(LongIdent::Ident(s))
-            }
-            x => Err(ParseError::todo("other long idents", self.loc())),
-        }
-    }
-
-    fn at_constructor(&mut self) -> bool {
-        match self.peek_parse(Self::parse_long_ident) {
-            Some(ident) => ident.last_symbol().is_constructor(),
-            None => false,
-        }
     }
 
     fn parse_constructor(&mut self) -> ParseRes<Expression> {
@@ -187,21 +147,7 @@ impl<'a> Parser<'a> {
     fn parse_let_in(&mut self) -> ParseRes<Expression> {
         let start = self.loc();
 
-        self.expect(TokenKind::Let)?;
-
-        let rec_flag = if self.at(TokenKind::Rec) {
-            self.advance();
-            RecFlag::Recursive
-        } else {
-            RecFlag::NonRecursive
-        };
-
-        let mut bindings = vec![self.parse_value_binding()?];
-
-        while self.at(TokenKind::And) {
-            self.advance();
-            bindings.push(self.parse_value_binding()?);
-        }
+        let (rec_flag, bindings) = self.parse_let_bindings()?;
 
         self.expect(TokenKind::In)?;
 

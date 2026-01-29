@@ -7,7 +7,7 @@ use crate::{
 pub enum ParseErrorKind {
     EOF,
     Todo(String),
-    Unexpected { expected: TokenKind, got: TokenKind },
+    Unexpected { got: TokenKind, expected: TokenKind },
 }
 
 #[derive(Debug)]
@@ -17,12 +17,12 @@ pub struct ParseError {
 }
 
 impl ParseError {
-    pub fn unexpected(tok: Token, got: TokenKind) -> Self {
+    pub fn unexpected(tok: Token, expected: TokenKind) -> Self {
         Self {
             loc: tok.span.into(),
             kind: ParseErrorKind::Unexpected {
-                expected: tok.kind,
-                got,
+                expected,
+                got: tok.kind,
             },
         }
     }
