@@ -1,6 +1,6 @@
 use crate::{
     lexer::token::{Token, TokenKind},
-    parse_tree::structure::Structure,
+    parse_tree::{LongIdent, structure::Structure},
     parser::error::{ParseError, ParseRes},
     source_manager::{
         FileId,
@@ -33,7 +33,8 @@ impl<'a> Parser<'a> {
     }
 
     fn peek(&self) -> Option<&Token> {
-        self.toks.get(self.pos).copied()
+        let res = self.toks.get(self.pos).copied();
+        res
     }
 
     fn advance(&mut self) -> Option<&Token> {
@@ -43,7 +44,7 @@ impl<'a> Parser<'a> {
     }
 
     fn span(&self) -> Span {
-        if let Some(t) = self.peek() {
+        if let Some(t) = self.toks.get(0.max(self.pos - 1)) {
             t.span
         } else {
             self.toks.last().unwrap().span
@@ -51,7 +52,13 @@ impl<'a> Parser<'a> {
     }
 
     fn loc(&self) -> Loc {
-        self.span().split().0
+        if let Some(t) = self.peek() {
+            t.span
+        } else {
+            self.toks.last().unwrap().span
+        }
+        .split()
+        .0
     }
 
     fn expect(&mut self, kind: TokenKind) -> Result<&Token, ParseError> {
@@ -64,6 +71,10 @@ impl<'a> Parser<'a> {
 
     fn at(&self, kind: TokenKind) -> bool {
         self.peek().map_or_else(|| false, |x| x.kind == kind)
+    }
+
+    fn is_done(&self) -> bool {
+        self.peek().is_none()
     }
 
     #[allow(unused)]
@@ -101,7 +112,50 @@ impl<'a> Parser<'a> {
         res
     }
 
+    fn parse_long_ident(&mut self) -> ParseRes<LongIdent> {
+        // let start = self.loc();
+        match self.peek().map(|x| x.kind.clone()) {
+            Some(TokenKind::Ident(s)) => {
+                self.advance();
+                Ok(LongIdent::Ident(s))
+            }
+            _ => Err(ParseError::todo("other long idents", self.loc())),
+        }
+    }
+
+    fn at_constructor(&mut self) -> bool {
+        match self.peek_parse(Self::parse_long_ident) {
+            Some(ident) => ident.last_symbol().is_constructor(),
+            None => false,
+        }
+    }
+
     pub fn parse_program(&mut self) -> ParseRes<Structure> {
         self.parse_structure()
+    }
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum Assoc {
+    Left,
+    Right,
+}
+
+impl TokenKind {
+    pub fn assoc(&self) -> Option<(u8, Assoc)> {
+        match self {
+            TokenKind::LOr => Some((1, Assoc::Right)),
+            TokenKind::LAnd => Some((2, Assoc::Right)),
+            TokenKind::Eq
+            | TokenKind::NEq
+            | TokenKind::LT
+            | TokenKind::GT
+            | TokenKind::GEq
+            | TokenKind::LEq => Some((3, Assoc::Left)),
+            TokenKind::Plus | TokenKind::Minus => Some((4, Assoc::Left)),
+            TokenKind::Star | TokenKind::Div => Some((5, Assoc::Left)),
+            TokenKind::Op(_) => todo!("Custom operators"),
+            _ => None,
+        }
     }
 }
