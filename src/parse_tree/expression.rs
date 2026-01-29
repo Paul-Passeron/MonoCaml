@@ -1,11 +1,15 @@
 use crate::{
-    lexer::interner::{StrLit, Symbol},
+    lexer::{
+        interner::{StrLit, Symbol},
+        token::TokenKind,
+    },
     parse_tree::{
         ArgLabel, Located, LongIdent, RecordField, pattern::Pattern, type_expr::TypeExpr,
     },
     source_manager::loc::Span,
 };
 
+#[derive(Debug)]
 pub enum Constant {
     Int(i64),
     Char(char),
@@ -15,11 +19,55 @@ pub enum Constant {
 
 pub type Expression = Located<ExpressionDesc>;
 
+#[derive(Debug)]
 pub enum RecFlag {
     Recursive,
     NonRecursive,
 }
 
+#[derive(Debug)]
+pub enum BinaryOp {
+    Plus,
+    Minus,
+    Star,
+    Div,
+    Eq,
+    NEq,
+    LT,
+    GT,
+    GEq,
+    LEq,
+    LOr,
+    LAnd,
+    Cons,
+    Custom(Symbol),
+}
+
+impl TryFrom<TokenKind> for BinaryOp {
+    type Error = ();
+
+    fn try_from(value: TokenKind) -> Result<Self, Self::Error> {
+        match value {
+            TokenKind::Plus => Ok(Self::Plus),
+            TokenKind::Minus => Ok(Self::Minus),
+            TokenKind::Star => Ok(Self::Star),
+            TokenKind::Div => Ok(Self::Div),
+            TokenKind::Eq => Ok(Self::Eq),
+            TokenKind::NEq => Ok(Self::NEq),
+            TokenKind::LT => Ok(Self::LT),
+            TokenKind::GT => Ok(Self::GT),
+            TokenKind::GEq => Ok(Self::GEq),
+            TokenKind::LEq => Ok(Self::LEq),
+            TokenKind::LOr => Ok(Self::LOr),
+            TokenKind::LAnd => Ok(Self::LAnd),
+            TokenKind::Cons => Ok(Self::Cons),
+            TokenKind::Op(x) => Ok(Self::Custom(x)),
+            _ => Err(()),
+        }
+    }
+}
+
+#[derive(Debug)]
 pub enum ExpressionDesc {
     Ident(LongIdent),
     Constant(Constant),
@@ -42,7 +90,7 @@ pub enum ExpressionDesc {
     Construct(LongIdent, Option<Box<Expression>>),
     Record(Vec<RecordField<Box<Expression>>>),
     Field(Box<Expression>, LongIdent),
-
+    Application(Box<Expression>, Box<Expression>),
     // t.f <- v
     SetField {
         target: Box<Expression>,
@@ -67,13 +115,60 @@ pub enum ExpressionDesc {
         body: Box<Expression>,
     },
     Constraint(Box<Expression>, TypeExpr),
+    Unit,
+    Paren(Box<Expression>),
+    BinaryOp(BinaryOp, Box<Expression>, Box<Expression>),
 }
 
+impl ExpressionDesc {
+    pub fn if_then_else(
+        cond: Expression,
+        then_expr: Expression,
+        else_expr: Option<Expression>,
+    ) -> Self {
+        Self::IfThenElse {
+            cond: Box::new(cond),
+            then_expr: Box::new(then_expr),
+            else_expr: else_expr.map(Box::new),
+        }
+    }
+
+    pub fn let_in(rec: RecFlag, bindings: Vec<ValueBinding>, expr: Expression) -> Self {
+        Self::Let {
+            rec,
+            bindings,
+            expression: Box::new(expr),
+        }
+    }
+
+    pub fn application(fun: Expression, arg: Expression) -> Self {
+        Self::Application(Box::new(fun), Box::new(arg))
+    }
+
+    pub fn construct(c: LongIdent, args: Option<Expression>) -> Self {
+        Self::Construct(c, args.map(Box::new))
+    }
+
+    pub fn paren(e: Expression) -> Self {
+        Self::Paren(Box::new(e))
+    }
+
+    pub fn tuple(v: Vec<Expression>) -> Self {
+        Self::Tuple(v)
+    }
+
+    pub fn binary_op(op: BinaryOp, left: Expression, right: Expression) -> Self {
+        Self::BinaryOp(op, Box::new(left), Box::new(right))
+    }
+}
+
+#[derive(Debug)]
 pub enum DirectionFlag {
     Upto,
     Downto,
 }
 
+#[derive(Debug)]
 pub struct ValueBinding {
     pub pat: Pattern,                        // The pattern being bound
     pub expr: Box<Expression>,               // The expression
@@ -97,27 +192,15 @@ impl ValueBinding {
     }
 }
 
+#[derive(Debug)]
 pub struct ValueConstraint {
     pub locally_abstract_types: Vec<Symbol>,
     pub typ: TypeExpr,
 }
 
+#[derive(Debug)]
 pub struct Case {
     pub lhs: Pattern,
     pub guard: Option<Expression>,
     pub expr: Expression,
-}
-
-impl ExpressionDesc {
-    pub fn if_then_else(
-        cond: Expression,
-        then_expr: Expression,
-        else_expr: Option<Expression>,
-    ) -> Self {
-        Self::IfThenElse {
-            cond: Box::new(cond),
-            then_expr: Box::new(then_expr),
-            else_expr: else_expr.map(Box::new),
-        }
-    }
 }

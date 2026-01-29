@@ -5,6 +5,7 @@ use crate::{
 
 pub type TypeExpr = Located<TypeExprDesc>;
 
+#[derive(Debug)]
 pub enum TypeExprDesc {
     Any,                                           // _
     Var(Symbol),                                   // 'a

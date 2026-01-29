@@ -5,6 +5,7 @@ use crate::{
 
 pub type Pattern = Located<PatternDesc>;
 
+#[derive(Debug)]
 pub enum PatternDesc {
     Any,                                         // _
     Var(Symbol),                                 // x
