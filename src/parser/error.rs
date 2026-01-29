@@ -3,11 +3,14 @@ use crate::{
     source_manager::loc::{Loc, LocKind},
 };
 
+#[derive(Debug)]
 pub enum ParseErrorKind {
     EOF,
+    Todo(String),
     Unexpected { expected: TokenKind, got: TokenKind },
 }
 
+#[derive(Debug)]
 pub struct ParseError {
     pub loc: LocKind,
     pub kind: ParseErrorKind,
@@ -28,6 +31,13 @@ impl ParseError {
         Self {
             loc: l.into(),
             kind: ParseErrorKind::EOF,
+        }
+    }
+
+    pub fn todo<S: ToString>(s: S, l: Loc) -> Self {
+        Self {
+            loc: l.into(),
+            kind: ParseErrorKind::Todo(s.to_string()),
         }
     }
 }

@@ -18,7 +18,7 @@ pub mod value_constraint;
 
 pub struct Parser<'a> {
     pub src: FileId,
-    pub toks: &'a [Token],
+    pub toks: Vec<&'a Token>,
     pub pos: usize,
 }
 
@@ -27,12 +27,13 @@ impl<'a> Parser<'a> {
         if toks.is_empty() {
             None
         } else {
+            let toks = toks.iter().filter(|x| !x.is_skip()).collect();
             Some(Self { src, toks, pos: 0 })
         }
     }
 
     fn peek(&self) -> Option<&Token> {
-        self.toks.get(self.pos)
+        self.toks.get(self.pos).copied()
     }
 
     fn advance(&mut self) -> Option<&Token> {
@@ -87,6 +88,17 @@ impl<'a> Parser<'a> {
             }
         }
         Err(error.unwrap_or(ParseError::eof(self.loc())))
+    }
+
+    fn peek_parse<F, T>(&mut self, f: F) -> Option<T>
+    where
+        F: FnMut(&mut Self) -> ParseRes<T>,
+    {
+        let anchor = self.pos;
+        let mut f = f;
+        let res = f(self).ok();
+        self.pos = anchor;
+        res
     }
 
     pub fn parse_program(&mut self) -> ParseRes<Structure> {
