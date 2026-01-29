@@ -150,6 +150,8 @@ impl Lexer {
             "rec" => Ok(Token::new(TokenKind::Rec, l.span(&self.loc()))),
             "fun" => Ok(Token::new(TokenKind::Fun, l.span(&self.loc()))),
             "function" => Ok(Token::new(TokenKind::Function, l.span(&self.loc()))),
+            "and" => Ok(Token::new(TokenKind::And, l.span(&self.loc()))),
+            "in" => Ok(Token::new(TokenKind::In, l.span(&self.loc()))),
             "let" => {
                 if self.is_operator_start(true) {
                     let start = self.loc().offset;

@@ -73,6 +73,7 @@ impl Lexer {
             ">=" => Ok(Token::new(TokenKind::GEq, l.span(&self.loc()))),
             "<=" => Ok(Token::new(TokenKind::LEq, l.span(&self.loc()))),
             "||" => Ok(Token::new(TokenKind::LOr, l.span(&self.loc()))),
+            "&&" => Ok(Token::new(TokenKind::LAnd, l.span(&self.loc()))),
             ":" => Ok(Token::new(TokenKind::Colon, l.span(&self.loc()))),
             "::" => Ok(Token::new(TokenKind::Cons, l.span(&self.loc()))),
             "|" => Ok(Token::new(TokenKind::Pipe, l.span(&self.loc()))),
