@@ -144,16 +144,18 @@ pub enum Assoc {
 impl TokenKind {
     pub fn assoc(&self) -> Option<(u8, Assoc)> {
         match self {
-            TokenKind::LOr => Some((1, Assoc::Right)),
-            TokenKind::LAnd => Some((2, Assoc::Right)),
+            TokenKind::Semi => Some((1, Assoc::Left)),
+            TokenKind::Comma => Some((2, Assoc::Left)),
+            TokenKind::LOr => Some((3, Assoc::Right)),
+            TokenKind::LAnd => Some((4, Assoc::Right)),
             TokenKind::Eq
             | TokenKind::NEq
             | TokenKind::LT
             | TokenKind::GT
             | TokenKind::GEq
-            | TokenKind::LEq => Some((3, Assoc::Left)),
-            TokenKind::Plus | TokenKind::Minus => Some((4, Assoc::Left)),
-            TokenKind::Star | TokenKind::Div => Some((5, Assoc::Left)),
+            | TokenKind::LEq => Some((5, Assoc::Left)),
+            TokenKind::Plus | TokenKind::Minus => Some((6, Assoc::Left)),
+            TokenKind::Star | TokenKind::Div => Some((7, Assoc::Left)),
             TokenKind::Op(_) => todo!("Custom operators"),
             _ => None,
         }

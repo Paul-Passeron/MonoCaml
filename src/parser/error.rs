@@ -8,6 +8,7 @@ pub enum ParseErrorKind {
     EOF,
     Todo(String),
     Unexpected { got: TokenKind, expected: TokenKind },
+    EmptyTupleWithoutParen,
 }
 
 #[derive(Debug)]

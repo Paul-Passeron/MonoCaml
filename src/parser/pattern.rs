@@ -52,13 +52,31 @@ impl<'a> Parser<'a> {
 
                 self.try_parse(vec![Box::new(try_as_tuple), Box::new(try_as_constraint)])
             }
-            Some(TokenKind::Ident(Symbol::Cons(c))) => todo!(),
+            Some(TokenKind::Ident(Symbol::Cons(_))) => todo!(),
             Some(TokenKind::Ident(Symbol::Ident(s))) => {
                 let start = self.loc();
                 self.advance();
                 let end = self.span().split().1;
                 let span = start.span(&end);
                 let desc = PatternDesc::Var(Symbol::Ident(s));
+                Ok(Pattern::new(desc, span))
+            }
+            Some(TokenKind::LSqr) => {
+                self.advance();
+                let mut elems = vec![];
+                while !self.is_done() && !self.at(TokenKind::RSqr) {
+                    elems.push(self.parse_atom_pat()?);
+                    if !self.at(TokenKind::Semi) {
+                        break;
+                    }
+                    self.advance();
+                }
+                self.expect(TokenKind::RSqr)?;
+
+                let end = self.span().split().1;
+                let span = start.span(&end);
+                let desc = PatternDesc::List(elems);
+
                 Ok(Pattern::new(desc, span))
             }
             _ => Err(ParseError::todo("parse_pattern", self.loc())),

@@ -35,7 +35,6 @@ impl<'a> Parser<'a> {
             None
         };
         self.expect(TokenKind::Eq)?;
-        println!("Here !");
         let expr = self.parse_expression()?;
         let end = self.span().split().1;
         Ok(ValueBinding::new(pat, expr, constraint, start.span(&end)))

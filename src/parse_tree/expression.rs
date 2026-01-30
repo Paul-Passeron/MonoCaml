@@ -86,7 +86,6 @@ pub enum ExpressionDesc {
         pat: Pattern,
         body: Box<Expression>,
     },
-    Tuple(Vec<Expression>),
     Construct(LongIdent, Option<Box<Expression>>),
     Record(Vec<RecordField<Box<Expression>>>),
     Field(Box<Expression>, LongIdent),
@@ -102,6 +101,7 @@ pub enum ExpressionDesc {
         then_expr: Box<Expression>,
         else_expr: Option<Box<Expression>>,
     },
+    Product(Box<Expression>, Box<Expression>),
     Sequence(Box<Expression>, Box<Expression>),
     While {
         cond: Box<Expression>,
@@ -118,6 +118,7 @@ pub enum ExpressionDesc {
     Unit,
     Paren(Box<Expression>),
     BinaryOp(BinaryOp, Box<Expression>, Box<Expression>),
+    List(Vec<Expression>),
 }
 
 impl ExpressionDesc {
@@ -153,12 +154,23 @@ impl ExpressionDesc {
         Self::Paren(Box::new(e))
     }
 
-    pub fn tuple(v: Vec<Expression>) -> Self {
-        Self::Tuple(v)
+    // pub fn tuple(v: Vec<Expression>) -> Self {
+    //     Self::Tuple(v)
+    // }
+
+    pub fn binary_op(op: TokenKind, left: Expression, right: Expression) -> Self {
+        match op {
+            TokenKind::Comma => Self::Product(Box::new(left), Box::new(right)),
+            TokenKind::Semi => Self::Sequence(Box::new(left), Box::new(right)),
+            _ => {
+                let op = op.try_into().unwrap();
+                Self::BinaryOp(op, Box::new(left), Box::new(right))
+            }
+        }
     }
 
-    pub fn binary_op(op: BinaryOp, left: Expression, right: Expression) -> Self {
-        Self::BinaryOp(op, Box::new(left), Box::new(right))
+    pub fn seq(fst: Expression, snd: Expression) -> Self {
+        Self::Sequence(Box::new(fst), Box::new(snd))
     }
 }
 

@@ -24,6 +24,7 @@ pub enum PatternDesc {
     Unit,                                           // ()
     Paren(Box<Pattern>),                            // (x)
     BinaryOp(BinaryOp, Box<Pattern>, Box<Pattern>), // a :: b
+    List(Vec<Pattern>),
 }
 
 impl PatternDesc {

@@ -17,7 +17,28 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_tuple_as_vec(&mut self) -> ParseRes<Vec<Expression>> {
-        todo!()
+        self.expect(TokenKind::LPar)?;
+        let mut v = vec![];
+        let e = self.parse_expression()?;
+
+        fn flatten(v: &mut Vec<Expression>, current: Expression) {
+            if matches!(&current.desc, ExpressionDesc::Product(_, _)) {
+                match current.desc {
+                    ExpressionDesc::Product(a, b) => {
+                        flatten(v, *a);
+                        v.push(*b)
+                    }
+                    _ => unreachable!(),
+                }
+            } else {
+                v.push(current);
+            }
+        }
+
+        flatten(&mut v, e);
+
+        self.expect(TokenKind::RPar)?;
+        Ok(v)
     }
 
     fn parse_atom(&mut self) -> ParseRes<Expression> {
@@ -30,7 +51,26 @@ impl<'a> Parser<'a> {
                     start.span(&self.loc()),
                 ))
             }
+            Some(TokenKind::LSqr) => {
+                let start = self.loc();
+                self.advance();
+                let mut elems = vec![];
+                while !self.is_done() && !self.at(TokenKind::RSqr) {
+                    elems.push(self.parse_expression()?);
+                    if !self.at(TokenKind::Semi) {
+                        break;
+                    } else {
+                        self.advance();
+                    }
+                }
+                self.expect(TokenKind::RSqr)?;
+                let end = self.span().split().1;
+                let span = start.span(&end);
+                let desc = ExpressionDesc::List(elems);
+                Ok(Expression::new(desc, span))
+            }
             Some(TokenKind::LPar) => {
+                let pos = self.pos;
                 let elems = self.parse_tuple_as_vec()?;
                 let end = self.span().split().1;
                 let span = start.span(&end);
@@ -39,7 +79,11 @@ impl<'a> Parser<'a> {
                 } else if elems.len() == 1 {
                     ExpressionDesc::paren(elems.into_iter().next().unwrap())
                 } else {
-                    ExpressionDesc::tuple(elems)
+                    self.pos = pos;
+                    self.expect(TokenKind::LPar)?;
+                    let e = self.parse_expression()?;
+                    self.expect(TokenKind::RPar)?;
+                    ExpressionDesc::paren(e)
                 };
                 Ok(Expression::new(desc, span))
             }
@@ -118,7 +162,7 @@ impl<'a> Parser<'a> {
                 Assoc::Right => prec,
             };
             let rhs = self.parse_binary_expression(next_min)?;
-            let desc = ExpressionDesc::binary_op(op.try_into().unwrap(), lhs, rhs);
+            let desc = ExpressionDesc::binary_op(op, lhs, rhs);
             let end = self.span().split().1;
             lhs = Expression::new(desc, start.span(&end));
         }
