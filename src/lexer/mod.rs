@@ -284,6 +284,14 @@ impl Lexer {
                 }
                 '?' | '~' => todo!(),
                 _ if is_identifier_start(c) => self.lex_identifier(session),
+                ';' => {
+                    self.advance();
+                    Ok(Token::new(TokenKind::Semi, l.span(&self.loc())))
+                }
+                ',' => {
+                    self.advance();
+                    Ok(Token::new(TokenKind::Comma, l.span(&self.loc())))
+                }
                 _ => Err(LexingError::UnexpectedChar(l)),
             }
         } else {
