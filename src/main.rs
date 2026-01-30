@@ -14,6 +14,7 @@ use crate::{
     lexer::{Lexer, error::LexingError},
     lower::mono_to_cfg::MonoToCfg,
     mono_ir::{Ast, Var, types::AstCtx},
+    parser::Parser,
     session::Session,
     source_manager::SourceManager,
 };
@@ -66,8 +67,6 @@ fn run_and_check_output(program: &str, args: &[&str], expected: &str) -> std::io
 }
 
 fn main() {
-    // let (ast, ctx) = rev_bench(100, 100);
-    // compile_ast_with_ctx(ast, "llvm_test", ctx);
     let sm = SourceManager::new();
     let mut session = Session::new(sm);
     let contents = {
@@ -97,11 +96,15 @@ fn main() {
         }
     }
 
-    for t in tokens {
+    for t in &tokens {
         println!("{}", t.display(&session));
     }
 
     if error.is_some() {
         println!("Lexing error: {}", error.unwrap().display(&session))
     }
+
+    let mut parser = Parser::new(id, &tokens).unwrap();
+    let prog = parser.parse_program().unwrap();
+    println!("{:#?}", prog);
 }
