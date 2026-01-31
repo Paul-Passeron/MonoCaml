@@ -172,6 +172,13 @@ impl ExpressionDesc {
     pub fn seq(fst: Expression, snd: Expression) -> Self {
         Self::Sequence(Box::new(fst), Box::new(snd))
     }
+
+    pub fn match_with(expr: Expression, with: Vec<Case>) -> Self {
+        Self::Match {
+            expr: Box::new(expr),
+            with,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -183,6 +190,7 @@ pub enum DirectionFlag {
 #[derive(Debug)]
 pub struct ValueBinding {
     pub pat: Pattern,                        // The pattern being bound
+    pub args: Vec<Pattern>,                  // The arguments (can be 0) ex: let x y = 1 + y
     pub expr: Box<Expression>,               // The expression
     pub constraint: Option<ValueConstraint>, // Optional type constraint
     pub span: Span,
@@ -191,12 +199,14 @@ pub struct ValueBinding {
 impl ValueBinding {
     pub fn new(
         pat: Pattern,
+        args: Vec<Pattern>,
         expr: Expression,
         constraint: Option<ValueConstraint>,
         span: Span,
     ) -> Self {
         Self {
             pat,
+            args,
             expr: Box::new(expr),
             constraint,
             span,
@@ -215,4 +225,10 @@ pub struct Case {
     pub lhs: Pattern,
     pub guard: Option<Expression>,
     pub expr: Expression,
+}
+
+impl Case {
+    pub fn new(lhs: Pattern, guard: Option<Expression>, expr: Expression) -> Self {
+        Self { lhs, guard, expr }
+    }
 }

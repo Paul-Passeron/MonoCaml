@@ -33,7 +33,11 @@ impl<'a> Parser<'a> {
     }
 
     fn peek(&self) -> Option<&Token> {
-        let res = self.toks.get(self.pos).copied();
+        self.peek_n(0)
+    }
+
+    fn peek_n(&self, n: usize) -> Option<&Token> {
+        let res = self.toks.get(self.pos + n).copied();
         res
     }
 
@@ -73,6 +77,10 @@ impl<'a> Parser<'a> {
         self.peek().map_or_else(|| false, |x| x.kind == kind)
     }
 
+    fn at_n(&self, n: usize, kind: TokenKind) -> bool {
+        self.peek_n(n).map_or_else(|| false, |x| x.kind == kind)
+    }
+
     fn is_done(&self) -> bool {
         self.peek().is_none()
     }
@@ -98,7 +106,7 @@ impl<'a> Parser<'a> {
                 }
             }
         }
-        Err(error.unwrap_or(ParseError::eof(self.loc())))
+        Err(error.unwrap())
     }
 
     fn peek_parse<F, T>(&mut self, f: F) -> Option<T>
@@ -154,8 +162,9 @@ impl TokenKind {
             | TokenKind::GT
             | TokenKind::GEq
             | TokenKind::LEq => Some((5, Assoc::Left)),
-            TokenKind::Plus | TokenKind::Minus => Some((6, Assoc::Left)),
-            TokenKind::Star | TokenKind::Div => Some((7, Assoc::Left)),
+            TokenKind::Cons => Some((6, Assoc::Right)),
+            TokenKind::Plus | TokenKind::Minus => Some((7, Assoc::Left)),
+            TokenKind::Star | TokenKind::Div => Some((8, Assoc::Left)),
             TokenKind::Op(_) => todo!("Custom operators"),
             _ => None,
         }

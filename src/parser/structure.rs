@@ -33,10 +33,15 @@ impl<'a> Parser<'a> {
             if self.at(TokenKind::Type) {
                 items.push(self.parse_type_decl_as_structure_item()?)
             } else {
-                items.push(self.try_parse(vec![
-                    Box::new(Self::parse_eval),
-                    Box::new(Self::parse_value),
-                ])?)
+                let pos = self.pos;
+
+                let eval = self.parse_eval();
+                if eval.is_ok() {
+                    items.push(eval.unwrap());
+                    continue;
+                }
+                self.pos = pos;
+                items.push(self.parse_value()?);
             }
         }
         Ok(items)

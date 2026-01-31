@@ -34,9 +34,22 @@ impl<'a> Parser<'a> {
         } else {
             None
         };
+
+        let mut args = vec![];
+
+        while !self.is_done() && !self.at(TokenKind::Eq) {
+            args.push(self.parse_pattern()?);
+        }
+
         self.expect(TokenKind::Eq)?;
         let expr = self.parse_expression()?;
         let end = self.span().split().1;
-        Ok(ValueBinding::new(pat, expr, constraint, start.span(&end)))
+        Ok(ValueBinding::new(
+            pat,
+            args,
+            expr,
+            constraint,
+            start.span(&end),
+        ))
     }
 }

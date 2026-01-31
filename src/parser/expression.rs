@@ -1,6 +1,6 @@
 use crate::{
     lexer::{interner::Symbol, token::TokenKind},
-    parse_tree::expression::{Constant, Expression, ExpressionDesc},
+    parse_tree::expression::{Case, Constant, Expression, ExpressionDesc},
     parser::{
         Assoc, Parser,
         error::{ParseError, ParseRes},
@@ -12,8 +12,46 @@ impl<'a> Parser<'a> {
         match self.peek().map(|x| &x.kind) {
             Some(TokenKind::If) => self.parse_if_then_else(),
             Some(TokenKind::Let) => self.parse_let_in(),
+            Some(TokenKind::Match) => self.parse_match(),
             _ => self.parse_binary_expression(0),
         }
+    }
+
+    fn parse_case(&mut self) -> ParseRes<Case> {
+        let pat = self.parse_pattern()?;
+        let guard = if self.at(TokenKind::When) {
+            self.advance();
+            Some(self.parse_expression()?)
+        } else {
+            None
+        };
+        self.expect(TokenKind::Arrow)?;
+        let expr = self.parse_expression()?;
+        Ok(Case::new(pat, guard, expr))
+    }
+
+    fn parse_match(&mut self) -> ParseRes<Expression> {
+        let start = self.loc();
+
+        self.expect(TokenKind::Match)?;
+        let expr = self.parse_expression()?;
+        self.expect(TokenKind::With)?;
+        if self.at(TokenKind::Pipe) {
+            self.advance();
+        }
+
+        let mut cases = vec![self.parse_case()?];
+
+        while self.at(TokenKind::Pipe) {
+            self.advance();
+            cases.push(self.parse_case()?)
+        }
+
+        let end = self.span().split().1;
+
+        let span = start.span(&end);
+        let desc = ExpressionDesc::match_with(expr, cases);
+        Ok(Expression::new(desc, span))
     }
 
     fn parse_tuple_as_vec(&mut self) -> ParseRes<Vec<Expression>> {
@@ -70,20 +108,31 @@ impl<'a> Parser<'a> {
                 Ok(Expression::new(desc, span))
             }
             Some(TokenKind::LPar) => {
-                let pos = self.pos;
-                let elems = self.parse_tuple_as_vec()?;
-                let end = self.span().split().1;
-                let span = start.span(&end);
-                let desc = if elems.is_empty() {
-                    ExpressionDesc::Unit
-                } else if elems.len() == 1 {
-                    ExpressionDesc::paren(elems.into_iter().next().unwrap())
+                let (desc, span) = if self.at_n(1, TokenKind::RPar) {
+                    self.advance();
+                    self.advance();
+                    let end = self.span().split().1;
+                    let span = start.span(&end);
+                    (ExpressionDesc::Unit, span)
                 } else {
-                    self.pos = pos;
-                    self.expect(TokenKind::LPar)?;
-                    let e = self.parse_expression()?;
-                    self.expect(TokenKind::RPar)?;
-                    ExpressionDesc::paren(e)
+                    let pos = self.pos;
+                    let elems = self.parse_tuple_as_vec()?;
+                    let end = self.span().split().1;
+                    let span = start.span(&end);
+                    (
+                        if elems.is_empty() {
+                            ExpressionDesc::Unit
+                        } else if elems.len() == 1 {
+                            ExpressionDesc::paren(elems.into_iter().next().unwrap())
+                        } else {
+                            self.pos = pos;
+                            self.expect(TokenKind::LPar)?;
+                            let e = self.parse_expression()?;
+                            self.expect(TokenKind::RPar)?;
+                            ExpressionDesc::paren(e)
+                        },
+                        span,
+                    )
                 };
                 Ok(Expression::new(desc, span))
             }
