@@ -135,6 +135,7 @@ impl Lexer {
         match s {
             // Keywords
             "if" => Ok(Token::new(TokenKind::If, l.span(&self.loc()))),
+            "when" => Ok(Token::new(TokenKind::When, l.span(&self.loc()))),
             "then" => Ok(Token::new(TokenKind::Then, l.span(&self.loc()))),
             "else" => Ok(Token::new(TokenKind::Else, l.span(&self.loc()))),
             "for" => Ok(Token::new(TokenKind::For, l.span(&self.loc()))),

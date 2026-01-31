@@ -37,6 +37,7 @@ pub enum TokenKind {
     Done,
     To,
     Type,
+    When,
 
     Plus,
     Minus,
@@ -141,6 +142,7 @@ impl<'a, 'b> fmt::Display for DebugTokenKindDisplay<'a, 'b> {
             TokenKind::True => write!(f, "True: ")?,
             TokenKind::False => write!(f, "False: ")?,
             TokenKind::If => write!(f, "If: ")?,
+            TokenKind::When => write!(f, "When: ")?,
             TokenKind::Then => write!(f, "Then: ")?,
             TokenKind::Else => write!(f, "Else: ")?,
             TokenKind::Match => write!(f, "Match: ")?,
@@ -210,6 +212,7 @@ impl<'a, 'b> fmt::Display for TokenKindDisplay<'a, 'b> {
             TokenKind::True => write!(f, "true"),
             TokenKind::False => write!(f, "false"),
             TokenKind::If => write!(f, "if"),
+            TokenKind::When => write!(f, "when"),
             TokenKind::Then => write!(f, "then"),
             TokenKind::Else => write!(f, "else"),
             TokenKind::Match => write!(f, "match"),
