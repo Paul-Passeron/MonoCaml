@@ -24,7 +24,16 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_type_decl_as_structure_item(&mut self) -> ParseRes<StructureItem> {
-        todo!()
+        let start = self.loc();
+        self.expect(TokenKind::Type)?;
+        let mut decls = vec![self.parse_type_decl()?];
+        while self.at(TokenKind::And) {
+            self.advance();
+            decls.push(self.parse_type_decl()?);
+        }
+        let end = self.span().split().1;
+        let span = start.span(&end);
+        Ok(StructureItem::new(StructureItemDesc::Type(decls), span))
     }
 
     pub(super) fn parse_structure(&mut self) -> ParseRes<Structure> {

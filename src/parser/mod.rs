@@ -1,6 +1,9 @@
 use crate::{
-    lexer::token::{Token, TokenKind},
-    parse_tree::{LongIdent, structure::Structure},
+    lexer::{
+        interner::Symbol,
+        token::{Token, TokenKind},
+    },
+    parse_tree::{Located, LongIdent, structure::Structure},
     parser::error::{ParseError, ParseRes},
     source_manager::{
         FileId,
@@ -12,6 +15,7 @@ pub mod error;
 pub mod expression;
 pub mod pattern;
 pub mod structure;
+pub mod type_declaration;
 pub mod type_expr;
 pub mod value_binding;
 pub mod value_constraint;
@@ -140,6 +144,26 @@ impl<'a> Parser<'a> {
 
     pub fn parse_program(&mut self) -> ParseRes<Structure> {
         self.parse_structure()
+    }
+
+    fn at_poly(&self) -> bool {
+        matches!(
+            self.peek().map(|x| &x.kind),
+            Some(TokenKind::PolyTypeName(_))
+        )
+    }
+
+    fn parse_symbol(&mut self) -> ParseRes<Located<Symbol>> {
+        let l = self.loc();
+        match self.advance().map(|x| x.kind.clone()) {
+            Some(TokenKind::Ident(x)) => {
+                let end = self.span().split().1;
+                let span = l.span(&end);
+                Ok(Located::new(x, span))
+            }
+            None => Err(ParseError::eof(l)),
+            _ => Err(ParseError::todo("Expected symbol", l)),
+        }
     }
 }
 

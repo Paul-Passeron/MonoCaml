@@ -10,7 +10,7 @@ use crate::{
 #[derive(Debug)]
 pub struct TypeDeclaration {
     pub name: Located<Symbol>,
-    pub params: Vec<TypeExpr>,
+    pub params: Vec<Symbol>,
     pub kind: TypeKind,
 }
 
@@ -23,14 +23,13 @@ pub enum TypeKind {
 #[derive(Debug)]
 pub struct ConstructorDeclaration {
     pub name: Located<Symbol>,
-    pub vars: Vec<Symbol>,
-    pub args: ConstructorArguments,
+    pub args: Option<ConstructorArguments>,
     pub loc: Loc,
 }
 
 #[derive(Debug)]
 pub enum ConstructorArguments {
-    Tuple(Vec<TypeExpr>),
+    TypeExpr(TypeExpr),
     Record(Vec<LabelDeclaration>),
 }
 
@@ -74,14 +73,18 @@ impl fmt::Display for TypeDeclarationDisplay<'_, '_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if !self.decl.params.is_empty() {
             if self.decl.params.len() == 1 {
-                write!(f, "{} ", self.decl.params[0].desc.display(self.session, 0))?;
+                write!(
+                    f,
+                    "{} ",
+                    self.decl.params[0].display(&self.session.symbol_interner)
+                )?;
             } else {
                 write!(f, "(")?;
                 for (i, param) in self.decl.params.iter().enumerate() {
                     if i > 0 {
                         write!(f, ", ")?;
                     }
-                    write!(f, "{}", param.desc.display(self.session, 0))?;
+                    write!(f, "{}", param.display(&self.session.symbol_interner))?;
                 }
                 write!(f, ") ")?;
             }
@@ -100,7 +103,11 @@ impl fmt::Display for TypeDeclarationDisplay<'_, '_> {
                     if i == 0 {
                         write!(f, "\n{}", INDENT.repeat(self.indent + 1))?;
                     } else {
-                        write!(f, "\n{}| ", INDENT.repeat(self.indent))?;
+                        write!(
+                            f,
+                            "\n{}| ",
+                            &INDENT.repeat(self.indent + 1).to_string()[2..]
+                        )?;
                     }
                     write!(
                         f,
@@ -108,30 +115,11 @@ impl fmt::Display for TypeDeclarationDisplay<'_, '_> {
                         cons.name.desc.display(&self.session.symbol_interner)
                     )?;
 
-                    if !cons.vars.is_empty() {
-                        write!(f, " : type ")?;
-                        for (i, var) in cons.vars.iter().enumerate() {
-                            if i > 0 {
-                                write!(f, " ")?;
-                            }
-                            write!(f, "'{}", var.display(&self.session.symbol_interner))?;
-                        }
-                        write!(f, ". ")?;
-                    }
-
                     match &cons.args {
-                        ConstructorArguments::Tuple(types) => {
-                            if !types.is_empty() {
-                                write!(f, " of ")?;
-                                for (i, typ) in types.iter().enumerate() {
-                                    if i > 0 {
-                                        write!(f, " * ")?;
-                                    }
-                                    write!(f, "{}", typ.desc.display(self.session, 0))?;
-                                }
-                            }
+                        Some(ConstructorArguments::TypeExpr(typ)) => {
+                            write!(f, " of {}", typ.desc.display(self.session, 0))?;
                         }
-                        ConstructorArguments::Record(labels) => {
+                        Some(ConstructorArguments::Record(labels)) => {
                             write!(f, " of {{ ")?;
                             for (i, label) in labels.iter().enumerate() {
                                 if i > 0 {
@@ -147,6 +135,7 @@ impl fmt::Display for TypeDeclarationDisplay<'_, '_> {
                             }
                             write!(f, " }}")?;
                         }
+                        None => (),
                     }
                 }
                 Ok(())
