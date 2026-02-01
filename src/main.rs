@@ -69,16 +69,16 @@ fn run_and_check_output(program: &str, args: &[&str], expected: &str) -> std::io
 fn main() {
     let sm = SourceManager::new();
     let mut session = Session::new(sm);
+    let file_name = "examples/hello_world.ml";
     let contents = {
         let mut s = String::new();
-        let mut f = File::open("examples/hello_world.ml").unwrap();
+        let mut f = File::open(file_name).unwrap();
         f.read_to_string(&mut s).unwrap();
         s
     };
-    let id = session.source_manager.add_file(
-        PathBuf::from("examples/hello_world.ml"),
-        contents.to_string(),
-    );
+    let id = session
+        .source_manager
+        .add_file(PathBuf::from(file_name), contents.to_string());
     let mut l = Lexer::new(&session.source_manager, id);
     let mut tokens = vec![];
     let mut error: Option<LexingError> = None;
@@ -106,5 +106,10 @@ fn main() {
 
     let mut parser = Parser::new(id, &tokens).unwrap();
     let prog = parser.parse_program().unwrap();
-    println!("{:#?}", prog);
+    // println!("{:#?}", prog);
+
+    for item in &prog {
+        println!("{}", item.desc.display(&session, 0));
+        println!();
+    }
 }
