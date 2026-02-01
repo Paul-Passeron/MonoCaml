@@ -1,7 +1,8 @@
 use crate::{
     lexer::{interner::Symbol, token::TokenKind},
     parse_tree::type_declaration::{
-        ConstructorArguments, ConstructorDeclaration, LabelDeclaration, TypeDeclaration, TypeKind,
+        ConstructorArguments, ConstructorDeclaration, LabelDeclaration, MutableFlag,
+        TypeDeclaration, TypeKind,
     },
     parser::{
         Parser,
@@ -10,8 +11,38 @@ use crate::{
 };
 
 impl<'a> Parser<'a> {
+    fn parse_label_declaration(&mut self) -> ParseRes<LabelDeclaration> {
+        let loc = self.loc();
+        let mutable = if self.at(TokenKind::Mutable) {
+            self.advance();
+            MutableFlag::Mut
+        } else {
+            MutableFlag::NonMut
+        };
+        let name = self.parse_symbol()?;
+        self.expect(TokenKind::Colon)?;
+        let typ = self.parse_type_expr()?;
+        Ok(LabelDeclaration {
+            name,
+            mutable,
+            typ,
+            loc,
+        })
+    }
+
     fn parse_record_decl(&mut self) -> ParseRes<Vec<LabelDeclaration>> {
-        todo!()
+        self.expect(TokenKind::LBra)?;
+        let mut res = vec![];
+        while !self.is_done() && !self.at(TokenKind::RBra) {
+            let lab_decl = self.parse_label_declaration()?;
+            res.push(lab_decl);
+            if !self.at(TokenKind::Semi) {
+                break;
+            }
+            self.expect(TokenKind::Semi)?;
+        }
+        self.expect(TokenKind::RBra)?;
+        Ok(res)
     }
 
     fn parse_constructor_declaration(&mut self) -> ParseRes<ConstructorDeclaration> {
