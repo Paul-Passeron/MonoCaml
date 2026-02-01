@@ -36,6 +36,7 @@ pub enum TokenKind {
     Do,
     Done,
     To,
+    Of,
     Type,
     When,
 
@@ -161,6 +162,7 @@ impl<'a, 'b> fmt::Display for DebugTokenKindDisplay<'a, 'b> {
             TokenKind::Do => write!(f, "Do: ")?,
             TokenKind::Done => write!(f, "Done: ")?,
             TokenKind::To => write!(f, "To: ")?,
+            TokenKind::Of => write!(f, "Of: ")?,
             TokenKind::Type => write!(f, "Type: ")?,
             TokenKind::Plus => write!(f, "Plus: ")?,
             TokenKind::Minus => write!(f, "Minus: ")?,
@@ -232,6 +234,7 @@ impl<'a, 'b> fmt::Display for TokenKindDisplay<'a, 'b> {
             TokenKind::Do => write!(f, "do"),
             TokenKind::Done => write!(f, "done"),
             TokenKind::To => write!(f, "to"),
+            TokenKind::Of => write!(f, "of"),
             TokenKind::Type => write!(f, "type"),
             TokenKind::Plus => write!(f, "+"),
             TokenKind::Minus => write!(f, "-"),
