@@ -52,7 +52,7 @@ impl<'a> Parser<'a> {
         let args = if self.at(TokenKind::Of) {
             self.advance();
             if self.at(TokenKind::LBra) {
-                todo!()
+                Some(ConstructorArguments::Record(self.parse_record_decl()?))
             } else {
                 let te = self.parse_type_expr()?;
                 Some(ConstructorArguments::TypeExpr(te))
