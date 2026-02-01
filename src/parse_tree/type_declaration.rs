@@ -76,7 +76,7 @@ impl fmt::Display for TypeDeclarationDisplay<'_, '_> {
             if self.decl.params.len() == 1 {
                 write!(
                     f,
-                    "{} ",
+                    "'{} ",
                     self.decl.params[0].display(&self.session.symbol_interner)
                 )?;
             } else {
@@ -85,7 +85,7 @@ impl fmt::Display for TypeDeclarationDisplay<'_, '_> {
                     if i > 0 {
                         write!(f, ", ")?;
                     }
-                    write!(f, "{}", param.display(&self.session.symbol_interner))?;
+                    write!(f, "'{}", param.display(&self.session.symbol_interner))?;
                 }
                 write!(f, ") ")?;
             }
