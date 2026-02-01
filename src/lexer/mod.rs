@@ -155,6 +155,7 @@ impl Lexer {
             "function" => Ok(Token::new(TokenKind::Function, l.span(&self.loc()))),
             "and" => Ok(Token::new(TokenKind::And, l.span(&self.loc()))),
             "in" => Ok(Token::new(TokenKind::In, l.span(&self.loc()))),
+            "mutable" => Ok(Token::new(TokenKind::Mutable, l.span(&self.loc()))),
             "let" => {
                 if self.is_operator_start(true) {
                     let start = self.loc().offset;
@@ -226,6 +227,8 @@ impl Lexer {
                 ')' => Ok(create_single_char_token(self, TokenKind::RPar)),
                 '[' => Ok(create_single_char_token(self, TokenKind::LSqr)),
                 ']' => Ok(create_single_char_token(self, TokenKind::RSqr)),
+                '{' => Ok(create_single_char_token(self, TokenKind::LBra)),
+                '}' => Ok(create_single_char_token(self, TokenKind::RBra)),
                 _ if self.at_intlit_start() => {
                     let l = self.loc();
                     if c == '-' {

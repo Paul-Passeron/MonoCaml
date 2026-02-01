@@ -39,6 +39,7 @@ pub enum TokenKind {
     Of,
     Type,
     When,
+    Mutable,
 
     Plus,
     Minus,
@@ -191,6 +192,7 @@ impl<'a, 'b> fmt::Display for DebugTokenKindDisplay<'a, 'b> {
             TokenKind::RBra => write!(f, "RBra: ")?,
             TokenKind::LSqr => write!(f, "LSQr: ")?,
             TokenKind::RSqr => write!(f, "RSQr: ")?,
+            TokenKind::Mutable => write!(f, "Mut: ")?,
         };
 
         write!(f, "{}", self.0.display(self.1))
@@ -263,6 +265,7 @@ impl<'a, 'b> fmt::Display for TokenKindDisplay<'a, 'b> {
             TokenKind::RBra => write!(f, "}}"),
             TokenKind::LSqr => write!(f, "["),
             TokenKind::RSqr => write!(f, "]"),
+            TokenKind::Mutable => write!(f, "mutable"),
             TokenKind::Comment(s) => write!(f, "{}", s.escape_debug()),
         }
     }
