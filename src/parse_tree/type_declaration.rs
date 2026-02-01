@@ -16,6 +16,7 @@ pub struct TypeDeclaration {
 
 #[derive(Debug)]
 pub enum TypeKind {
+    Alias(TypeExpr),
     Variant(Vec<ConstructorDeclaration>),
     Record(Vec<LabelDeclaration>),
 }
@@ -97,6 +98,9 @@ impl fmt::Display for TypeDeclarationDisplay<'_, '_> {
         )?;
 
         match &self.decl.kind {
+            TypeKind::Alias(typ) => {
+                write!(f, " = {}", typ.desc.display(self.session, 0))
+            }
             TypeKind::Variant(constructors) => {
                 write!(f, " =")?;
                 for (i, cons) in constructors.iter().enumerate() {

@@ -44,8 +44,10 @@ impl<'a> Parser<'a> {
     fn parse_type_kind(&mut self) -> ParseRes<TypeKind> {
         if self.at(TokenKind::LBra) {
             Ok(TypeKind::Record(self.parse_record_decl()?))
-        } else {
+        } else if self.at_constructor() {
             Ok(TypeKind::Variant(self.parse_variant_decl()?))
+        } else {
+            Ok(TypeKind::Alias(self.parse_type_expr()?))
         }
     }
 
@@ -53,14 +55,20 @@ impl<'a> Parser<'a> {
         let mut params = vec![];
         if self.at_poly() {
             match &self.peek().ok_or_else(|| ParseError::eof(self.loc()))?.kind {
-                TokenKind::PolyTypeName(x) => params.push(*x),
+                TokenKind::PolyTypeName(x) => {
+                    params.push(*x);
+                    self.advance();
+                }
                 _ => unreachable!(),
             }
         } else if self.at(TokenKind::LPar) {
             self.advance();
             while !(self.at(TokenKind::RPar)) {
                 match &self.peek().ok_or_else(|| ParseError::eof(self.loc()))?.kind {
-                    TokenKind::PolyTypeName(x) => params.push(*x),
+                    TokenKind::PolyTypeName(x) => {
+                        params.push(*x);
+                        self.advance();
+                    }
                     _ => unreachable!(),
                 }
                 if !self.at(TokenKind::Comma) {
