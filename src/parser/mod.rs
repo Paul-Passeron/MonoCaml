@@ -125,14 +125,26 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_long_ident(&mut self) -> ParseRes<LongIdent> {
-        // let start = self.loc();
-        match self.peek().map(|x| x.kind.clone()) {
+        let mut res = match self.peek().map(|x| x.kind.clone()) {
             Some(TokenKind::Ident(s)) => {
                 self.advance();
                 Ok(LongIdent::Ident(s))
             }
             _ => Err(ParseError::todo("other long idents", self.loc())),
+        }?;
+
+        while self.at(TokenKind::Dot) {
+            self.advance();
+            match self.peek().map(|x| x.kind.clone()) {
+                Some(TokenKind::Ident(s)) => {
+                    self.advance();
+                    res = LongIdent::Dot(Box::new(res), s);
+                }
+                _ => Err(ParseError::todo("other long idents", self.loc()))?,
+            }
         }
+
+        Ok(res)
     }
 
     fn at_constructor(&mut self) -> bool {
