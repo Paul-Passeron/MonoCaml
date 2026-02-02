@@ -5,9 +5,7 @@ use crate::{
         interner::{StrLit, Symbol},
         token::TokenKind,
     },
-    parse_tree::{
-        ArgLabel, Located, LongIdent, RecordField, pattern::Pattern, type_expr::TypeExpr,
-    },
+    parse_tree::{Located, LongIdent, RecordField, pattern::Pattern, type_expr::TypeExpr},
     session::Session,
     source_manager::loc::Span,
 };
@@ -85,8 +83,7 @@ pub enum ExpressionDesc {
         with: Vec<Case>,
     },
     Fun {
-        arg: ArgLabel<Option<Box<Expression>>>,
-        pat: Pattern,
+        arg: Pattern,
         body: Box<Expression>,
     },
     Construct(LongIdent, Option<Box<Expression>>),
@@ -176,6 +173,13 @@ impl ExpressionDesc {
         Self::Match {
             expr: Box::new(expr),
             with,
+        }
+    }
+
+    pub fn fun(pat: Pattern, body: Expression) -> Self {
+        Self::Fun {
+            arg: pat,
+            body: Box::new(body),
         }
     }
 }
@@ -448,26 +452,9 @@ impl fmt::Display for ExpressionDescDisplay<'_, '_> {
                 }
                 Ok(())
             }
-            ExpressionDesc::Fun { arg, pat, body } => {
+            ExpressionDesc::Fun { arg, body } => {
                 write!(f, "{}fun ", INDENT.repeat(self.indent))?;
-                match arg {
-                    ArgLabel::NoLabel => {}
-                    ArgLabel::Labelled(sym, default) => {
-                        write!(f, "~{}", sym.display(&self.session.symbol_interner))?;
-                        if let Some(def) = default {
-                            write!(f, ":{}", def.desc.display(self.session, 0))?;
-                        }
-                        write!(f, " ")?;
-                    }
-                    ArgLabel::Optional(sym, default) => {
-                        write!(f, "?{}", sym.display(&self.session.symbol_interner))?;
-                        if let Some(def) = default {
-                            write!(f, ":{}", def.desc.display(self.session, 0))?;
-                        }
-                        write!(f, " ")?;
-                    }
-                }
-                write!(f, "{} ->\n", pat.desc.display(self.session, 0))?;
+                write!(f, "{} ->\n", arg.desc.display(self.session, 0))?;
                 write!(f, "{}", body.desc.display(self.session, self.indent + 1))
             }
             ExpressionDesc::Construct(long_ident, None) => {
