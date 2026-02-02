@@ -13,6 +13,8 @@ pub enum TokenKind {
     Strlit(StrLit),
     Charlit(char),
 
+    Wildcard,
+
     True,
     False,
 
@@ -137,6 +139,7 @@ impl<'a, 'b> fmt::Display for DebugTokenKindDisplay<'a, 'b> {
             TokenKind::Intlit(_) => write!(f, "Intlit: ")?,
             TokenKind::Strlit(_) => write!(f, "Strlit: ")?,
             TokenKind::Charlit(_) => write!(f, "Charlit: ")?,
+            TokenKind::Wildcard => write!(f, "Wildcard: ")?,
             TokenKind::LetOp(_) => write!(f, "LetOp: ")?,
             TokenKind::Op(_) => write!(f, "Op: ")?,
             TokenKind::Comment(_) => write!(f, "Comment: ")?,
@@ -213,6 +216,7 @@ impl<'a, 'b> fmt::Display for TokenKindDisplay<'a, 'b> {
             }
             TokenKind::PolyTypeName(symbol) => write!(f, "'{}", s.resolve_symbol(*symbol)),
             TokenKind::Charlit(c) => write!(f, "'{}'", c.escape_debug()),
+            TokenKind::Wildcard => write!(f, "_"),
             TokenKind::True => write!(f, "true"),
             TokenKind::False => write!(f, "false"),
             TokenKind::If => write!(f, "if"),

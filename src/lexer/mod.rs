@@ -156,6 +156,7 @@ impl Lexer {
             "and" => Ok(Token::new(TokenKind::And, l.span(&self.loc()))),
             "in" => Ok(Token::new(TokenKind::In, l.span(&self.loc()))),
             "mutable" => Ok(Token::new(TokenKind::Mutable, l.span(&self.loc()))),
+            "_" => Ok(Token::new(TokenKind::Wildcard, l.span(&self.loc()))),
             "let" => {
                 if self.is_operator_start(true) {
                     let start = self.loc().offset;
