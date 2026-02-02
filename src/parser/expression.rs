@@ -125,6 +125,13 @@ impl<'a> Parser<'a> {
                     start.span(&self.loc()),
                 ))
             }
+            Some(TokenKind::Strlit(s)) => {
+                self.advance();
+                Ok(Expression::new(
+                    ExpressionDesc::Constant(Constant::String(s)),
+                    start.span(&self.loc()),
+                ))
+            }
             Some(TokenKind::LSqr) => {
                 let start = self.loc();
                 self.advance();
