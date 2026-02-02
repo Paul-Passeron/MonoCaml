@@ -205,7 +205,7 @@ impl MonoToCfg {
                 *body,
             ),
             _ => {
-                panic!()
+                panic!("This is actually not what we want to be doing")
             }
         }
     }
