@@ -52,6 +52,12 @@ impl<'a> Parser<'a> {
 
                 self.try_parse(vec![Box::new(try_as_tuple), Box::new(try_as_constraint)])
             }
+            Some(TokenKind::Wildcard) => {
+                let start = self.loc();
+                self.advance();
+                let end = self.span().split().1;
+                Ok(Pattern::new(PatternDesc::Any, start.span(&end)))
+            }
             Some(TokenKind::Ident(Symbol::Cons(_))) => todo!(),
             Some(TokenKind::Ident(Symbol::Ident(s))) => {
                 let start = self.loc();

@@ -1,5 +1,5 @@
 use crate::{
-    lexer::{interner::Symbol, token::TokenKind},
+    lexer::token::TokenKind,
     parse_tree::expression::{Case, Constant, Expression, ExpressionDesc},
     parser::{
         Assoc, Parser,
@@ -20,8 +20,20 @@ impl<'a> Parser<'a> {
     }
 
     fn parse_function(&mut self) -> ParseRes<Expression> {
+        let start = self.loc();
         self.expect(TokenKind::Function)?;
-        todo!()
+
+        let mut cases = vec![self.parse_case()?];
+
+        while self.at(TokenKind::Pipe) {
+            self.advance();
+            cases.push(self.parse_case()?)
+        }
+
+        let end = self.span().split().1;
+        let span = start.span(&end);
+        let desc = ExpressionDesc::Function(cases);
+        Ok(Expression::new(desc, span))
     }
 
     fn parse_fun(&mut self) -> ParseRes<Expression> {
