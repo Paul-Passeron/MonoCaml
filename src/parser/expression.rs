@@ -13,8 +13,32 @@ impl<'a> Parser<'a> {
             Some(TokenKind::If) => self.parse_if_then_else(),
             Some(TokenKind::Let) => self.parse_let_in(),
             Some(TokenKind::Match) => self.parse_match(),
+            Some(TokenKind::Fun) => self.parse_fun(),
+            Some(TokenKind::Function) => self.parse_function(),
             _ => self.parse_binary_expression(0),
         }
+    }
+
+    fn parse_function(&mut self) -> ParseRes<Expression> {
+        self.expect(TokenKind::Function)?;
+        todo!()
+    }
+
+    fn parse_fun(&mut self) -> ParseRes<Expression> {
+        self.expect(TokenKind::Fun)?;
+        let mut params = vec![self.parse_pattern()?];
+        while !self.is_done() && !self.at(TokenKind::Arrow) {
+            params.push(self.parse_pattern()?);
+        }
+        self.expect(TokenKind::Arrow)?;
+        let body = self.parse_expression()?;
+        let end = self.span().split().1;
+        Ok(params.into_iter().rev().fold(body, |acc, pat| {
+            let start = pat.span.split().0;
+            let desc = ExpressionDesc::fun(pat, acc);
+            let span = start.span(&end);
+            Expression::new(desc, span)
+        }))
     }
 
     fn parse_case(&mut self) -> ParseRes<Case> {
@@ -136,7 +160,7 @@ impl<'a> Parser<'a> {
                 };
                 Ok(Expression::new(desc, span))
             }
-            Some(TokenKind::Ident(Symbol::Ident(_))) => {
+            Some(TokenKind::Ident(_)) => {
                 let start = self.loc();
                 let desc = ExpressionDesc::Ident(self.parse_long_ident()?);
                 let end = self.span().split().1;
@@ -192,7 +216,13 @@ impl<'a> Parser<'a> {
             Some(TokenKind::Minus) => {
                 todo!()
             }
+            Some(TokenKind::Exclam) => {
+                self.advance();
+                let _e = self.parse_atom()?;
+                todo!()
+            }
             Some(_) if self.at_constructor() => self.parse_constructor(),
+
             _ => self.parse_application(),
         }
     }
