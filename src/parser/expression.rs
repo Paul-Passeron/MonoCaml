@@ -22,7 +22,9 @@ impl<'a> Parser<'a> {
     fn parse_function(&mut self) -> ParseRes<Expression> {
         let start = self.loc();
         self.expect(TokenKind::Function)?;
-
+        if self.at(TokenKind::Pipe) {
+            self.advance();
+        }
         let mut cases = vec![self.parse_case()?];
 
         while self.at(TokenKind::Pipe) {
