@@ -13,7 +13,7 @@ use crate::{
 impl<'a> Parser<'a> {
     fn parse_atom_pat(&mut self) -> ParseRes<Pattern> {
         let start = self.loc();
-        match self.peek().map(|x| x.kind.clone()) {
+        let res = match self.peek().map(|x| x.kind.clone()) {
             Some(TokenKind::Intlit(x)) => {
                 self.advance();
                 Ok(Pattern::new(
@@ -85,7 +85,23 @@ impl<'a> Parser<'a> {
 
                 Ok(Pattern::new(desc, span))
             }
-            _ => Err(ParseError::todo("parse_pattern", self.loc())),
+            x => Err(ParseError::todo(
+                format!("parse_pattern {:?}", x),
+                self.loc(),
+            )),
+        }?;
+        if self.at(TokenKind::Colon)
+            && !matches!(res.desc, PatternDesc::Constraint(_, _))
+            && !matches!(res.desc, PatternDesc::Paren(_))
+        {
+            self.advance();
+            let constraint = self.parse_type_expr()?;
+            let end = self.loc();
+            let span = start.span(&end);
+            let desc = PatternDesc::Constraint(Box::new(res), constraint);
+            Ok(Pattern::new(desc, span))
+        } else {
+            Ok(res)
         }
     }
 
