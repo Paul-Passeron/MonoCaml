@@ -28,18 +28,18 @@ impl<'a> Parser<'a> {
     pub(super) fn parse_value_binding(&mut self) -> ParseRes<ValueBinding> {
         let start = self.loc();
         let pat = self.parse_pattern()?;
+
+        let mut args = vec![];
+
+        while !self.is_done() && !self.at(TokenKind::Eq) && !self.at(TokenKind::Colon) {
+            args.push(self.parse_pattern()?);
+        }
+
         let constraint = if self.at(TokenKind::Colon) {
-            self.advance();
             Some(self.parse_value_constraint()?)
         } else {
             None
         };
-
-        let mut args = vec![];
-
-        while !self.is_done() && !self.at(TokenKind::Eq) {
-            args.push(self.parse_pattern()?);
-        }
 
         self.expect(TokenKind::Eq)?;
         let expr = self.parse_expression()?;
