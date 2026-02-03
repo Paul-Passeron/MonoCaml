@@ -251,11 +251,10 @@ impl Lexer {
                 }
                 '"' => self.lex_string(session),
                 '\'' => {
-                    // We need to handle char lit and polymorphic type name
                     let mut length = 0;
                     while let Some(x) = self.peek_n(length + 1)
-                        && x != '\''
-                        && !x.is_whitespace()
+                        && dbg!(x) != '\''
+                        && is_identifier(x, length == 0)
                     {
                         length += 1;
                     }
