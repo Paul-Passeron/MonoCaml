@@ -1,5 +1,4 @@
 #![feature(normalize_lexically, exit_status_error)]
-#![feature(random)]
 
 use std::{
     fs::File,
@@ -28,6 +27,7 @@ pub mod lower;
 pub mod mono_ir;
 pub mod parse_tree;
 pub mod parser;
+pub mod resolved;
 pub mod session;
 pub mod source_manager;
 
@@ -69,7 +69,7 @@ fn run_and_check_output(program: &str, args: &[&str], expected: &str) -> std::io
 fn main() {
     let sm = SourceManager::new();
     let mut session = Session::new(sm);
-    let file_name = "examples/hello_world.ml";
+    let file_name = "examples/inference.ml";
     let contents = {
         let mut s = String::new();
         let mut f = File::open(file_name).unwrap();
@@ -105,8 +105,13 @@ fn main() {
     }
 
     let mut parser = Parser::new(id, &tokens).unwrap();
-    let prog = parser.parse_program().unwrap();
-    // println!("{:#?}", prog);
+    let prog = match parser.parse_program() {
+        Ok(p) => p,
+        Err(e) => {
+            println!("Parsing error: {:?}", e);
+            return;
+        }
+    };
 
     for item in &prog {
         println!("{}", item.desc.display(&session, 0));
