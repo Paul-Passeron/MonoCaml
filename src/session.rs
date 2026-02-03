@@ -1,5 +1,6 @@
 use crate::{
     lexer::interner::{Interner, StrLit, Symbol},
+    resolved::def::DefTable,
     source_manager::SourceManager,
 };
 
@@ -8,6 +9,7 @@ pub struct Session {
     pub source_manager: SourceManager,
     pub symbol_interner: Interner<Symbol>,
     pub strlit_interner: Interner<StrLit>,
+    pub def_table: DefTable,
 }
 
 impl Session {
@@ -16,6 +18,7 @@ impl Session {
             source_manager,
             symbol_interner: Interner::new(),
             strlit_interner: Interner::new(),
+            def_table: DefTable::new(),
         }
     }
 

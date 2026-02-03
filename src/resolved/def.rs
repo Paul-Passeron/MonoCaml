@@ -1,11 +1,9 @@
-#[derive(Copy, Clone, Eq, PartialEq, Hash)]
+use crate::resolved::poly_ir::types::{TypeDef, TypeId};
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub struct ValueId(u32);
 
-#[derive(Copy, Clone, Eq, PartialEq, Hash)]
-pub struct TypeId(u32);
-
 pub struct ValueDef {}
-pub struct TypeDef {}
 
 pub struct DefTable {
     values: Vec<ValueDef>,
