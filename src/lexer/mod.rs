@@ -253,7 +253,7 @@ impl Lexer {
                 '\'' => {
                     let mut length = 0;
                     while let Some(x) = self.peek_n(length + 1)
-                        && dbg!(x) != '\''
+                        && x != '\''
                         && is_identifier(x, length == 0)
                     {
                         length += 1;
