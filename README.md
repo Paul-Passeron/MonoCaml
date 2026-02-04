@@ -4,7 +4,8 @@
 ------------ 
 ## Overview
 
-For the moment, we compile a statically typed lambda calculus-like language to a flat SSA IR, which is then transpiled to C.
+For the moment, we compile a statically typed, monomorphic lambda calculus-like IR to a flat SSA IR, which is then transpiled to LLVM IR, which is then compiled.
+OCaml source (or rather a small subset) is parsed. The AST will be transformed into a polymorphic IR that will then be transformed in the monomorphic IR discussed earlier.
 
 ## Memory Management
 Closure environnements and objects are allocated on the heap and reference-counted by a small custom runtime written in C.
