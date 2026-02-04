@@ -45,7 +45,7 @@ Compiles and outputs:
 720
 ```
 
-## What's interesting
+## Some implementation details thoughts
 
 I stumbled upon a pretty powerful pattern for writing type-safe SSA in Rust. 
 The assigned values in SSA (`%1`, `%2`, ...) can be defined as a type `Var` from which we can extract a value (Here it's unique ids but it could be strings, ...)
