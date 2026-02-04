@@ -1,4 +1,7 @@
-use crate::resolved::poly_ir::types::{TypeDef, TypeId};
+use crate::{
+    helpers::unique::Token,
+    resolved::poly_ir::types::{TypeDef, TypeDefId},
+};
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
 pub struct ValueId(u32);
@@ -24,8 +27,8 @@ impl DefTable {
         id
     }
 
-    pub fn add_type(&mut self, t: TypeDef) -> TypeId {
-        let id = TypeId(self.types.len() as u32);
+    pub fn add_type(&mut self, t: TypeDef) -> TypeDefId {
+        let id = TypeDefId::from(Token::from(self.types.len()));
         self.types.push(t);
         id
     }
@@ -34,7 +37,7 @@ impl DefTable {
         self.values.get(id.0 as usize).unwrap()
     }
 
-    pub fn get_type(&self, id: TypeId) -> &TypeDef {
-        self.types.get(id.0 as usize).unwrap()
+    pub fn get_type(&self, id: TypeDefId) -> &TypeDef {
+        self.types.get(id.extract()).unwrap()
     }
 }

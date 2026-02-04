@@ -1,11 +1,10 @@
 use std::fmt::Debug;
 use std::hash::Hash;
 
-use crate::{lexer::interner::Symbol, source_manager::loc::Span};
+use crate::{lexer::interner::Symbol, resolved::uniqueness, source_manager::loc::Span};
 
-// TODO: Make it not public, maybe using Unique
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
-pub struct TypeId(pub u32);
+pub type TypeDefId = uniqueness::Uniklon<uniqueness::TypeDefMarker>;
+pub type TypeVarId = uniqueness::Uniklon<uniqueness::TypeVarMarker>;
 
 #[derive(Debug, Clone, Hash)]
 pub struct Typed<T>
@@ -33,6 +32,16 @@ pub struct TypeDef {
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub enum Type {
-    Specialized { decl: TypeId, args: Vec<Box<Type>> },
-    Single { decl: TypeId },
+    Var(TypeVarId),
+    Con {
+        name: Symbol, // Will be a Path
+        args: Vec<Type>,
+    },
+    Arrow(Box<Type>, Box<Type>),
+    Tuple(Vec<Type>), // unit is Tuple(vec![])
+    Record {
+        fields: Vec<(Symbol, Type)>, // is it needed ?
+    },
+    Hole,  // To be inferred
+    Error, // Error recovery
 }
