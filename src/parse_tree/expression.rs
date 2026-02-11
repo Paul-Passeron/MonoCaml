@@ -26,6 +26,17 @@ pub enum RecFlag {
     NonRecursive,
 }
 
+impl RecFlag {
+    pub fn is_rec(&self) -> bool {
+        matches!(self, RecFlag::Recursive)
+    }
+}
+
+#[derive(Debug)]
+pub enum UnaryOp {
+    //TODO
+}
+
 #[derive(Debug)]
 pub enum BinaryOp {
     Plus,
