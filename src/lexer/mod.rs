@@ -1,10 +1,10 @@
 use crate::{
+    SESSION,
     lexer::{
         error::{LexRes, LexingError},
         token::{Token, TokenKind},
     },
-    session::Session,
-    source_manager::{FileId, SourceManager, loc::Loc},
+    source_manager::{FileId, loc::Loc},
 };
 
 pub mod char_lit;
@@ -33,9 +33,15 @@ fn is_identifier(c: char, is_first: bool) -> bool {
 }
 
 impl Lexer {
-    pub fn new(sm: &SourceManager, file: FileId) -> Self {
+    pub fn new(file: FileId) -> Self {
         Self {
-            contents: sm.get_file(file).contents.clone(),
+            contents: SESSION
+                .lock()
+                .unwrap()
+                .source_manager
+                .get_file(file)
+                .contents
+                .clone(),
             file,
             pos: 0,
         }
@@ -120,7 +126,7 @@ impl Lexer {
         }
     }
 
-    fn lex_identifier(&mut self, session: &mut Session) -> LexRes {
+    fn lex_identifier(&mut self) -> LexRes {
         if !is_identifier_start(self.peek_or_eof()?) {
             return Err(LexingError::UnexpectedChar(self.loc()));
         }
@@ -160,23 +166,23 @@ impl Lexer {
             "let" => {
                 if self.is_operator_start(true) {
                     let start = self.loc().offset;
-                    let _ = self.lex_operator(session)?;
+                    let _ = self.lex_operator()?;
                     let loc = self.loc();
                     let s = &self.contents[start..loc.offset];
-                    let symbol = session.intern_symbol(s);
+                    let symbol = SESSION.lock().unwrap().intern_symbol(s);
                     Ok(Token::new(TokenKind::LetOp(symbol), l.span(&loc)))
                 } else {
                     Ok(Token::new(TokenKind::Let, l.span(&self.loc())))
                 }
             }
             _ => {
-                let symbol = session.intern_symbol(s);
+                let symbol = SESSION.lock().unwrap().intern_symbol(s);
                 Ok(Token::new(TokenKind::Ident(symbol), l.span(&self.loc())))
             }
         }
     }
 
-    fn lex_string(&mut self, session: &mut Session) -> LexRes {
+    fn lex_string(&mut self) -> LexRes {
         let l = self.loc();
         if self.peek_or_eof()? != '"' {
             Err(LexingError::UnexpectedChar(l))
@@ -194,7 +200,7 @@ impl Lexer {
                 contents.push(self.parse_char_content()?);
                 self.peek_or_eof()?;
             }
-            let strlit = session.intern_strlit(&contents);
+            let strlit = SESSION.lock().unwrap().intern_strlit(&contents);
             Ok(Token::new(TokenKind::Strlit(strlit), l.span(&self.loc())))
         }
     }
@@ -207,7 +213,7 @@ impl Lexer {
         }
     }
 
-    pub fn next_token(&mut self, session: &mut Session) -> LexRes {
+    pub fn next_token(&mut self) -> LexRes {
         self.skip_whitespace();
         let l = self.loc();
         let create_single_char_token = |this: &mut Lexer, kind| {
@@ -247,9 +253,9 @@ impl Lexer {
                 }
                 _ if self.is_operator_start(true) => {
                     // This is an operator
-                    self.lex_operator(session)
+                    self.lex_operator()
                 }
-                '"' => self.lex_string(session),
+                '"' => self.lex_string(),
                 '\'' => {
                     let mut length = 0;
                     while let Some(x) = self.peek_n(length + 1)
@@ -274,7 +280,7 @@ impl Lexer {
                         .all(|(i, x)| is_identifier(x, i == 0))
                     {
                         self.advance();
-                        let iden = self.lex_identifier(session)?;
+                        let iden = self.lex_identifier()?;
                         let symb = match &iden.kind {
                             TokenKind::Ident(x) => *x,
                             _ => return Err(LexingError::KeywordInPolyTypeName(iden)),
@@ -288,7 +294,7 @@ impl Lexer {
                     }
                 }
                 '?' | '~' => todo!(),
-                _ if is_identifier_start(c) => self.lex_identifier(session),
+                _ if is_identifier_start(c) => self.lex_identifier(),
                 ';' => {
                     self.advance();
                     Ok(Token::new(TokenKind::Semi, l.span(&self.loc())))

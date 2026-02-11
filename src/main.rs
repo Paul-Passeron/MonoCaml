@@ -5,15 +5,23 @@ use std::{
     io::Read,
     path::PathBuf,
     process::{Command, Stdio},
+    sync::Mutex,
 };
+
+use lazy_static::lazy_static;
 
 use crate::{
     backend::llvm_backend::LLVMBackend,
     cfg::{FunName, Label, var::CfgVar},
-    lexer::{Lexer, error::LexingError},
+    lexer::{
+        Lexer,
+        error::LexingError,
+        interner::{StrLit, Symbol},
+    },
     lower::mono_to_cfg::MonoToCfg,
     mono_ir::{Ast, Var, types::AstCtx},
     parser::Parser,
+    resolution::Resolver,
     session::Session,
     source_manager::SourceManager,
 };
@@ -27,7 +35,8 @@ pub mod lower;
 pub mod mono_ir;
 pub mod parse_tree;
 pub mod parser;
-pub mod resolved;
+pub mod poly_ir;
+pub mod resolution;
 pub mod session;
 pub mod source_manager;
 
@@ -66,24 +75,36 @@ fn run_and_check_output(program: &str, args: &[&str], expected: &str) -> std::io
     Ok(stdout.contains(expected))
 }
 
+lazy_static! {
+    static ref SESSION: Mutex<Session> = Mutex::new(Session::new(SourceManager::new()));
+}
+
+fn resolve_symbol(symbol: Symbol) -> String {
+    SESSION.lock().unwrap().resolve_symbol(symbol).to_string()
+}
+
+fn resolve_strlit(strlit: StrLit) -> String {
+    SESSION.lock().unwrap().resolve_strlit(strlit).to_string()
+}
+
 fn main() {
-    let sm = SourceManager::new();
-    let mut session = Session::new(sm);
-    let file_name = "examples/inference.ml";
+    let file_name = "examples/type_empty_cons.ml";
     let contents = {
         let mut s = String::new();
         let mut f = File::open(file_name).unwrap();
         f.read_to_string(&mut s).unwrap();
         s
     };
-    let id = session
+    let id = SESSION
+        .lock()
+        .unwrap()
         .source_manager
         .add_file(PathBuf::from(file_name), contents.to_string());
-    let mut l = Lexer::new(&session.source_manager, id);
+    let mut l = Lexer::new(id);
     let mut tokens = vec![];
     let mut error: Option<LexingError> = None;
     loop {
-        let t = l.next_token(&mut session);
+        let t = l.next_token();
         match t {
             Ok(x) => tokens.push(x),
             Err(LexingError::EOF) => {
@@ -97,11 +118,11 @@ fn main() {
     }
 
     for t in &tokens {
-        println!("{}", t.display(&session));
+        println!("{t}");
     }
 
     if error.is_some() {
-        println!("Lexing error: {}", error.unwrap().display(&session))
+        println!("Lexing error: {}", error.unwrap())
     }
 
     let mut parser = Parser::new(id, &tokens).unwrap();
@@ -113,8 +134,6 @@ fn main() {
         }
     };
 
-    for item in &prog {
-        println!("{}", item.desc.display(&session, 0));
-        println!();
-    }
+    let poly = Resolver::new().resolve_structure(&prog).unwrap();
+    println!("{poly:#?}")
 }

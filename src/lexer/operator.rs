@@ -1,9 +1,9 @@
 use crate::{
+    SESSION,
     lexer::{
         LexRes, Lexer, LexingError,
         token::{Token, TokenKind},
     },
-    session::Session,
 };
 
 impl Lexer {
@@ -44,7 +44,7 @@ impl Lexer {
         }
     }
 
-    pub(super) fn lex_operator(&mut self, session: &mut Session) -> LexRes {
+    pub(super) fn lex_operator(&mut self) -> LexRes {
         if !self.is_operator_start(true) {
             return Err(LexingError::UnexpectedChar(self.loc()));
         }
@@ -82,7 +82,7 @@ impl Lexer {
             "$" => Ok(Token::new(TokenKind::Pound, l.span(&self.loc()))),
 
             _ => {
-                let op_symbol = session.intern_symbol(s);
+                let op_symbol = SESSION.lock().unwrap().intern_symbol(s);
                 Ok(Token::new(TokenKind::Op(op_symbol), l.span(&self.loc())))
             }
         }

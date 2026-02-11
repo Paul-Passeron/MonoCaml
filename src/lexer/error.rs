@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::{lexer::token::Token, session::Session, source_manager::loc::Loc};
+use crate::{lexer::token::Token, source_manager::loc::Loc};
 
 pub enum LexingError {
     EOF,
@@ -18,90 +18,49 @@ pub enum LexingError {
     UnterminatedChar(Loc),
 }
 
-pub struct LexingErrorDisplay<'a, 'b>(&'a LexingError, &'b Session);
-
-impl<'a, 'b> fmt::Display for LexingErrorDisplay<'a, 'b> {
+impl fmt::Display for LexingError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match &self.0 {
+        match &self {
             LexingError::EOF => write!(f, "EOF"),
             LexingError::UnexpectedChar(loc) => {
-                write!(
-                    f,
-                    "{}: Unexpected characted",
-                    loc.display(&self.1.source_manager)
-                )
+                write!(f, "{}: Unexpected characted", loc)
             }
-            LexingError::UnmatchedCommentStart(loc) => write!(
-                f,
-                "{}: Unmatched comment start",
-                loc.display(&self.1.source_manager)
-            ),
-            LexingError::NotAnOperator(loc) => write!(
-                f,
-                "{}: Expected an operator",
-                loc.display(&self.1.source_manager)
-            ),
-            LexingError::UnterminatedString(loc) => write!(
-                f,
-                "{}: String literal is not terminated",
-                loc.display(&self.1.source_manager)
-            ),
+            LexingError::UnmatchedCommentStart(loc) => {
+                write!(f, "{}: Unmatched comment start", loc)
+            }
+            LexingError::NotAnOperator(loc) => write!(f, "{}: Expected an operator", loc),
+            LexingError::UnterminatedString(loc) => {
+                write!(f, "{}: String literal is not terminated", loc)
+            }
             LexingError::KeywordInPolyTypeName(token) => write!(
                 f,
                 "{}: Reserved keyword used in polymorphic type name ({})",
-                token.span.split().0.display(&self.1.source_manager),
-                token.kind.display(&self.1)
+                token.span.split().0,
+                token.kind
             ),
-            LexingError::InvalidCharLiteral(loc) => write!(
-                f,
-                "{}: Invalid character literal",
-                loc.display(&self.1.source_manager)
-            ),
-            LexingError::EmptyCharLiteral(loc) => write!(
-                f,
-                "{}: Empty character literal",
-                loc.display(&self.1.source_manager)
-            ),
+            LexingError::InvalidCharLiteral(loc) => write!(f, "{}: Invalid character literal", loc),
+            LexingError::EmptyCharLiteral(loc) => write!(f, "{}: Empty character literal", loc),
             LexingError::InvalidEscape(loc, c) => {
                 write!(
                     f,
                     "{}: Invalid escape character '{}'",
-                    loc.display(&self.1.source_manager),
+                    loc,
                     c.escape_debug()
                 )
             }
-            LexingError::InvalidUnicodeEscape(loc, s) => write!(
-                f,
-                "{}: Invalid unicode escape {}",
-                loc.display(&self.1.source_manager),
-                s
-            ),
-            LexingError::InvalidAsciiEscape(loc, s) => write!(
-                f,
-                "{}: Invalid ascii escape {}",
-                loc.display(&self.1.source_manager),
-                s
-            ),
-            LexingError::InvalidCodePoint(loc, cp) => write!(
-                f,
-                "{}: Invalid code point {}",
-                loc.display(&self.1.source_manager),
-                cp
-            ),
+            LexingError::InvalidUnicodeEscape(loc, s) => {
+                write!(f, "{}: Invalid unicode escape {}", loc, s)
+            }
+            LexingError::InvalidAsciiEscape(loc, s) => {
+                write!(f, "{}: Invalid ascii escape {}", loc, s)
+            }
+            LexingError::InvalidCodePoint(loc, cp) => {
+                write!(f, "{}: Invalid code point {}", loc, cp)
+            }
             LexingError::UnterminatedChar(loc) => {
-                write!(
-                    f,
-                    "{}: Unterminated char literal",
-                    loc.display(&self.1.source_manager),
-                )
+                write!(f, "{}: Unterminated char literal", loc,)
             }
         }
-    }
-}
-
-impl LexingError {
-    pub fn display<'a, 'b>(&'a self, s: &'b Session) -> LexingErrorDisplay<'a, 'b> {
-        LexingErrorDisplay(self, s)
     }
 }
 

@@ -2,11 +2,11 @@ use std::fmt;
 
 use crate::{
     lexer::interner::{StrLit, Symbol},
-    session::Session,
+    resolve_strlit, resolve_symbol,
     source_manager::loc::Span,
 };
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub enum TokenKind {
     Ident(Symbol),
     Intlit(i64),
@@ -89,52 +89,29 @@ impl TokenKind {
     pub fn is_skip(&self) -> bool {
         self.is_comment()
     }
-
-    pub fn display<'a, 'b>(&'a self, s: &'b Session) -> TokenKindDisplay<'a, 'b> {
-        TokenKindDisplay(self, s)
-    }
-
-    pub fn debug<'a, 'b>(&'a self, s: &'b Session) -> DebugTokenKindDisplay<'a, 'b> {
-        DebugTokenKindDisplay(self, s)
-    }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Token {
     pub kind: TokenKind,
     pub span: Span,
 }
 
-pub struct TokenKindDisplay<'a, 'b>(&'a TokenKind, &'b Session);
-pub struct TokenDisplay<'a, 'b>(&'a Token, &'b Session);
-pub struct DebugTokenKindDisplay<'a, 'b>(&'a TokenKind, &'b Session);
-pub struct DebugTokenDisplay<'a, 'b>(&'a Token, &'b Session);
-
-impl<'a, 'b> fmt::Display for TokenDisplay<'a, 'b> {
+impl fmt::Display for Token {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{}: {}",
-            self.0.span.display(&self.1.source_manager),
-            self.0.kind.display(self.1)
-        )
+        write!(f, "{}: {}", self.span, self.kind,)
     }
 }
 
-impl<'a, 'b> fmt::Display for DebugTokenDisplay<'a, 'b> {
+impl fmt::Debug for Token {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "{}: {}",
-            self.0.span.display(&self.1.source_manager),
-            self.0.kind.debug(self.1)
-        )
+        write!(f, "{}: {:?}", self.span, self.kind)
     }
 }
 
-impl<'a, 'b> fmt::Display for DebugTokenKindDisplay<'a, 'b> {
+impl fmt::Debug for TokenKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self.0 {
+        match self {
             TokenKind::Ident(_) => write!(f, "Ident: ")?,
             TokenKind::Intlit(_) => write!(f, "Intlit: ")?,
             TokenKind::Strlit(_) => write!(f, "Strlit: ")?,
@@ -198,23 +175,22 @@ impl<'a, 'b> fmt::Display for DebugTokenKindDisplay<'a, 'b> {
             TokenKind::Mutable => write!(f, "Mut: ")?,
         };
 
-        write!(f, "{}", self.0.display(self.1))
+        write!(f, "{}", self)
     }
 }
 
-impl<'a, 'b> fmt::Display for TokenKindDisplay<'a, 'b> {
+impl fmt::Display for TokenKind {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let s = &self.1;
-        match self.0 {
+        match self {
             TokenKind::Op(symbol) | TokenKind::Ident(symbol) => {
-                write!(f, "{}", s.resolve_symbol(*symbol))
+                write!(f, "{}", resolve_symbol(*symbol))
             }
             TokenKind::Intlit(x) => write!(f, "{x}"),
             TokenKind::Strlit(str_lit) => {
-                let lit = s.resolve_strlit(*str_lit);
+                let lit = resolve_strlit(*str_lit);
                 write!(f, "\"{}\"", lit.escape_debug())
             }
-            TokenKind::PolyTypeName(symbol) => write!(f, "'{}", s.resolve_symbol(*symbol)),
+            TokenKind::PolyTypeName(symbol) => write!(f, "'{}", resolve_symbol(*symbol)),
             TokenKind::Charlit(c) => write!(f, "'{}'", c.escape_debug()),
             TokenKind::Wildcard => write!(f, "_"),
             TokenKind::True => write!(f, "true"),
@@ -230,7 +206,7 @@ impl<'a, 'b> fmt::Display for TokenKindDisplay<'a, 'b> {
             TokenKind::Let => write!(f, "let"),
             TokenKind::And => write!(f, "and"),
             TokenKind::In => write!(f, "in"),
-            TokenKind::LetOp(symbol) => write!(f, "let{}", s.resolve_symbol(*symbol)),
+            TokenKind::LetOp(symbol) => write!(f, "let{}", resolve_symbol(*symbol)),
             TokenKind::Rec => write!(f, "rec"),
             TokenKind::Fun => write!(f, "fun"),
             TokenKind::Function => write!(f, "function"),
@@ -286,13 +262,5 @@ impl Token {
 
     pub fn is_skip(&self) -> bool {
         self.kind.is_skip()
-    }
-
-    pub fn display<'a, 'b>(&'a self, sm: &'b Session) -> TokenDisplay<'a, 'b> {
-        TokenDisplay(self, sm)
-    }
-
-    pub fn debug<'a, 'b>(&'a self, sm: &'b Session) -> DebugTokenDisplay<'a, 'b> {
-        DebugTokenDisplay(self, sm)
     }
 }
