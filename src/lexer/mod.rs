@@ -10,7 +10,6 @@ use crate::{
 pub mod char_lit;
 pub mod error;
 pub mod interner;
-pub mod iter;
 pub mod operator;
 pub mod token;
 
