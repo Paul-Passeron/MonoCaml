@@ -39,7 +39,7 @@ impl Pattern {
         match self {
             Pattern::Int(_) => (),
             Pattern::Symbol(var, _) => {
-                s.insert(var.clone());
+                s.insert(*var);
             }
             Pattern::Cons { arg, .. } => arg.iter().for_each(|x| x.vars_aux(s)),
             Pattern::Tuple(patterns) => patterns.iter().for_each(|x| x.vars_aux(s)),

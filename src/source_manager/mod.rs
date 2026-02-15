@@ -21,7 +21,6 @@ impl FileInfo {
             .chain(
                 contents
                     .chars()
-                    .into_iter()
                     .enumerate()
                     .filter_map(|(i, c)| if c == '\n' { Some(i) } else { None }),
             )
@@ -55,7 +54,7 @@ impl FileKind {
     pub fn get_name(&self) -> &str {
         match self {
             FileKind::StdIn => "stdin",
-            FileKind::File(s) => &s,
+            FileKind::File(s) => s,
         }
     }
 }
@@ -98,7 +97,7 @@ impl SourceManager {
                 offset: 0,
                 line: 1,
                 col: 1,
-                path: &f.kind.get_name(),
+                path: f.kind.get_name(),
             }
         } else {
             let (line, offset) = f
@@ -106,15 +105,14 @@ impl SourceManager {
                 .iter()
                 .copied()
                 .enumerate()
-                .filter(|(_, off)| *off < loc.offset)
-                .last()
+                .rfind(|(_, off)| *off < loc.offset)
                 .unwrap();
             let col = loc.offset - offset;
             LocInfo {
                 offset,
                 line: line + 1,
                 col: col + if line == 0 { 1 } else { 0 },
-                path: &f.kind.get_name(),
+                path: f.kind.get_name(),
             }
         }
     }
@@ -127,9 +125,15 @@ impl SourceManager {
             .copied()
             .enumerate()
             .find(|(_, off)| *off >= loc.offset)
-            .unwrap_or_else(|| (f.lines.len(), loc.offset));
+            .unwrap_or((f.lines.len(), loc.offset));
         let col = loc.offset - offset;
 
         format!("{}:{}:{}", f.kind.get_name(), line, col)
+    }
+}
+
+impl Default for SourceManager {
+    fn default() -> Self {
+        Self::new()
     }
 }

@@ -1,9 +1,6 @@
 use std::fmt;
 
-use crate::{
-    SESSION,
-    source_manager::{FileId, SourceManager},
-};
+use crate::{SESSION, source_manager::FileId};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Loc {
@@ -76,14 +73,26 @@ pub enum LocKind {
     Loc(Loc),
 }
 
-impl Into<LocKind> for Loc {
-    fn into(self) -> LocKind {
-        LocKind::Loc(self)
+// impl Into<LocKind> for Loc {
+//     fn into(self) -> LocKind {
+//         LocKind::Loc(self)
+//     }
+// }
+
+// impl Into<LocKind> for Span {
+//     fn into(self) -> LocKind {
+//         LocKind::Span(self)
+//     }
+// }
+
+impl From<Loc> for LocKind {
+    fn from(value: Loc) -> Self {
+        Self::Loc(value)
     }
 }
 
-impl Into<LocKind> for Span {
-    fn into(self) -> LocKind {
-        LocKind::Span(self)
+impl From<Span> for LocKind {
+    fn from(value: Span) -> Self {
+        Self::Span(value)
     }
 }

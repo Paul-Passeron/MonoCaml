@@ -33,7 +33,7 @@ impl Lexer {
     pub(super) fn is_operator_start(&self, is_first: bool) -> bool {
         if let Some(c) = self.peek() {
             match c {
-                '?' | '~' if is_first => self.peek_n(1).map_or(false, Self::is_operator_char),
+                '?' | '~' if is_first => self.peek_n(1).is_some_and(Self::is_operator_char),
                 '!' | '$' | '%' | '&' | '*' | '+' | '-' | '.' | '/' | ':' | '<' | '=' | '>'
                 | '@' | '^' | '|' => true,
                 '?' | '~' => true, // valid as continuation
@@ -57,9 +57,7 @@ impl Lexer {
         let s = &self.contents[l.offset..self.loc().offset];
 
         match s {
-            "?" | "~" => {
-                return Err(LexingError::NotAnOperator(l));
-            }
+            "?" | "~" => Err(LexingError::NotAnOperator(l)),
             // Reserved tokens
             "+" => Ok(Token::new(TokenKind::Plus, l.span(&self.loc()))),
             "-" => Ok(Token::new(TokenKind::Minus, l.span(&self.loc()))),

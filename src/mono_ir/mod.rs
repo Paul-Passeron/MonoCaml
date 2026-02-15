@@ -98,7 +98,7 @@ impl<MetaData: Clone> Ast<MetaData> {
         match self.expr() {
             AstKind::Str(_) | AstKind::Int(_) | AstKind::Native(_) => (),
             AstKind::Var(var) => {
-                s.insert(var.clone());
+                s.insert(*var);
             }
             AstKind::Lambda { arg, body, .. } => {
                 body.free_vars_aux(s);
@@ -365,7 +365,7 @@ impl<'a, M: Clone> fmt::Display for DisplayAstKind<'a, M> {
                     if fu.contains("\n") {
                         write!(f, "{}", fu.lines().next().unwrap_or(""))?;
                         for l in fu.lines().skip(1) {
-                            write!(f, "{}{}{}", "\n", " ".repeat(TAB_SIZE * self.1), l)?;
+                            write!(f, "\n{}{}", " ".repeat(TAB_SIZE * self.1), l)?;
                         }
                         write!(f, " ")?;
                     } else {
@@ -374,7 +374,7 @@ impl<'a, M: Clone> fmt::Display for DisplayAstKind<'a, M> {
                     if x.contains("\n") {
                         write!(f, "{}", x.lines().next().unwrap_or(""))?;
                         for l in x.lines().skip(1) {
-                            write!(f, "{}{}{}", "\n", " ".repeat(TAB_SIZE * self.1), l)?;
+                            write!(f, "\n{}{}", " ".repeat(TAB_SIZE * self.1), l)?;
                         }
                         Ok(())
                     } else {
@@ -440,14 +440,12 @@ impl<'a, M: Clone> fmt::Display for DisplayAstKind<'a, M> {
                     writeln!(f, "{}", DisplayAst(then_e, self.1 + 1))?;
                     writeln!(f, "{}else", " ".repeat(TAB_SIZE * self.1))?;
                     writeln!(f, "{}", DisplayAst(else_e, self.1 + 1))?;
+                } else if str_then_e.contains("\n") || str_else_e.contains("\n") {
+                    writeln!(f, "\n{}", DisplayAst(then_e, self.1 + 1))?;
+                    writeln!(f, "{}else", " ".repeat(TAB_SIZE * self.1))?;
+                    writeln!(f, "{}", DisplayAst(else_e, self.1 + 1))?;
                 } else {
-                    if str_then_e.contains("\n") || str_else_e.contains("\n") {
-                        writeln!(f, "\n{}", DisplayAst(then_e, self.1 + 1))?;
-                        writeln!(f, "{}else", " ".repeat(TAB_SIZE * self.1))?;
-                        writeln!(f, "{}", DisplayAst(else_e, self.1 + 1))?;
-                    } else {
-                        writeln!(f, " if {str_cond} then {str_then_e} else {str_else_e}")?;
-                    }
+                    writeln!(f, " if {str_cond} then {str_then_e} else {str_else_e}")?;
                 }
 
                 Ok(())
@@ -477,7 +475,7 @@ impl<'a, M: Clone> fmt::Display for DisplayAstKind<'a, M> {
                 write!(f, "match ")?;
                 let str_e = expr.display().to_string();
                 if str_e.contains("\n") {
-                    writeln!(f, "")?;
+                    writeln!(f)?;
                     for l in str_e.lines() {
                         writeln!(f, "{}{}", " ".repeat(TAB_SIZE * (self.1 + 1)), l)?;
                     }
@@ -494,7 +492,7 @@ impl<'a, M: Clone> fmt::Display for DisplayAstKind<'a, M> {
                     )?;
                     let e = case.expr.display().to_string();
                     if e.contains("\n") {
-                        writeln!(f, "")?;
+                        writeln!(f)?;
                         for l in e.lines() {
                             writeln!(f, "{}{}", " ".repeat(TAB_SIZE * (self.1 + 1)), l)?;
                         }
@@ -558,16 +556,16 @@ impl<'a, M: fmt::Display + Clone> fmt::Display for MetaDisplayAstKind<'a, M> {
                     if fu.contains("\n") {
                         write!(f, "{}", fu.lines().next().unwrap_or(""))?;
                         for l in fu.lines().skip(1) {
-                            writeln!(f, "{}{}{}", "\n", " ".repeat(TAB_SIZE * self.1), l)?;
+                            writeln!(f, "\n{}{}", " ".repeat(TAB_SIZE * self.1), l)?;
                         }
-                        writeln!(f, "")?;
+                        writeln!(f)?;
                     } else {
                         write!(f, "{fu} ")?;
                     }
                     if x.contains("\n") {
                         write!(f, "{}", x.lines().next().unwrap_or(""))?;
                         for l in x.lines().skip(1) {
-                            write!(f, "{}{}{}", "\n", " ".repeat(TAB_SIZE * self.1), l)?;
+                            write!(f, "\n{}{}", " ".repeat(TAB_SIZE * self.1), l)?;
                         }
                         Ok(())
                     } else {
@@ -633,14 +631,12 @@ impl<'a, M: fmt::Display + Clone> fmt::Display for MetaDisplayAstKind<'a, M> {
                     writeln!(f, "{}", MetaDisplayAst(then_e, self.1 + 1))?;
                     writeln!(f, "{}else", " ".repeat(TAB_SIZE * self.1))?;
                     writeln!(f, "{}", MetaDisplayAst(else_e, self.1 + 1))?;
+                } else if str_then_e.contains("\n") || str_else_e.contains("\n") {
+                    writeln!(f, "\n{}", MetaDisplayAst(then_e, self.1 + 1))?;
+                    writeln!(f, "{}else", " ".repeat(TAB_SIZE * self.1))?;
+                    writeln!(f, "{}", MetaDisplayAst(else_e, self.1 + 1))?;
                 } else {
-                    if str_then_e.contains("\n") || str_else_e.contains("\n") {
-                        writeln!(f, "\n{}", MetaDisplayAst(then_e, self.1 + 1))?;
-                        writeln!(f, "{}else", " ".repeat(TAB_SIZE * self.1))?;
-                        writeln!(f, "{}", MetaDisplayAst(else_e, self.1 + 1))?;
-                    } else {
-                        writeln!(f, " if {str_cond} then {str_then_e} else {str_else_e}")?;
-                    }
+                    writeln!(f, " if {str_cond} then {str_then_e} else {str_else_e}")?;
                 }
 
                 Ok(())
@@ -670,7 +666,7 @@ impl<'a, M: fmt::Display + Clone> fmt::Display for MetaDisplayAstKind<'a, M> {
                 write!(f, "match ")?;
                 let str_e = expr.display_meta().to_string();
                 if str_e.contains("\n") {
-                    writeln!(f, "")?;
+                    writeln!(f,)?;
                     for l in str_e.lines() {
                         writeln!(f, "{}{}", " ".repeat(TAB_SIZE * (self.1 + 1)), l)?;
                     }
@@ -687,7 +683,7 @@ impl<'a, M: fmt::Display + Clone> fmt::Display for MetaDisplayAstKind<'a, M> {
                     )?;
                     let e = case.expr.display_meta().to_string();
                     if e.contains("\n") {
-                        writeln!(f, "")?;
+                        writeln!(f)?;
                         for l in e.lines() {
                             writeln!(f, "{}{}", " ".repeat(TAB_SIZE * (self.1 + 1)), l)?;
                         }

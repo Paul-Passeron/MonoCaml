@@ -1,6 +1,6 @@
 use crate::{
     lexer::interner::Symbol,
-    poly_ir::{ItemId, TypeId, expr::ValueBinding, spanned::Spanned, type_expr::Type},
+    poly_ir::{TypeId, expr::ValueBinding, spanned::Spanned, type_expr::Type},
 };
 
 pub type Item = Spanned<ItemNode>;
@@ -8,7 +8,6 @@ pub type Item = Spanned<ItemNode>;
 #[derive(Debug)]
 pub enum ItemNode {
     Value {
-        id: ItemId,
         recursive: bool,
         bindings: Vec<ValueBinding>,
     },

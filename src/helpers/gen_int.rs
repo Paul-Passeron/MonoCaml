@@ -76,10 +76,10 @@ impl From<usize> for GenInt {
     }
 }
 
-impl Into<i8> for GenInt {
-    fn into(self) -> i8 {
-        match self {
-            GenInt::I8(x) => x as i8,
+impl From<GenInt> for i8 {
+    fn from(value: GenInt) -> Self {
+        match value {
+            GenInt::I8(x) => x,
             GenInt::I16(x) => x as i8,
             GenInt::I32(x) => x as i8,
             GenInt::I64(x) => x as i8,
@@ -94,11 +94,11 @@ impl Into<i8> for GenInt {
         }
     }
 }
-impl Into<i16> for GenInt {
-    fn into(self) -> i16 {
-        match self {
+impl From<GenInt> for i16 {
+    fn from(value: GenInt) -> Self {
+        match value {
             GenInt::I8(x) => x as i16,
-            GenInt::I16(x) => x as i16,
+            GenInt::I16(x) => x,
             GenInt::I32(x) => x as i16,
             GenInt::I64(x) => x as i16,
             GenInt::I128(x) => x as i16,
@@ -112,12 +112,12 @@ impl Into<i16> for GenInt {
         }
     }
 }
-impl Into<i32> for GenInt {
-    fn into(self) -> i32 {
-        match self {
+impl From<GenInt> for i32 {
+    fn from(value: GenInt) -> Self {
+        match value {
             GenInt::I8(x) => x as i32,
             GenInt::I16(x) => x as i32,
-            GenInt::I32(x) => x as i32,
+            GenInt::I32(x) => x,
             GenInt::I64(x) => x as i32,
             GenInt::I128(x) => x as i32,
             GenInt::ISize(x) => x as i32,
@@ -130,13 +130,13 @@ impl Into<i32> for GenInt {
         }
     }
 }
-impl Into<i64> for GenInt {
-    fn into(self) -> i64 {
-        match self {
+impl From<GenInt> for i64 {
+    fn from(value: GenInt) -> Self {
+        match value {
             GenInt::I8(x) => x as i64,
             GenInt::I16(x) => x as i64,
             GenInt::I32(x) => x as i64,
-            GenInt::I64(x) => x as i64,
+            GenInt::I64(x) => x,
             GenInt::I128(x) => x as i64,
             GenInt::ISize(x) => x as i64,
             GenInt::U8(x) => x as i64,
@@ -148,14 +148,14 @@ impl Into<i64> for GenInt {
         }
     }
 }
-impl Into<i128> for GenInt {
-    fn into(self) -> i128 {
-        match self {
+impl From<GenInt> for i128 {
+    fn from(value: GenInt) -> Self {
+        match value {
             GenInt::I8(x) => x as i128,
             GenInt::I16(x) => x as i128,
             GenInt::I32(x) => x as i128,
             GenInt::I64(x) => x as i128,
-            GenInt::I128(x) => x as i128,
+            GenInt::I128(x) => x,
             GenInt::ISize(x) => x as i128,
             GenInt::U8(x) => x as i128,
             GenInt::U16(x) => x as i128,
@@ -166,15 +166,15 @@ impl Into<i128> for GenInt {
         }
     }
 }
-impl Into<isize> for GenInt {
-    fn into(self) -> isize {
-        match self {
+impl From<GenInt> for isize {
+    fn from(value: GenInt) -> Self {
+        match value {
             GenInt::I8(x) => x as isize,
             GenInt::I16(x) => x as isize,
             GenInt::I32(x) => x as isize,
             GenInt::I64(x) => x as isize,
             GenInt::I128(x) => x as isize,
-            GenInt::ISize(x) => x as isize,
+            GenInt::ISize(x) => x,
             GenInt::U8(x) => x as isize,
             GenInt::U16(x) => x as isize,
             GenInt::U32(x) => x as isize,
@@ -184,16 +184,16 @@ impl Into<isize> for GenInt {
         }
     }
 }
-impl Into<u8> for GenInt {
-    fn into(self) -> u8 {
-        match self {
+impl From<GenInt> for u8 {
+    fn from(value: GenInt) -> Self {
+        match value {
             GenInt::I8(x) => x as u8,
             GenInt::I16(x) => x as u8,
             GenInt::I32(x) => x as u8,
             GenInt::I64(x) => x as u8,
             GenInt::I128(x) => x as u8,
             GenInt::ISize(x) => x as u8,
-            GenInt::U8(x) => x as u8,
+            GenInt::U8(x) => x,
             GenInt::U16(x) => x as u8,
             GenInt::U32(x) => x as u8,
             GenInt::U64(x) => x as u8,
@@ -202,9 +202,9 @@ impl Into<u8> for GenInt {
         }
     }
 }
-impl Into<u16> for GenInt {
-    fn into(self) -> u16 {
-        match self {
+impl From<GenInt> for u16 {
+    fn from(value: GenInt) -> Self {
+        match value {
             GenInt::I8(x) => x as u16,
             GenInt::I16(x) => x as u16,
             GenInt::I32(x) => x as u16,
@@ -212,7 +212,7 @@ impl Into<u16> for GenInt {
             GenInt::I128(x) => x as u16,
             GenInt::ISize(x) => x as u16,
             GenInt::U8(x) => x as u16,
-            GenInt::U16(x) => x as u16,
+            GenInt::U16(x) => x,
             GenInt::U32(x) => x as u16,
             GenInt::U64(x) => x as u16,
             GenInt::U128(x) => x as u16,
@@ -220,9 +220,9 @@ impl Into<u16> for GenInt {
         }
     }
 }
-impl Into<u32> for GenInt {
-    fn into(self) -> u32 {
-        match self {
+impl From<GenInt> for u32 {
+    fn from(value: GenInt) -> Self {
+        match value {
             GenInt::I8(x) => x as u32,
             GenInt::I16(x) => x as u32,
             GenInt::I32(x) => x as u32,
@@ -231,16 +231,16 @@ impl Into<u32> for GenInt {
             GenInt::ISize(x) => x as u32,
             GenInt::U8(x) => x as u32,
             GenInt::U16(x) => x as u32,
-            GenInt::U32(x) => x as u32,
+            GenInt::U32(x) => x,
             GenInt::U64(x) => x as u32,
             GenInt::U128(x) => x as u32,
             GenInt::USize(x) => x as u32,
         }
     }
 }
-impl Into<u64> for GenInt {
-    fn into(self) -> u64 {
-        match self {
+impl From<GenInt> for u64 {
+    fn from(value: GenInt) -> Self {
+        match value {
             GenInt::I8(x) => x as u64,
             GenInt::I16(x) => x as u64,
             GenInt::I32(x) => x as u64,
@@ -250,15 +250,15 @@ impl Into<u64> for GenInt {
             GenInt::U8(x) => x as u64,
             GenInt::U16(x) => x as u64,
             GenInt::U32(x) => x as u64,
-            GenInt::U64(x) => x as u64,
+            GenInt::U64(x) => x,
             GenInt::U128(x) => x as u64,
             GenInt::USize(x) => x as u64,
         }
     }
 }
-impl Into<u128> for GenInt {
-    fn into(self) -> u128 {
-        match self {
+impl From<GenInt> for u128 {
+    fn from(value: GenInt) -> Self {
+        match value {
             GenInt::I8(x) => x as u128,
             GenInt::I16(x) => x as u128,
             GenInt::I32(x) => x as u128,
@@ -269,14 +269,14 @@ impl Into<u128> for GenInt {
             GenInt::U16(x) => x as u128,
             GenInt::U32(x) => x as u128,
             GenInt::U64(x) => x as u128,
-            GenInt::U128(x) => x as u128,
+            GenInt::U128(x) => x,
             GenInt::USize(x) => x as u128,
         }
     }
 }
-impl Into<usize> for GenInt {
-    fn into(self) -> usize {
-        match self {
+impl From<GenInt> for usize {
+    fn from(value: GenInt) -> Self {
+        match value {
             GenInt::I8(x) => x as usize,
             GenInt::I16(x) => x as usize,
             GenInt::I32(x) => x as usize,
@@ -288,7 +288,7 @@ impl Into<usize> for GenInt {
             GenInt::U32(x) => x as usize,
             GenInt::U64(x) => x as usize,
             GenInt::U128(x) => x as usize,
-            GenInt::USize(x) => x as usize,
+            GenInt::USize(x) => x,
         }
     }
 }

@@ -144,7 +144,7 @@ impl Builder {
     }
 
     pub fn finalize(self) -> Func {
-        if self.instrs.len() > 0 {
+        if !self.instrs.is_empty() {
             panic!("Cannot finalize builder if there is an unfinished basic block")
         }
         Func::new(
@@ -349,5 +349,11 @@ impl TyCtx {
         for (x, y) in &self.natives {
             prog.add_native_alias(x.clone(), y.clone());
         }
+    }
+}
+
+impl Default for TyCtx {
+    fn default() -> Self {
+        Self::new()
     }
 }

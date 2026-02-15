@@ -51,14 +51,14 @@ where
     pub fn fresh() -> T {
         let id = Self::id();
         let mut m = UNIQUE_MAP.lock().unwrap();
-        let value = if m.contains_key(&id) {
+        let value = if let std::collections::hash_map::Entry::Vacant(e) = m.entry(id) {
+            let z = S::zero();
+            e.insert(GenInt::from(z.clone()));
+            z
+        } else {
             let r = m.get_mut(&id).unwrap();
             r.incr();
             (*r).into()
-        } else {
-            let z = S::zero();
-            m.insert(id, GenInt::from(z.clone()));
-            z
         };
         Token::from(value).into()
     }

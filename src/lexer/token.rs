@@ -80,10 +80,7 @@ pub enum TokenKind {
 
 impl TokenKind {
     pub fn is_comment(&self) -> bool {
-        match self {
-            Self::Comment(_) => true,
-            _ => false,
-        }
+        matches!(self, Self::Comment(_))
     }
 
     pub fn is_skip(&self) -> bool {

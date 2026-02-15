@@ -121,10 +121,10 @@ impl<P: AsRef<Path>> ExportC<P> {
                     .type_names
                     .iter()
                     .filter_map(|(existing_ty, existing_name)| {
-                        if let Ty::FunPtr(_) = existing_ty {
-                            if self.canonical_decayed(existing_ty) == my_canonical {
-                                return Some(existing_name.clone());
-                            }
+                        if let Ty::FunPtr(_) = existing_ty
+                            && self.canonical_decayed(existing_ty) == my_canonical
+                        {
+                            return Some(existing_name.clone());
                         }
                         None
                     })
@@ -140,7 +140,7 @@ impl<P: AsRef<Path>> ExportC<P> {
                 let name = format!("ty_{}", self.count);
                 self.count += 1;
 
-                let decayed_ret = self.get_decayed_type_name(&sig.ret());
+                let decayed_ret = self.get_decayed_type_name(sig.ret());
                 let decayed_params: Vec<_> = sig
                     .params()
                     .iter()
@@ -177,15 +177,15 @@ impl<P: AsRef<Path>> ExportC<P> {
                     .type_names
                     .iter()
                     .filter_map(|(existing_ty, existing_name)| {
-                        if let Ty::Struct(_) = existing_ty {
-                            if self.canonical_decayed(existing_ty) == my_canonical {
-                                match self.decayed_type_names.get(existing_ty) {
-                                    Some(decayed_name) => {
-                                        return Some((existing_name.clone(), decayed_name.clone()));
-                                    }
-                                    None => {
-                                        return Some((existing_name.clone(), my_canonical.clone()));
-                                    }
+                        if let Ty::Struct(_) = existing_ty
+                            && self.canonical_decayed(existing_ty) == my_canonical
+                        {
+                            match self.decayed_type_names.get(existing_ty) {
+                                Some(decayed_name) => {
+                                    return Some((existing_name.clone(), decayed_name.clone()));
+                                }
+                                None => {
+                                    return Some((existing_name.clone(), my_canonical.clone()));
                                 }
                             }
                         }
@@ -248,15 +248,15 @@ impl<P: AsRef<Path>> ExportC<P> {
                     .type_names
                     .iter()
                     .filter_map(|(existing_ty, existing_name)| {
-                        if let Ty::Struct(_) = existing_ty {
-                            if self.canonical_decayed(existing_ty) == my_canonical {
-                                match self.decayed_type_names.get(existing_ty) {
-                                    Some(decayed_name) => {
-                                        return Some((existing_name.clone(), decayed_name.clone()));
-                                    }
-                                    None => {
-                                        return Some((existing_name.clone(), my_canonical.clone()));
-                                    }
+                        if let Ty::Struct(_) = existing_ty
+                            && self.canonical_decayed(existing_ty) == my_canonical
+                        {
+                            match self.decayed_type_names.get(existing_ty) {
+                                Some(decayed_name) => {
+                                    return Some((existing_name.clone(), decayed_name.clone()));
+                                }
+                                None => {
+                                    return Some((existing_name.clone(), my_canonical.clone()));
                                 }
                             }
                         }
@@ -334,13 +334,7 @@ impl<P: AsRef<Path>> ExportC<P> {
         let param_ty_names = f
             .params()
             .iter()
-            .map(|(name, x)| {
-                format!(
-                    "{} {}",
-                    self.get_decayed_type_name(x),
-                    format!("_v{}", name.extract())
-                )
-            })
+            .map(|(name, x)| format!("{} _v{}", self.get_decayed_type_name(x), name.extract()))
             .collect::<Vec<_>>();
         write!(
             &mut self.f,
@@ -368,7 +362,7 @@ impl<P: AsRef<Path>> ExportC<P> {
             )
             .unwrap();
         }
-        writeln!(&mut self.f, "").unwrap();
+        writeln!(&mut self.f).unwrap();
     }
 
     fn const_as_string(c: &Const) -> String {
@@ -384,7 +378,7 @@ impl<P: AsRef<Path>> ExportC<P> {
                     .join(", ")
             ),
             Const::FunPtr(name) => format!("{}", name),
-            Const::NullPtr => format!("NULL"),
+            Const::NullPtr => "NULL".to_string(),
         }
     }
 
@@ -478,7 +472,7 @@ impl<P: AsRef<Path>> ExportC<P> {
             Terminator::Return(value) => {
                 let ret = match value {
                     Some(v) => format!(" {}", self.value_as_string(v)),
-                    None => format!(""),
+                    None => String::new(),
                 };
                 writeln!(&mut self.f, "return{};", ret).unwrap()
             }
@@ -524,7 +518,7 @@ impl<P: AsRef<Path>> ExportC<P> {
                         if matches!(expr, Expr::Alloca(_)) {
                             match expr {
                                 Expr::Alloca(ty) => {
-                                    let type_name = self.get_type_name(&ty);
+                                    let type_name = self.get_type_name(ty);
                                     writeln!(&mut self.f, "{type_name} loc_{};", var.extract())
                                         .unwrap();
                                     write!(&mut self.f, "        ").unwrap();
@@ -553,25 +547,23 @@ impl<P: AsRef<Path>> ExportC<P> {
                                 }
                                 _ => unreachable!(),
                             }
-                        } else {
-                            if !var_ty.is_zero_sized() {
-                                let t = self.get_type_name(&var_ty);
-                                if matches!(
-                                    expr,
-                                    Expr::Struct(_) | Expr::Value(Value::Const(Const::Struct(_)))
-                                ) {
-                                    write!(&mut self.f, "_v{} = ({t})", var.extract()).unwrap();
-                                    self.write_expr(expr);
-                                    writeln!(&mut self.f, ";").unwrap();
-                                } else {
-                                    write!(&mut self.f, "_v{} = ", var.extract()).unwrap();
-                                    self.write_expr(expr);
-                                    writeln!(&mut self.f, ";").unwrap();
-                                }
+                        } else if !var_ty.is_zero_sized() {
+                            let t = self.get_type_name(&var_ty);
+                            if matches!(
+                                expr,
+                                Expr::Struct(_) | Expr::Value(Value::Const(Const::Struct(_)))
+                            ) {
+                                write!(&mut self.f, "_v{} = ({t})", var.extract()).unwrap();
+                                self.write_expr(expr);
+                                writeln!(&mut self.f, ";").unwrap();
                             } else {
+                                write!(&mut self.f, "_v{} = ", var.extract()).unwrap();
                                 self.write_expr(expr);
                                 writeln!(&mut self.f, ";").unwrap();
                             }
+                        } else {
+                            self.write_expr(expr);
+                            writeln!(&mut self.f, ";").unwrap();
                         }
                     }
                     Instr::Store { ptr, value } => {
@@ -694,7 +686,7 @@ fn add_type(s: &mut HashSet<Ty>, ty: &Ty) {
         Ty::Ptr(ty) => add_type(s, ty),
         Ty::Struct(items) => items.iter().for_each(|x| add_type(s, x)),
         Ty::FunPtr(sig) => {
-            add_type(s, &sig.ret());
+            add_type(s, sig.ret());
             sig.params().iter().for_each(|x| add_type(s, x));
         }
         _ => (),
@@ -723,8 +715,7 @@ impl Program {
             add_type(&mut s, f.ret_ty());
             f.cfg()
                 .iter()
-                .map(|x| x.get_all_types())
-                .flatten()
+                .flat_map(|x| x.get_all_types())
                 .for_each(|x| add_type(&mut s, &x));
         }
         s

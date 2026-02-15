@@ -88,7 +88,7 @@ impl Lexer {
     }
 
     fn peek_or_eof(&self) -> Result<char, LexingError> {
-        self.peek().ok_or_else(|| LexingError::EOF)
+        self.peek().ok_or(LexingError::EOF)
     }
 
     fn lex_comment(&mut self) -> LexRes {

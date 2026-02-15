@@ -23,7 +23,7 @@ impl MonoToCfg {
             Const::FunPtr(borrow_object).into(),
             vec![param.into()],
         );
-        builder.ret_void(&mut self.ctx);
+        builder.ret_void(&self.ctx);
     }
 
     fn create_borrow_for_nonrec_enum(
@@ -48,7 +48,7 @@ impl MonoToCfg {
             let next_check_use = Use::from(&next_check_lbl);
 
             builder.branch(
-                &mut self.ctx,
+                &self.ctx,
                 is_i,
                 case_body_use,
                 next_check_use.clone(),
@@ -63,10 +63,10 @@ impl MonoToCfg {
                 self.borrow_ty(val, t, builder);
             }
 
-            builder.goto(&mut self.ctx, ret_use.clone(), next_check_lbl);
+            builder.goto(&self.ctx, ret_use.clone(), next_check_lbl);
         }
-        builder.goto(&mut self.ctx, ret_use, ret_lbl);
-        builder.ret_void(&mut self.ctx);
+        builder.goto(&self.ctx, ret_use, ret_lbl);
+        builder.ret_void(&self.ctx);
     }
 
     fn create_borrows_for_enum(&mut self, enum_def: &EnumDef, funname: FunName) {
@@ -135,7 +135,7 @@ impl MonoToCfg {
             let next_check_use = Use::from(&next_check_lbl);
 
             builder.branch(
-                &mut self.ctx,
+                &self.ctx,
                 is_i,
                 case_body_use,
                 next_check_use.clone(),
@@ -149,10 +149,10 @@ impl MonoToCfg {
                 let val = builder.extract(&mut self.ctx, union_val, i).into();
                 self.drop_ty(val, t, builder);
             }
-            builder.goto(&mut self.ctx, ret_use.clone(), next_check_lbl);
+            builder.goto(&self.ctx, ret_use.clone(), next_check_lbl);
         }
-        builder.goto(&mut self.ctx, ret_use, ret_lbl);
-        builder.ret_void(&mut self.ctx);
+        builder.goto(&self.ctx, ret_use, ret_lbl);
+        builder.ret_void(&self.ctx);
     }
 
     fn create_drops_for_rec_enum(
@@ -178,13 +178,7 @@ impl MonoToCfg {
         let ret_use = Use::from(&ret_lbl);
         let ifu = Use::from(&if_unique);
 
-        builder.branch(
-            &mut self.ctx,
-            is_unique.into(),
-            ifu,
-            ret_use.clone(),
-            if_unique,
-        );
+        builder.branch(&self.ctx, is_unique.into(), ifu, ret_use.clone(), if_unique);
 
         let ptr =
             builder.get_element_ptr(&mut self.ctx, param.clone().into(), self_ty.into_inner(), 0);
@@ -202,7 +196,7 @@ impl MonoToCfg {
             let next_check_use = Use::from(&next_check_lbl);
 
             builder.branch(
-                &mut self.ctx,
+                &self.ctx,
                 is_i,
                 case_body_use,
                 next_check_use.clone(),
@@ -225,9 +219,9 @@ impl MonoToCfg {
                 let val = builder.extract(&mut self.ctx, union_val, i).into();
                 self.drop_ty(val, t, builder);
             }
-            builder.goto(&mut self.ctx, ret_use.clone(), next_check_lbl);
+            builder.goto(&self.ctx, ret_use.clone(), next_check_lbl);
         }
-        builder.goto(&mut self.ctx, ret_use, ret_lbl);
+        builder.goto(&self.ctx, ret_use, ret_lbl);
 
         let drop_fun = self.prog.natives()[&format!("{name}_release")].clone();
         builder.native_call(
@@ -236,7 +230,7 @@ impl MonoToCfg {
             vec![param.clone().into()],
         );
 
-        builder.ret_void(&mut self.ctx);
+        builder.ret_void(&self.ctx);
     }
 
     fn create_drops_for_enum(&mut self, enum_def: &EnumDef, funname: FunName) {
@@ -276,8 +270,8 @@ impl MonoToCfg {
     pub fn create_drops(&mut self) {
         self.ast_ctx
             .types
-            .iter()
-            .map(|(_, x)| x.clone())
+            .values()
+            .cloned()
             .collect::<Vec<_>>()
             .iter()
             .map(|x| (x, self.declare_drops_for_enum(x)))
@@ -289,8 +283,8 @@ impl MonoToCfg {
     pub fn create_borrows(&mut self) {
         self.ast_ctx
             .types
-            .iter()
-            .map(|(_, x)| x.clone())
+            .values()
+            .cloned()
             .collect::<Vec<_>>()
             .iter()
             .map(|x| (x, self.declare_borrows_for_enum(x)))
@@ -301,7 +295,7 @@ impl MonoToCfg {
 
     pub fn create_boxed_types(&mut self) {
         self.ast_ctx.types.clone().iter().for_each(|x| {
-            let ty = self.ast_ty_to_ty(&AstTy::named(&x.0));
+            let ty = self.ast_ty_to_ty(&AstTy::named(x.0));
             self.prog.mut_boxed_types().insert(x.0.clone(), ty);
         });
     }
@@ -356,10 +350,10 @@ impl MonoToCfg {
                     self.ctx.natives[&format!("{}_pool_allocate", enum_def.name)].clone(),
                 );
                 let m = builder.native_call(&mut self.ctx, allocate_obj.into(), vec![]);
-                builder.store(&mut self.ctx, m.clone().into(), struct_val);
-                builder.ret(&mut self.ctx, m.into());
+                builder.store(&self.ctx, m.clone().into(), struct_val);
+                builder.ret(&self.ctx, m.into());
             } else {
-                builder.ret(&mut self.ctx, struct_val);
+                builder.ret(&self.ctx, struct_val);
             }
             let f = builder.finalize();
             self.add_func(f);
@@ -373,8 +367,8 @@ impl MonoToCfg {
     pub fn create_constructors(&mut self) {
         self.ast_ctx
             .types
-            .iter()
-            .map(|(_, x)| x.clone())
+            .values()
+            .cloned()
             .collect::<Vec<_>>()
             .iter()
             .for_each(|x| self.create_constructors_for_enum(x));
@@ -453,7 +447,7 @@ impl MonoToCfg {
             AstTy::Fun { .. } => {
                 self.inject_print("Dropping closure", b);
                 let drop_object = self.prog.natives()["drop_object"].clone();
-                let val = b.extract(&mut self.ctx, val.into(), 1);
+                let val = b.extract(&mut self.ctx, val, 1);
                 b.native_call(
                     &mut self.ctx,
                     Const::FunPtr(drop_object).into(),
@@ -484,7 +478,7 @@ impl MonoToCfg {
             AstTy::Fun { .. } => {
                 self.inject_print("Borrowing closure\n", b);
                 let borrow_object = self.prog.natives()["borrow_object"].clone();
-                let val = b.extract(&mut self.ctx, val.into(), 1);
+                let val = b.extract(&mut self.ctx, val, 1);
                 b.native_call(
                     &mut self.ctx,
                     Const::FunPtr(borrow_object).into(),

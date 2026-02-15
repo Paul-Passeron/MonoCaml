@@ -61,7 +61,7 @@ impl Backend for LLVMBackend {
                 .arg("-o")
                 .arg(self.output_path)
                 .output()
-                .map_err(|_| format!("Failed to compile runtime library"))
+                .map_err(|_| "Failed to compile runtime library".to_string())
                 .unwrap();
         }
 

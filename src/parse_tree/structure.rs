@@ -6,7 +6,7 @@ use crate::{
         expression::{Expression, RecFlag, ValueBinding},
         type_declaration::TypeDeclaration,
     },
-    session::Session,
+    resolve_symbol,
 };
 
 pub type Structure = Vec<StructureItem>;
@@ -20,33 +20,24 @@ pub enum StructureItemDesc {
     Type(Vec<TypeDeclaration>),
 }
 
-const INDENT: &'static str = "    ";
+const INDENT: &str = "    ";
 
-pub struct StructureItemDescDisplay<'a, 'b> {
+pub struct StructureItemDescDisplay<'a> {
     pub desc: &'a StructureItemDesc,
-    pub session: &'b Session,
     pub indent: usize,
 }
 
 impl StructureItemDesc {
-    pub fn display<'a, 'b>(
-        &'a self,
-        session: &'b Session,
-        indent: usize,
-    ) -> StructureItemDescDisplay<'a, 'b> {
-        StructureItemDescDisplay {
-            desc: self,
-            session,
-            indent,
-        }
+    pub fn display<'a>(&'a self, indent: usize) -> StructureItemDescDisplay<'a> {
+        StructureItemDescDisplay { desc: self, indent }
     }
 }
 
-impl fmt::Display for StructureItemDescDisplay<'_, '_> {
+impl fmt::Display for StructureItemDescDisplay<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.desc {
             StructureItemDesc::Eval(expr) => {
-                write!(f, "{}", expr.desc.display(self.session, self.indent))
+                write!(f, "{}", expr.desc.display(self.indent))
             }
             StructureItemDesc::Value(rec, bindings) => {
                 write!(f, "{}", INDENT.repeat(self.indent))?;
@@ -59,12 +50,12 @@ impl fmt::Display for StructureItemDescDisplay<'_, '_> {
                         RecFlag::Recursive => " rec",
                         RecFlag::NonRecursive => "",
                     },
-                    first.pat.desc.display(self.session, 0)
+                    first.pat.desc.display(0)
                 )?;
 
                 // Print arguments
                 for arg in &first.args {
-                    write!(f, " {}", arg.desc.display(self.session, 0))?;
+                    write!(f, " {}", arg.desc.display(0))?;
                 }
 
                 // Print constraint if present
@@ -76,29 +67,25 @@ impl fmt::Display for StructureItemDescDisplay<'_, '_> {
                             if i > 0 {
                                 write!(f, " ")?;
                             }
-                            write!(f, "'{}", ty.display(&self.session.symbol_interner))?;
+                            write!(f, "'{}", resolve_symbol(*ty))?;
                         }
                         write!(f, ". ")?;
                     }
-                    write!(f, "{}", constraint.typ.desc.display(self.session, 0))?;
+                    write!(f, "{}", constraint.typ.desc.display(0))?;
                 }
 
-                write!(f, " =\n")?;
-                write!(
-                    f,
-                    "{}",
-                    first.expr.desc.display(self.session, self.indent + 1)
-                )?;
+                writeln!(f, " =")?;
+                write!(f, "{}", first.expr.desc.display(self.indent + 1))?;
 
                 for binding in iterator {
                     write!(
                         f,
                         "\n{}and {}",
                         INDENT.repeat(self.indent),
-                        binding.pat.desc.display(self.session, 0)
+                        binding.pat.desc.display(0)
                     )?;
                     for arg in &binding.args {
-                        write!(f, " {}", arg.desc.display(self.session, 0))?;
+                        write!(f, " {}", arg.desc.display(0))?;
                     }
                     if let Some(constraint) = &binding.constraint {
                         write!(f, " : ")?;
@@ -108,18 +95,14 @@ impl fmt::Display for StructureItemDescDisplay<'_, '_> {
                                 if i > 0 {
                                     write!(f, " ")?;
                                 }
-                                write!(f, "'{}", ty.display(&self.session.symbol_interner))?;
+                                write!(f, "'{}", resolve_symbol(*ty))?;
                             }
                             write!(f, ". ")?;
                         }
-                        write!(f, "{}", constraint.typ.desc.display(self.session, 0))?;
+                        write!(f, "{}", constraint.typ.desc.display(0))?;
                     }
-                    write!(f, " =\n")?;
-                    write!(
-                        f,
-                        "{}",
-                        binding.expr.desc.display(self.session, self.indent + 1)
-                    )?;
+                    writeln!(f, " =")?;
+                    write!(f, "{}", binding.expr.desc.display(self.indent + 1))?;
                 }
                 Ok(())
             }
@@ -129,7 +112,7 @@ impl fmt::Display for StructureItemDescDisplay<'_, '_> {
                     if i > 0 {
                         write!(f, "\n{}and ", INDENT.repeat(self.indent))?;
                     }
-                    write!(f, "{}", type_decl.display(self.session, self.indent))?;
+                    write!(f, "{}", type_decl.display(self.indent))?;
                 }
                 Ok(())
             }

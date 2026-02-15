@@ -52,7 +52,7 @@ fn compile_ast_with_ctx<S: ToString>(ast: Ast<()>, prog_name: S, ctx: AstCtx) {
     println!("{prog}");
 
     let _ = prog
-        .compile(LLVMBackend::new(&PathBuf::from(format!("./{prog_name}"))))
+        .compile(LLVMBackend::new(PathBuf::from(format!("./{prog_name}"))))
         .unwrap();
 
     Var::reset();
@@ -85,6 +85,14 @@ fn resolve_symbol(symbol: Symbol) -> String {
 
 fn resolve_strlit(strlit: StrLit) -> String {
     SESSION.lock().unwrap().resolve_strlit(strlit).to_string()
+}
+
+fn intern_symbol(s: &str) -> Symbol {
+    SESSION.lock().unwrap().intern_symbol(s)
+}
+
+fn intern_strlit(s: &str) -> StrLit {
+    SESSION.lock().unwrap().intern_strlit(s)
 }
 
 fn main() {
@@ -121,8 +129,8 @@ fn main() {
         println!("{t}");
     }
 
-    if error.is_some() {
-        println!("Lexing error: {}", error.unwrap())
+    if let Some(error) = error {
+        println!("Lexing error: {}", error)
     }
 
     let mut parser = Parser::new(id, &tokens).unwrap();
@@ -133,6 +141,10 @@ fn main() {
             return;
         }
     };
+
+    for item in &prog {
+        println!("{}", item.desc.display(0));
+    }
 
     let poly = Resolver::new().resolve_structure(&prog).unwrap();
     println!("{poly:#?}")

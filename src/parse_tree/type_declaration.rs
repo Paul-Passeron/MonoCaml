@@ -3,7 +3,7 @@ use std::fmt;
 use crate::{
     lexer::interner::Symbol,
     parse_tree::{Located, type_expr::TypeExpr},
-    session::Session,
+    resolve_symbol,
     source_manager::loc::Loc,
 };
 
@@ -48,58 +48,41 @@ pub struct LabelDeclaration {
     pub loc: Loc,
 }
 
-const INDENT: &'static str = "    ";
+const INDENT: &str = "    ";
 
-pub struct TypeDeclarationDisplay<'a, 'b> {
+pub struct TypeDeclarationDisplay<'a> {
     pub decl: &'a TypeDeclaration,
-    pub session: &'b Session,
     pub indent: usize,
 }
 
 impl TypeDeclaration {
-    pub fn display<'a, 'b>(
-        &'a self,
-        session: &'b Session,
-        indent: usize,
-    ) -> TypeDeclarationDisplay<'a, 'b> {
-        TypeDeclarationDisplay {
-            decl: self,
-            session,
-            indent,
-        }
+    pub fn display<'a>(&'a self, indent: usize) -> TypeDeclarationDisplay<'a> {
+        TypeDeclarationDisplay { decl: self, indent }
     }
 }
 
-impl fmt::Display for TypeDeclarationDisplay<'_, '_> {
+impl fmt::Display for TypeDeclarationDisplay<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if !self.decl.params.is_empty() {
             if self.decl.params.len() == 1 {
-                write!(
-                    f,
-                    "'{} ",
-                    self.decl.params[0].display(&self.session.symbol_interner)
-                )?;
+                write!(f, "'{} ", resolve_symbol(self.decl.params[0]))?;
             } else {
                 write!(f, "(")?;
                 for (i, param) in self.decl.params.iter().enumerate() {
                     if i > 0 {
                         write!(f, ", ")?;
                     }
-                    write!(f, "'{}", param.display(&self.session.symbol_interner))?;
+                    write!(f, "'{}", resolve_symbol(*param))?;
                 }
                 write!(f, ") ")?;
             }
         }
 
-        write!(
-            f,
-            "{}",
-            self.decl.name.desc.display(&self.session.symbol_interner)
-        )?;
+        write!(f, "{}", resolve_symbol(self.decl.name.desc))?;
 
         match &self.decl.kind {
             TypeKind::Alias(typ) => {
-                write!(f, " = {}", typ.desc.display(self.session, 0))
+                write!(f, " = {}", typ.desc.display(0))
             }
             TypeKind::Variant(constructors) => {
                 write!(f, " =")?;
@@ -113,15 +96,11 @@ impl fmt::Display for TypeDeclarationDisplay<'_, '_> {
                             &INDENT.repeat(self.indent + 1).to_string()[2..]
                         )?;
                     }
-                    write!(
-                        f,
-                        "{}",
-                        cons.name.desc.display(&self.session.symbol_interner)
-                    )?;
+                    write!(f, "{}", resolve_symbol(cons.name.desc))?;
 
                     match &cons.args {
                         Some(ConstructorArguments::TypeExpr(typ)) => {
-                            write!(f, " of {}", typ.desc.display(self.session, 0))?;
+                            write!(f, " of {}", typ.desc.display(0))?;
                         }
                         Some(ConstructorArguments::Record(labels)) => {
                             write!(f, " of {{ ")?;
@@ -129,13 +108,9 @@ impl fmt::Display for TypeDeclarationDisplay<'_, '_> {
                                 if i > 0 {
                                     write!(f, "; ")?;
                                 }
-                                write!(
-                                    f,
-                                    "{}",
-                                    label.name.desc.display(&self.session.symbol_interner)
-                                )?;
+                                write!(f, "{}", resolve_symbol(label.name.desc))?;
                                 write!(f, " : ")?;
-                                write!(f, "{}", label.typ.desc.display(self.session, 0))?;
+                                write!(f, "{}", label.typ.desc.display(0))?;
                             }
                             write!(f, " }}")?;
                         }
@@ -158,8 +133,8 @@ impl fmt::Display for TypeDeclarationDisplay<'_, '_> {
                     write!(
                         f,
                         "{} : {}",
-                        label.name.desc.display(&self.session.symbol_interner),
-                        label.typ.desc.display(self.session, 0)
+                        resolve_symbol(label.name.desc),
+                        label.typ.desc.display(0)
                     )?;
                 }
                 write!(f, "\n{}}}", INDENT.repeat(self.indent))

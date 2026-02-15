@@ -100,7 +100,7 @@ impl MonoToCfg {
         let _ = res.get_ast_ty_of(&ast);
         let mut b = Builder::new(entry, vec![], Ty::Void, &mut res.ctx);
         res.aux(&ast, &mut b);
-        b.ret_void(&mut res.ctx);
+        b.ret_void(&res.ctx);
         res.add_func(b.finalize());
         res.ctx.dump_aliases_in_prog(&mut res.prog);
         res.prog
@@ -132,7 +132,7 @@ impl MonoToCfg {
         match t {
             AstTy::Int => Ty::Int,
             AstTy::String => Ty::String,
-            AstTy::Tuple(items) if items.len() == 0 => Ty::Void,
+            AstTy::Tuple(items) if items.is_empty() => Ty::Void,
             AstTy::Tuple(items) => {
                 Ty::Struct(items.iter().map(|x| self.ast_ty_to_ty_pro(x, r)).collect())
             }
@@ -254,9 +254,9 @@ impl MonoToCfg {
         match ast.expr() {
             AstKind::Str(s) => Const::String(s.clone()).into(),
             AstKind::Int(i) => Const::Int(*i).into(),
-            AstKind::Var(var) => Value::Var(self.map[&var].clone()),
+            AstKind::Var(var) => Value::Var(self.map[var].clone()),
             AstKind::Lambda { arg, body, arg_ty } => {
-                self.compile_lambda(arg.clone(), arg_ty.clone(), body.as_ref().clone(), b)
+                self.compile_lambda(*arg, arg_ty.clone(), body.as_ref().clone(), b)
             }
             AstKind::App { fun, arg } => {
                 if self.ast_is_saturated(ast) {
@@ -279,8 +279,8 @@ impl MonoToCfg {
                 self.aux(snd, b)
             }
             AstKind::Tuple(asts) => {
-                let vals = asts.into_iter().map(|x| self.aux(x, b)).collect();
-                b.aggregate(&mut self.ctx, vals).into()
+                let vals = asts.iter().map(|x| self.aux(x, b)).collect();
+                b.aggregate(&mut self.ctx, vals)
             }
             AstKind::Native(name) => self.get_native_closure(name.clone(), b),
             AstKind::LetBinding {
@@ -289,9 +289,9 @@ impl MonoToCfg {
                 value,
                 in_expr,
             } => {
-                if value.free_vars().contains(&bound) {
+                if value.free_vars().contains(bound) {
                     self.compile_rec_let(
-                        bound.clone(),
+                        *bound,
                         bound_ty.clone(),
                         value.as_ref().clone(),
                         in_expr.as_ref().clone(),
@@ -339,8 +339,8 @@ impl MonoToCfg {
         let bound_ty = self.ast_ty_to_ty(bound_ty);
         assert!(val.get_type(&self.ctx).matches(&bound_ty));
         let bound_cfg = self.ctx.new_var(bound_ty);
-        self.map.insert(bound.clone(), Use::from(&bound_cfg));
-        b.assign_to(&mut self.ctx, bound_cfg, Expr::value(val.into()));
+        self.map.insert(*bound, Use::from(&bound_cfg));
+        b.assign_to(&mut self.ctx, bound_cfg, Expr::value(val));
         self.aux(in_expr, b)
     }
 
@@ -366,41 +366,27 @@ impl MonoToCfg {
             None
         };
 
-        b.branch(
-            &mut self.ctx,
-            compiled_cond.into(),
-            then_bb_use,
-            else_bb_use,
-            then_bb,
-        );
+        b.branch(&self.ctx, compiled_cond, then_bb_use, else_bb_use, then_bb);
         let then_value = match self.aux(then_e, b) {
             Value::Var(v) => v,
-            c => b.value(&mut self.ctx, c).into(),
+            c => b.value(&mut self.ctx, c),
         };
 
-        if res.is_some() {
-            b.store(
-                &mut self.ctx,
-                res.as_ref().unwrap().clone().into(),
-                then_value.into(),
-            );
+        if let Some(res) = &res {
+            b.store(&self.ctx, res.clone().into(), then_value.into());
         }
 
-        b.goto(&mut self.ctx, merge_bb_use.clone(), else_bb);
+        b.goto(&self.ctx, merge_bb_use.clone(), else_bb);
 
         let else_value = match self.aux(else_e, b) {
             Value::Var(v) => v,
-            c => b.value(&mut self.ctx, c).into(),
+            c => b.value(&mut self.ctx, c),
         };
 
-        if res.is_some() {
-            b.store(
-                &mut self.ctx,
-                res.as_ref().unwrap().clone().into(),
-                else_value.into(),
-            );
+        if let Some(res) = &res {
+            b.store(&self.ctx, res.clone().into(), else_value.into());
         }
-        b.goto(&mut self.ctx, merge_bb_use, merge_bb);
+        b.goto(&self.ctx, merge_bb_use, merge_bb);
         res.map_or(Const::Struct(vec![]).into(), |x| {
             b.load(&mut self.ctx, x.clone().into(), res_ty).into()
         })
@@ -416,7 +402,7 @@ impl MonoToCfg {
     ) -> Value {
         let cfg_bound_ty = self.ast_ty_to_ty(&bound_ty);
         assert!(cfg_bound_ty.repr_closure());
-        self.type_map.insert(bound.clone(), cfg_bound_ty.clone());
+        self.type_map.insert(bound, cfg_bound_ty.clone());
         let (param, value) = self.normalize_lambda(value);
         let (param, ast_ty, arg_ty) = param.unwrap();
 
@@ -432,7 +418,7 @@ impl MonoToCfg {
             .sigs
             .insert(funname_use.clone(), cfg_bound_ty.field(0).sig());
         self.create_initial_closure_for_recursion(
-            bound.clone(),
+            bound,
             bound_ty.clone(),
             b,
             funname_use,
@@ -453,7 +439,7 @@ impl MonoToCfg {
             .iter()
             .map(|x| {
                 let associated = &self.map[x];
-                self.ctx.vars[&associated].clone()
+                self.ctx.vars[associated].clone()
             })
             .collect::<Vec<_>>();
 
@@ -510,9 +496,9 @@ impl MonoToCfg {
         self.drop_ty(cfg_arg_use.into(), &ast_ty, &mut builder);
 
         if ret_ty.is_void() {
-            builder.ret_void(&mut self.ctx);
+            builder.ret_void(&self.ctx);
         } else {
-            builder.ret(&mut self.ctx, ret_value);
+            builder.ret(&self.ctx, ret_value);
         }
 
         let func = builder.finalize();
@@ -554,32 +540,27 @@ impl MonoToCfg {
 
         let env_struct = b.aggregate(&mut self.ctx, env_values);
 
-        let malloc = self.malloc_val(env_struct.clone().into(), b);
+        let malloc = self.malloc_val(env_struct.clone(), b);
         let register_object = Const::FunPtr(self.ctx.natives["register_object"].clone());
 
         b.native_call(
             &mut self.ctx,
             register_object.clone().into(),
-            vec![malloc.clone().into()],
+            vec![malloc.clone()],
         );
 
         let initial_closure = b.aggregate(
             &mut self.ctx,
-            vec![Const::FunPtr(funname_use.clone()).into(), malloc.into()],
+            vec![Const::FunPtr(funname_use.clone()).into(), malloc],
         );
 
         let malloc = self.malloc_val(initial_closure.clone(), b);
 
-        b.native_call(
-            &mut self.ctx,
-            register_object.into(),
-            vec![malloc.clone().into()],
-        );
+        b.native_call(&mut self.ctx, register_object.into(), vec![malloc.clone()]);
 
         let clos_ty = malloc.get_type(&self.ctx).into_inner();
 
-        let env_ptr_addr =
-            b.get_element_ptr(&mut self.ctx, malloc.clone().into(), clos_ty.clone(), 1);
+        let env_ptr_addr = b.get_element_ptr(&mut self.ctx, malloc.clone(), clos_ty.clone(), 1);
 
         let env_ty = env_struct.get_type(&self.ctx);
 
@@ -592,9 +573,9 @@ impl MonoToCfg {
         let self_ref_addr =
             b.get_element_ptr(&mut self.ctx, env_ptr.into(), env_ty.clone(), pos as usize);
 
-        b.store(&mut self.ctx, self_ref_addr.into(), initial_closure.into());
+        b.store(&self.ctx, self_ref_addr.into(), initial_closure);
         let res = b.load(&mut self.ctx, malloc, clos_ty);
-        self.map.insert(bound.clone(), res.clone());
+        self.map.insert(bound, res.clone());
         res
     }
 
@@ -602,7 +583,7 @@ impl MonoToCfg {
         let mut free_vars = ast.free_vars();
         free_vars.remove(param);
         let mut res = free_vars.into_iter().collect::<Vec<_>>();
-        res.sort_by(|x, y| x.cmp(y));
+        res.sort();
         res
     }
 
@@ -615,7 +596,7 @@ impl MonoToCfg {
                 let cfg_arg_ty = {
                     if !self.type_map.contains_key(arg) {
                         let cfg_arg_ty = self.ast_ty_to_ty(arg_ty);
-                        self.type_map.insert(arg.clone(), cfg_arg_ty.clone());
+                        self.type_map.insert(*arg, cfg_arg_ty.clone());
                         cfg_arg_ty
                     } else {
                         self.type_map[arg].clone()
@@ -645,7 +626,7 @@ impl MonoToCfg {
                 ..
             } => {
                 let bound_ty = self.ast_ty_to_ty(bound_ty);
-                self.type_map.insert(bound.clone(), bound_ty);
+                self.type_map.insert(*bound, bound_ty);
                 self.get_type_of_ast(in_expr)
             }
             AstKind::If {
@@ -658,14 +639,14 @@ impl MonoToCfg {
                 }
                 let t = self.get_type_of_ast(then_e);
                 let e = self.get_type_of_ast(else_e);
-                if !t.matches(&e) && !(t.is_zero_sized() && e.is_zero_sized()) {
+                if !(t.matches(&e) || t.is_zero_sized() && e.is_zero_sized()) {
                     panic!("Branches must have the same type ({t} vs {e})");
                 }
                 t
             }
             AstKind::Cons { enum_name, .. } => self.ast_ty_to_ty(&AstTy::named(enum_name)),
             AstKind::Match { expr, cases } => {
-                assert!(cases.len() > 0);
+                assert!(!cases.is_empty());
                 self.get_type_of_case(&cases[0])
             }
         }
@@ -755,7 +736,7 @@ impl MonoToCfg {
             .iter()
             .map(|x| {
                 let associated = &self.map[x];
-                self.ctx.vars[&associated].clone()
+                self.ctx.vars[associated].clone()
             })
             .collect::<Vec<_>>();
 
@@ -811,9 +792,9 @@ impl MonoToCfg {
         self.drop_ty(cfg_arg_use.into(), &ty, &mut fun_builder);
 
         if ret_ty.is_zero_sized() {
-            fun_builder.ret_void(&mut self.ctx);
+            fun_builder.ret_void(&self.ctx);
         } else {
-            fun_builder.ret(&mut self.ctx, ret_value);
+            fun_builder.ret(&self.ctx, ret_value);
         }
 
         let func = fun_builder.finalize();
@@ -833,18 +814,11 @@ impl MonoToCfg {
             .collect::<Vec<_>>();
 
         let env_struct = b.aggregate(&mut self.ctx, env_values);
-        let malloc = self.malloc_val(env_struct.into(), b);
+        let malloc = self.malloc_val(env_struct, b);
         let register_object = Const::FunPtr(self.ctx.natives["register_object"].clone());
-        b.native_call(
-            &mut self.ctx,
-            register_object.into(),
-            vec![malloc.clone().into()],
-        );
+        b.native_call(&mut self.ctx, register_object.into(), vec![malloc.clone()]);
 
-        b.aggregate(
-            &mut self.ctx,
-            vec![Const::FunPtr(fun_name).into(), malloc.into()],
-        )
+        b.aggregate(&mut self.ctx, vec![Const::FunPtr(fun_name).into(), malloc])
     }
 
     fn malloc_val(&mut self, v: Value, b: &mut Builder) -> Value {
@@ -853,7 +827,7 @@ impl MonoToCfg {
             Value::Const(Const::NullPtr)
         } else {
             let malloc = b.malloc_single(&mut self.ctx, v_ty);
-            b.store(&mut self.ctx, malloc.clone().into(), v.into());
+            b.store(&self.ctx, malloc.clone().into(), v);
             malloc.into()
         }
     }
@@ -887,7 +861,7 @@ impl MonoToCfg {
         let mut last = innermost_use.clone();
 
         let mut current_env_ty = if l > 1 {
-            Ty::Struct(sig.params()[0..l - 1].iter().cloned().collect())
+            Ty::Struct(sig.params()[0..l - 1].to_vec())
         } else {
             Ty::Struct(vec![])
         };
@@ -912,12 +886,7 @@ impl MonoToCfg {
 
             let (mut new_env_values, env_ptr) = if remaining_args > 1 {
                 let env_ptr = use_params[0].clone();
-                let env_ty = Ty::Struct(
-                    sig.params()[0..remaining_args - 1]
-                        .iter()
-                        .cloned()
-                        .collect(),
-                );
+                let env_ty = Ty::Struct(sig.params()[0..remaining_args - 1].to_vec());
                 let borrow_object = Const::FunPtr(self.ctx.natives["borrow_object"].clone());
 
                 wrapper_func_builder.native_call(
@@ -928,7 +897,6 @@ impl MonoToCfg {
                 let loaded_env =
                     wrapper_func_builder.load(&mut self.ctx, env_ptr.clone().into(), env_ty);
                 let v = (0..remaining_args - 1)
-                    .into_iter()
                     .map(|index| {
                         wrapper_func_builder
                             .extract(&mut self.ctx, loaded_env.clone().into(), index)
@@ -945,18 +913,16 @@ impl MonoToCfg {
             let aggregate_env = wrapper_func_builder.aggregate(&mut self.ctx, new_env_values);
             current_env_ty = aggregate_env.get_type(&self.ctx);
 
-            let malloc = self.malloc_val(aggregate_env.clone().into(), &mut wrapper_func_builder);
+            let malloc = self.malloc_val(aggregate_env.clone(), &mut wrapper_func_builder);
             let register_object = Const::FunPtr(self.ctx.natives["register_object"].clone());
 
             wrapper_func_builder.native_call(
                 &mut self.ctx,
                 register_object.into(),
-                vec![malloc.clone().into()],
+                vec![malloc.clone()],
             );
-            let closure_struct = wrapper_func_builder.aggregate(
-                &mut self.ctx,
-                vec![Const::FunPtr(last).into(), malloc.into()],
-            );
+            let closure_struct = wrapper_func_builder
+                .aggregate(&mut self.ctx, vec![Const::FunPtr(last).into(), malloc]);
 
             if let Some(env_ptr) = env_ptr {
                 self.inject_print(
@@ -968,7 +934,7 @@ impl MonoToCfg {
                 wrapper_func_builder.native_call(&mut self.ctx, drop_object.into(), vec![env_ptr]);
             }
 
-            wrapper_func_builder.ret(&mut self.ctx, closure_struct.into());
+            wrapper_func_builder.ret(&self.ctx, closure_struct);
             let func = wrapper_func_builder.finalize();
             self.add_func(func);
             remaining_args -= 1;
@@ -1041,11 +1007,7 @@ impl MonoToCfg {
             );
             let drop_object = Const::FunPtr(self.ctx.natives["drop_object"].clone());
 
-            innermost_builder.native_call(
-                &mut self.ctx,
-                drop_object.into(),
-                vec![env_ptr.clone().into()],
-            );
+            innermost_builder.native_call(&mut self.ctx, drop_object.into(), vec![env_ptr.clone()]);
         };
         if res.get_type(&self.ctx).is_void() {
             innermost_builder.ret_void(&self.ctx);
@@ -1063,7 +1025,7 @@ impl MonoToCfg {
             AstKind::Int(_) => AstTy::Int,
             AstKind::Var(var) => self.ast_tys[var].clone(),
             AstKind::Lambda { arg, arg_ty, body } => {
-                self.ast_tys.insert(arg.clone(), arg_ty.clone());
+                self.ast_tys.insert(*arg, arg_ty.clone());
                 let ret = self.get_ast_ty_of(body);
                 AstTy::fun(arg_ty.clone(), ret)
             }
@@ -1088,7 +1050,7 @@ impl MonoToCfg {
                 value,
                 in_expr,
             } => {
-                self.ast_tys.insert(bound.clone(), bound_ty.clone());
+                self.ast_tys.insert(*bound, bound_ty.clone());
                 let _ = self.get_ast_ty_of(value);
                 self.get_ast_ty_of(in_expr)
             }
@@ -1103,7 +1065,7 @@ impl MonoToCfg {
             }
             AstKind::Cons { enum_name, .. } => AstTy::Named(enum_name.clone()),
             AstKind::Match { expr, cases } => {
-                assert!(cases.len() > 0);
+                assert!(!cases.is_empty());
                 self.get_ast_type_of_case(&cases[0])
             }
         }
@@ -1118,13 +1080,10 @@ impl MonoToCfg {
     ) -> (Value, HashMap<Var, CfgVarUse>) {
         match pat {
             Pattern::Int(x) => (
-                b.eq(&mut self.ctx, Const::Int(*x).into(), v.into()).into(),
+                b.eq(&mut self.ctx, Const::Int(*x).into(), v.into()),
                 HashMap::new(),
             ),
-            Pattern::Symbol(var, _) => (
-                Const::Int(1).into(),
-                HashMap::from_iter(once((var.clone(), v))),
-            ),
+            Pattern::Symbol(var, _) => (Const::Int(1).into(), HashMap::from_iter(once((*var, v)))),
             Pattern::Cons {
                 enum_name,
                 cons,
@@ -1175,7 +1134,7 @@ impl MonoToCfg {
                             b.extract(&mut self.ctx, v.into(), pos)
                         };
                         let (new_val, new_bindings) = self.matches(v, &arg_ty, x, b);
-                        bindings.extend(new_bindings.into_iter());
+                        bindings.extend(new_bindings);
                         let mat = b.mul(&mut self.ctx, new_val, val);
                         (mat, bindings)
                     })
@@ -1187,9 +1146,9 @@ impl MonoToCfg {
                         (Value::Const(Const::Int(1)), HashMap::new()),
                         |(val, mut bindings), (i, (ty, pat))| {
                             let v = b.extract(&mut self.ctx, v.clone().into(), i);
-                            let (this, new_bindings) = self.matches(v.into(), ty, pat, b);
-                            let new_val = b.mul(&mut self.ctx, this.into(), val);
-                            bindings.extend(new_bindings.into_iter());
+                            let (this, new_bindings) = self.matches(v, ty, pat, b);
+                            let new_val = b.mul(&mut self.ctx, this, val);
+                            bindings.extend(new_bindings);
                             (new_val, bindings)
                         },
                     )
@@ -1234,7 +1193,7 @@ impl MonoToCfg {
             let next_check_lbl = Label::fresh();
             let next_check_use = Use::from(&next_check_lbl);
             b.branch(
-                &mut self.ctx,
+                &self.ctx,
                 mat,
                 case_body_use,
                 next_check_use.clone(),
@@ -1252,12 +1211,12 @@ impl MonoToCfg {
                 vals.push(cast);
             }
             if let Some(res) = &res {
-                b.store(&mut self.ctx, res.clone().into(), this_res);
+                b.store(&self.ctx, res.clone().into(), this_res);
             }
-            b.goto(&mut self.ctx, merge_use.clone(), next_check_lbl);
+            b.goto(&self.ctx, merge_use.clone(), next_check_lbl);
         }
 
-        b.goto(&mut self.ctx, merge_use, merge_lbl);
+        b.goto(&self.ctx, merge_use, merge_lbl);
         res.map_or(Const::Struct(vec![]).into(), |x| {
             b.load(&mut self.ctx, x.into(), target_ty).into()
         })

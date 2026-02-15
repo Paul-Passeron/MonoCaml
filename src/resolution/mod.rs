@@ -10,7 +10,8 @@ use crate::{
         type_expr::{TypeExpr, TypeExprDesc},
     },
     poly_ir::{
-        ItemId, TypeId, TypeParamId, ValueRef, VarMarker,
+        TypeId, TypeParamId, ValueRef, VarMarker,
+        expr::ValueBinding,
         id::Arena,
         item::{
             Constructor, ConstructorArg, Item, ItemInfo, ItemNode, TypeDecl, TypeDeclInfo,
@@ -56,7 +57,7 @@ impl Resolver {
     }
 
     fn with_scope<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
-        let parent = std::mem::replace(&mut self.scope, Scope::new());
+        let parent = std::mem::take(&mut self.scope);
         self.scope.parent = Some(Box::new(parent));
         let res = f(self);
         self.scope = *self.scope.parent.take().unwrap_or_default();
@@ -114,13 +115,39 @@ impl Resolver {
         todo!()
     }
 
+    fn declare_value_binding(&mut self, binding: &parse_tree::expression::ValueBinding) -> Res<()> {
+        todo!()
+    }
+
+    fn resolve_value_binding(
+        &mut self,
+        binding: &parse_tree::expression::ValueBinding,
+    ) -> Res<ValueBinding> {
+        todo!()
+    }
+
     fn resolve_value(
         &mut self,
         rec: bool,
         bindings: &[parse_tree::expression::ValueBinding],
         span: Span,
     ) -> Res<Item> {
-        todo!()
+        let bindings = if rec {
+            for binding in bindings {
+                self.declare_value_binding(binding)?;
+            }
+            bindings
+                .iter()
+                .map(|b| self.resolve_value_binding(b))
+                .collect::<Res<_>>()?
+        } else {
+            todo!()
+        };
+        let node = ItemNode::Value {
+            recursive: rec,
+            bindings,
+        };
+        Ok(Item::new(node, span))
     }
 
     fn resolve_type_item(&mut self, tys: &[TypeDeclaration], span: Span) -> Res<Item> {
@@ -199,6 +226,10 @@ impl Resolver {
                             .map(|c| this.resolve_constructor(c))
                             .collect::<Res<_>>()?,
                     ),
+                    TypeKind::Alias(expr) => {
+                        let resolved = this.resolve_type_expr(expr)?;
+                        TypeDeclKind::Alias(resolved)
+                    }
                     _ => todo!(),
                 },
             })
@@ -212,7 +243,7 @@ impl Resolver {
             TypeExprDesc::Var(name) => {
                 let id = self
                     .scope
-                    .resolve_type_var(*name, span)
+                    .resolve_type_var(*name)
                     .unwrap_or_else(|| self.fresh_type_var());
                 TypeNode::Var(id)
             }
@@ -240,8 +271,16 @@ impl Resolver {
                     args: r_args,
                 }
             }
-            TypeExprDesc::Alias(located, symbol) => todo!(),
+            TypeExprDesc::Alias(ty_expr, name) => {
+                todo!()
+            }
         };
         Ok(Type::new(node, span))
+    }
+}
+
+impl Default for Resolver {
+    fn default() -> Self {
+        Self::new()
     }
 }

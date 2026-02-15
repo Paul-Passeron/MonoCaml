@@ -60,15 +60,15 @@ impl<'a> Parser<'a> {
         let pos = self.pos;
         if let Some(TokenKind::Ident(_)) = self.peek().map(|t| &t.kind) {
             self.advance();
-            if self.at_poly() {
-                if let Some(TokenKind::PolyTypeName(var)) = self.peek().map(|t| &t.kind) {
-                    let var_sym = *var;
-                    self.advance();
-                    let end = self.span().split().1;
-                    let span = start.span(&end);
-                    let desc = TypeExprDesc::Alias(Box::new(type_expr), var_sym);
-                    return Ok(TypeExpr::new(desc, span));
-                }
+            if self.at_poly()
+                && let Some(TokenKind::PolyTypeName(var)) = self.peek().map(|t| &t.kind)
+            {
+                let var_sym = *var;
+                self.advance();
+                let end = self.span().split().1;
+                let span = start.span(&end);
+                let desc = TypeExprDesc::Alias(Box::new(type_expr), var_sym);
+                return Ok(TypeExpr::new(desc, span));
             }
             self.pos = pos;
         }

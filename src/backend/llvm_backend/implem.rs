@@ -35,7 +35,7 @@ pub(super) struct LLVMBackendImpl<'ctx> {
     pub count: usize,
 }
 
-type LLBB<'a> = inkwell::basic_block::BasicBlock<'a>;
+type Llbb<'a> = inkwell::basic_block::BasicBlock<'a>;
 
 impl<'ctx> LLVMBackendImpl<'ctx> {
     pub fn new(context: &'ctx Context) -> Self {
@@ -116,8 +116,7 @@ impl<'ctx> LLVMBackendImpl<'ctx> {
                 .struct_type(
                     &items
                         .iter()
-                        .map(make_type)
-                        .flatten()
+                        .filter_map(make_type)
                         .collect::<Vec<BasicTypeEnum>>(),
                     false,
                 )
@@ -132,15 +131,15 @@ impl<'ctx> LLVMBackendImpl<'ctx> {
                     _ => self.context.i8_type(),
                 };
                 let elem_size = align;
-                let count = (size + elem_size - 1) / elem_size;
+                // let count = (size + elem_size - 1) / elem_size;
+                let count = size.div_ceil(elem_size);
                 elem_ty.array_type(count as u32).into()
             }
             Ty::FunPtr(sig) => {
                 let params = sig
                     .params()
                     .iter()
-                    .map(make_type)
-                    .flatten()
+                    .filter_map(make_type)
                     .map(BasicMetadataTypeEnum::from)
                     .collect::<Vec<_>>();
                 if sig.ret().is_zero_sized() {
@@ -192,7 +191,7 @@ impl<'ctx> LLVMBackendImpl<'ctx> {
 
     fn build_expr(&mut self, expr: &Expr, func: &Func) -> AnyValueEnum<'ctx> {
         match expr {
-            Expr::Value(value) => self.build_value(value).into(),
+            Expr::Value(value) => self.build_value(value),
             Expr::Add(lhs, rhs) => {
                 let v1 = self.build_value(lhs).into_int_value();
                 let v2 = self.build_value(rhs).into_int_value();
@@ -233,12 +232,12 @@ impl<'ctx> LLVMBackendImpl<'ctx> {
             Expr::NativeCall { fun, args, s } => {
                 let sig_ty = self.get_type(&Ty::FunPtr(s.clone())).into_function_type();
                 let f_val = self.build_value(fun);
-                let f_val = self.into_basic(f_val);
+                let f_val = self.as_basic(f_val);
                 let args_vals = args
                     .iter()
                     .map(|x| {
                         let v = self.build_value(x);
-                        self.into_basic(v).into()
+                        self.as_basic(v).into()
                     })
                     .collect::<Vec<_>>();
                 self.builder
@@ -247,7 +246,7 @@ impl<'ctx> LLVMBackendImpl<'ctx> {
                     .as_any_value_enum()
             }
             Expr::GetElementPtr { ptr, ty, index } => match ty {
-                Ty::Struct(_) => self.build_gep_struct(&ty, ptr, *index).into(),
+                Ty::Struct(_) => self.build_gep_struct(ty, ptr, *index).into(),
                 Ty::Union(_) => self.build_gep_union(ptr).into(),
                 _ => unreachable!(),
             },
@@ -261,7 +260,7 @@ impl<'ctx> LLVMBackendImpl<'ctx> {
             }
             Expr::Load { ptr, ty } => {
                 let ty = self.get_type(ty);
-                let bty = self.into_basic_ty(ty);
+                let bty = self.as_basic_ty(ty);
                 let ptr_val = self.build_value(ptr).into_pointer_value();
                 self.builder.build_load(bty, ptr_val, "").unwrap().into()
             }
@@ -270,7 +269,7 @@ impl<'ctx> LLVMBackendImpl<'ctx> {
                     .iter()
                     .map(|x| {
                         let any = self.build_value(x);
-                        self.into_basic(any)
+                        self.as_basic(any)
                     })
                     .collect::<Vec<_>>();
                 let vts = vs.iter().map(|x| x.get_type()).collect::<Vec<_>>();
@@ -292,30 +291,30 @@ impl<'ctx> LLVMBackendImpl<'ctx> {
                 let zeroed = ty.const_zero();
                 self.builder.build_store(union_ptr, zeroed).unwrap();
                 let val = self.build_value(value);
-                let bv = self.into_basic(val);
+                let bv = self.as_basic(val);
                 self.builder.build_store(union_ptr, bv).unwrap();
                 self.builder.build_load(ty, union_ptr, "").unwrap().into()
             }
             Expr::Malloc(ty, value) => {
                 let llty = self.get_type(ty);
-                let bty = self.into_basic_ty(llty);
+                let bty = self.as_basic_ty(llty);
                 let ptr = self.builder.build_malloc(bty, "").unwrap();
 
                 let val = self.build_value(value);
-                let bval = self.into_basic(val);
+                let bval = self.as_basic(val);
                 self.builder.build_store(ptr, bval).unwrap();
                 ptr.into()
             }
             Expr::Cast(ty, value) => {
                 let ty = self.get_type(ty);
-                let bty = self.into_basic_ty(ty);
+                let bty = self.as_basic_ty(ty);
                 let v = self.build_value(value);
-                let bv = self.into_basic(v);
+                let bv = self.as_basic(v);
                 self.builder.build_bit_cast(bv, bty, "").unwrap().into()
             }
             Expr::Alloca(ty) => {
                 let llty = self.get_type(ty);
-                let bty = self.into_basic_ty(llty);
+                let bty = self.as_basic_ty(llty);
                 self.builder.build_alloca(bty, "").unwrap().into()
             }
         }
@@ -324,7 +323,7 @@ impl<'ctx> LLVMBackendImpl<'ctx> {
     fn build_gep_struct(&mut self, ty: &Ty, value: &Value, index: usize) -> PointerValue<'ctx> {
         let val = self.build_value(value).into_pointer_value();
         let llty = self.get_type(ty);
-        let bty = self.into_basic_ty(llty);
+        let bty = self.as_basic_ty(llty);
         self.builder
             .build_struct_gep(bty, val, index as u32, "")
             .unwrap()
@@ -350,14 +349,14 @@ impl<'ctx> LLVMBackendImpl<'ctx> {
     ) -> AnyValueEnum<'ctx> {
         let arr_val = self.build_value(value).into_array_value();
         let actual_ty = self.get_type(&items[index]);
-        let bty = self.into_basic_ty(actual_ty);
+        let bty = self.as_basic_ty(actual_ty);
         let allocated = self.builder.build_alloca(arr_val.get_type(), "").unwrap();
         self.builder.build_store(allocated, arr_val).unwrap();
 
         self.builder.build_load(bty, allocated, "").unwrap().into()
     }
 
-    fn into_basic_ty(&mut self, val: AnyTypeEnum<'ctx>) -> BasicTypeEnum<'ctx> {
+    fn as_basic_ty(&mut self, val: AnyTypeEnum<'ctx>) -> BasicTypeEnum<'ctx> {
         if val.is_function_type() {
             self.context.ptr_type(AddressSpace::default()).into()
         } else {
@@ -365,7 +364,7 @@ impl<'ctx> LLVMBackendImpl<'ctx> {
         }
     }
 
-    fn into_basic(&mut self, val: AnyValueEnum<'ctx>) -> BasicValueEnum<'ctx> {
+    fn as_basic(&self, val: AnyValueEnum<'ctx>) -> BasicValueEnum<'ctx> {
         if val.is_function_value() {
             let f_val = val.into_function_value();
             f_val.as_global_value().as_pointer_value().into()
@@ -385,7 +384,7 @@ impl<'ctx> LLVMBackendImpl<'ctx> {
             Instr::Store { ptr, value } => {
                 let ptr_val = self.build_value(ptr);
                 let val = self.build_value(value);
-                let basic_val = self.into_basic(val);
+                let basic_val = self.as_basic(val);
                 self.builder
                     .build_store(ptr_val.into_pointer_value(), basic_val)
                     .unwrap();
@@ -406,7 +405,7 @@ impl<'ctx> LLVMBackendImpl<'ctx> {
                     .iter()
                     .map(|x| {
                         let any = self.build_const(x);
-                        self.into_basic(any)
+                        self.as_basic(any)
                     })
                     .collect::<Vec<_>>();
                 let elems_tys = elems.iter().map(|x| x.get_type()).collect::<Vec<_>>();
@@ -437,11 +436,11 @@ impl<'ctx> LLVMBackendImpl<'ctx> {
         }
     }
 
-    fn build_terminator(&mut self, t: &Terminator, bbs: &HashMap<LabelUse, LLBB<'ctx>>) {
+    fn build_terminator(&mut self, t: &Terminator, bbs: &HashMap<LabelUse, Llbb<'ctx>>) {
         match t {
             Terminator::Return(Some(value)) => {
                 let v = self.build_value(value);
-                let bv = self.into_basic(v);
+                let bv = self.as_basic(v);
                 self.builder.build_return(Some(&bv)).unwrap();
             }
             Terminator::Return(None) => {
@@ -460,7 +459,7 @@ impl<'ctx> LLVMBackendImpl<'ctx> {
                 let v_ty = v.get_type();
                 let cond = self
                     .builder
-                    .build_int_compare(inkwell::IntPredicate::NE, v, v_ty.const_zero().into(), "")
+                    .build_int_compare(inkwell::IntPredicate::NE, v, v_ty.const_zero(), "")
                     .unwrap();
 
                 let then_block = bbs[then_bb];
@@ -472,7 +471,7 @@ impl<'ctx> LLVMBackendImpl<'ctx> {
         }
     }
 
-    fn build_block(&mut self, b: &BasicBlock, bbs: &HashMap<LabelUse, LLBB<'ctx>>, func: &Func) {
+    fn build_block(&mut self, b: &BasicBlock, bbs: &HashMap<LabelUse, Llbb<'ctx>>, func: &Func) {
         self.builder.position_at_end(bbs[&b.label()]);
         for instr in b.instrs() {
             self.build_instr(instr, func);
@@ -662,15 +661,15 @@ impl<'ctx> LLVMBackendImpl<'ctx> {
                     .type_names
                     .iter()
                     .filter_map(|(existing_ty, existing_name)| {
-                        if let Ty::Struct(_) = existing_ty {
-                            if self.canonical_decayed(existing_ty) == my_canonical {
-                                match self.decayed_type_names.get(existing_ty) {
-                                    Some(decayed_name) => {
-                                        return Some((existing_name.clone(), decayed_name.clone()));
-                                    }
-                                    None => {
-                                        return Some((existing_name.clone(), my_canonical.clone()));
-                                    }
+                        if let Ty::Struct(_) = existing_ty
+                            && self.canonical_decayed(existing_ty) == my_canonical
+                        {
+                            match self.decayed_type_names.get(existing_ty) {
+                                Some(decayed_name) => {
+                                    return Some((existing_name.clone(), decayed_name.clone()));
+                                }
+                                None => {
+                                    return Some((existing_name.clone(), my_canonical.clone()));
                                 }
                             }
                         }
@@ -715,18 +714,19 @@ impl<'ctx> LLVMBackendImpl<'ctx> {
                     .type_names
                     .iter()
                     .filter_map(|(existing_ty, existing_name)| {
-                        if let Ty::Union(_) = existing_ty {
-                            if self.canonical_decayed(existing_ty) == my_canonical {
-                                match self.decayed_type_names.get(existing_ty) {
-                                    Some(decayed_name) => {
-                                        return Some((existing_name.clone(), decayed_name.clone()));
-                                    }
-                                    None => {
-                                        return Some((existing_name.clone(), my_canonical.clone()));
-                                    }
+                        if let Ty::Union(_) = existing_ty
+                            && self.canonical_decayed(existing_ty) == my_canonical
+                        {
+                            match self.decayed_type_names.get(existing_ty) {
+                                Some(decayed_name) => {
+                                    return Some((existing_name.clone(), decayed_name.clone()));
+                                }
+                                None => {
+                                    return Some((existing_name.clone(), my_canonical.clone()));
                                 }
                             }
                         }
+
                         None
                     })
                     .next();
@@ -781,7 +781,7 @@ impl<'ctx> LLVMBackendImpl<'ctx> {
             self.define_c_type_pro(ty.into_inner().clone(), Some(name), &mut f);
         }
 
-        for (name, _) in boxed_types {
+        for name in boxed_types.keys() {
             writeln!(f, "setup_pool({name})").unwrap();
         }
 
@@ -797,16 +797,16 @@ impl<'ctx> LLVMBackendImpl<'ctx> {
             .arg("./runtime.llvm");
         let output = cmd
             .output()
-            .map_err(|_| format!("Failed to compile runtime library"))
+            .map_err(|_| "Failed to compile runtime library".to_string())
             .unwrap();
 
         println!("{}", String::from_utf8(output.stderr).unwrap());
 
-        let mem = MemoryBuffer::create_from_file(&PathBuf::from("runtime.llvm")).map_err(|x| {
-            let _ = std::fs::remove_file(&PathBuf::from("./runtime.llvm"));
-            x
-        });
-        let _ = std::fs::remove_file(&PathBuf::from("./runtime.llvm"));
+        let mem =
+            MemoryBuffer::create_from_file(&PathBuf::from("runtime.llvm")).inspect_err(|_| {
+                let _ = std::fs::remove_file(PathBuf::from("./runtime.llvm"));
+            });
+        let _ = std::fs::remove_file(PathBuf::from("./runtime.llvm"));
 
         let runtime_module = self.context.create_module_from_ir(mem.unwrap()).unwrap();
 
@@ -822,13 +822,13 @@ impl<'ctx> LLVMBackendImpl<'ctx> {
             .map(|(alias, true_name)| (true_name.clone(), alias.clone()))
             .collect::<HashMap<_, _>>();
 
-        rev_map.insert(prog.entry(), format!("start"));
+        rev_map.insert(prog.entry(), "start".to_string());
 
         for f in prog.funcs() {
             if f.cfg().is_none() {
                 self.module
                     .get_function(&rev_map.get(&f.name()).cloned().unwrap())
-                    .map(|name| self.funs.insert(Use::from(f.name()), name));
+                    .map(|name| self.funs.insert(f.name(), name));
             } else {
                 self.declare_function(f, rev_map.get(&f.name()).cloned());
             }

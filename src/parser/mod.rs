@@ -26,6 +26,8 @@ pub struct Parser<'a> {
     pub pos: usize,
 }
 
+type ParseFun<'a, T> = Box<dyn FnMut(&mut Parser<'a>) -> ParseRes<T>>;
+
 impl<'a> Parser<'a> {
     pub fn new(src: FileId, toks: &'a [Token]) -> Option<Self> {
         if toks.is_empty() {
@@ -41,8 +43,7 @@ impl<'a> Parser<'a> {
     }
 
     fn peek_n(&self, n: usize) -> Option<&Token> {
-        let res = self.toks.get(self.pos + n).copied();
-        res
+        self.toks.get(self.pos + n).copied()
     }
 
     fn advance(&mut self) -> Option<&Token> {
@@ -90,10 +91,7 @@ impl<'a> Parser<'a> {
     }
 
     #[allow(unused)]
-    fn try_parse<T>(
-        &mut self,
-        funs: Vec<Box<dyn FnMut(&mut Parser<'a>) -> ParseRes<T>>>,
-    ) -> ParseRes<T> {
+    fn try_parse<T>(&mut self, funs: Vec<ParseFun<'a, T>>) -> ParseRes<T> {
         assert!(!funs.is_empty());
         let mut error = None;
         let mut last_len = 0;

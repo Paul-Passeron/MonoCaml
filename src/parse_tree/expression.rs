@@ -6,7 +6,7 @@ use crate::{
         token::TokenKind,
     },
     parse_tree::{Located, LongIdent, RecordField, pattern::Pattern, type_expr::TypeExpr},
-    session::Session,
+    resolve_strlit, resolve_symbol,
     source_manager::loc::Span,
 };
 
@@ -247,49 +247,34 @@ impl Case {
     }
 }
 
-const INDENT: &'static str = "    ";
+const INDENT: &str = "    ";
 
-pub struct ExpressionDescDisplay<'a, 'b> {
+pub struct ExpressionDescDisplay<'a> {
     pub desc: &'a ExpressionDesc,
-    pub session: &'b Session,
     pub indent: usize,
 }
 
 impl ExpressionDesc {
-    pub fn display<'a, 'b>(
-        &'a self,
-        session: &'b Session,
-        indent: usize,
-    ) -> ExpressionDescDisplay<'a, 'b> {
-        ExpressionDescDisplay {
-            desc: self,
-            session,
-            indent,
-        }
+    pub fn display<'a>(&'a self, indent: usize) -> ExpressionDescDisplay<'a> {
+        ExpressionDescDisplay { desc: self, indent }
     }
 }
 
-pub struct LongIdentDisplay<'a, 'b> {
+pub struct LongIdentDisplay<'a> {
     pub ident: &'a LongIdent,
-    pub session: &'b Session,
     pub indent: usize,
 }
 
 impl LongIdent {
-    pub fn display<'a, 'b>(
-        &'a self,
-        session: &'b Session,
-        indent: usize,
-    ) -> LongIdentDisplay<'a, 'b> {
+    pub fn display<'a>(&'a self, indent: usize) -> LongIdentDisplay<'a> {
         LongIdentDisplay {
             ident: self,
-            session,
             indent,
         }
     }
 }
 
-impl fmt::Display for LongIdentDisplay<'_, '_> {
+impl fmt::Display for LongIdentDisplay<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self.ident {
             LongIdent::Ident(symbol) => {
@@ -297,7 +282,7 @@ impl fmt::Display for LongIdentDisplay<'_, '_> {
                     f,
                     "{}{}",
                     INDENT.repeat(self.indent),
-                    symbol.display(&self.session.symbol_interner)
+                    resolve_symbol(*symbol)
                 )
             }
             LongIdent::Dot(long_ident, symbol) => {
@@ -305,19 +290,19 @@ impl fmt::Display for LongIdentDisplay<'_, '_> {
                     f,
                     "{}{}.{}",
                     INDENT.repeat(self.indent),
-                    long_ident.display(&self.session, 0),
-                    symbol.display(&self.session.symbol_interner)
+                    long_ident.display(0),
+                    resolve_symbol(*symbol),
                 )
             }
         }
     }
 }
 
-impl fmt::Display for ExpressionDescDisplay<'_, '_> {
+impl fmt::Display for ExpressionDescDisplay<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match &self.desc {
             ExpressionDesc::Ident(long_ident) => {
-                write!(f, "{}", long_ident.display(&self.session, self.indent))
+                write!(f, "{}", long_ident.display(self.indent))
             }
             ExpressionDesc::Constant(constant) => {
                 write!(f, "{}", INDENT.repeat(self.indent))?;
@@ -325,7 +310,7 @@ impl fmt::Display for ExpressionDescDisplay<'_, '_> {
                     Constant::Int(x) => write!(f, "{}", x),
                     Constant::Char(c) => write!(f, "'{}'", c),
                     Constant::String(s) => {
-                        write!(f, "\"{}\"", self.session.resolve_strlit(*s))
+                        write!(f, "\"{}\"", resolve_strlit(*s))
                     }
                     Constant::Float(fl) => write!(f, "{}", fl),
                 }
@@ -345,11 +330,11 @@ impl fmt::Display for ExpressionDescDisplay<'_, '_> {
                         RecFlag::Recursive => " rec",
                         RecFlag::NonRecursive => "",
                     },
-                    first.pat.desc.display(self.session, 0)
+                    first.pat.desc.display(0)
                 )?;
 
                 for arg in &first.args {
-                    write!(f, " {}", arg.desc.display(self.session, 0))?;
+                    write!(f, " {}", arg.desc.display(0))?;
                 }
 
                 if let Some(constraint) = &first.constraint {
@@ -360,29 +345,25 @@ impl fmt::Display for ExpressionDescDisplay<'_, '_> {
                             if i > 0 {
                                 write!(f, " ")?;
                             }
-                            write!(f, "'{}", ty.display(&self.session.symbol_interner))?;
+                            write!(f, "'{}", resolve_symbol(*ty))?;
                         }
                         write!(f, ". ")?;
                     }
-                    write!(f, "{}", constraint.typ.desc.display(self.session, 0))?;
+                    write!(f, "{}", constraint.typ.desc.display(0))?;
                 }
 
-                write!(f, " =\n")?;
-                write!(
-                    f,
-                    "{}",
-                    first.expr.desc.display(self.session, self.indent + 1)
-                )?;
+                writeln!(f, " =")?;
+                write!(f, "{}", first.expr.desc.display(self.indent + 1))?;
 
                 for binding in iterator {
                     write!(
                         f,
                         "\n{}and {}",
                         INDENT.repeat(self.indent),
-                        binding.pat.desc.display(self.session, 0)
+                        binding.pat.desc.display(0)
                     )?;
                     for arg in &binding.args {
-                        write!(f, " {}", arg.desc.display(self.session, 0))?;
+                        write!(f, " {}", arg.desc.display(0))?;
                     }
                     if let Some(constraint) = &binding.constraint {
                         write!(f, " : ")?;
@@ -392,98 +373,73 @@ impl fmt::Display for ExpressionDescDisplay<'_, '_> {
                                 if i > 0 {
                                     write!(f, " ")?;
                                 }
-                                write!(f, "'{}", ty.display(&self.session.symbol_interner))?;
+                                write!(f, "'{}", resolve_symbol(*ty))?;
                             }
                             write!(f, ". ")?;
                         }
-                        write!(f, "{}", constraint.typ.desc.display(self.session, 0))?;
+                        write!(f, "{}", constraint.typ.desc.display(0))?;
                     }
-                    write!(f, " =\n")?;
-                    write!(
-                        f,
-                        "{}",
-                        binding.expr.desc.display(self.session, self.indent + 1)
-                    )?;
+                    writeln!(f, " =")?;
+                    write!(f, "{}", binding.expr.desc.display(self.indent + 1))?;
                 }
 
-                write!(f, "\n{}in\n", INDENT.repeat(self.indent))?;
-                write!(f, "{}", expression.desc.display(self.session, self.indent))
+                writeln!(f, "\n{}in", INDENT.repeat(self.indent))?;
+                write!(f, "{}", expression.desc.display(self.indent))
             }
             ExpressionDesc::Function(cases) => {
                 write!(f, "{}function", INDENT.repeat(self.indent))?;
-                for (i, case) in cases.iter().enumerate() {
-                    if i == 0 {
-                        write!(f, "\n")?;
-                    } else {
-                        write!(f, "\n")?;
-                    }
+                for case in cases.iter() {
+                    writeln!(f)?;
                     write!(
                         f,
                         "{}| {}",
                         INDENT.repeat(self.indent),
-                        case.lhs.desc.display(self.session, 0)
+                        case.lhs.desc.display(0)
                     )?;
                     if let Some(guard) = &case.guard {
-                        write!(f, " when {}", guard.desc.display(self.session, 0))?;
+                        write!(f, " when {}", guard.desc.display(0))?;
                     }
-                    write!(f, " ->\n")?;
-                    write!(
-                        f,
-                        "{}",
-                        case.expr.desc.display(self.session, self.indent + 1)
-                    )?;
+                    writeln!(f, " ->")?;
+                    write!(f, "{}", case.expr.desc.display(self.indent + 1))?;
                 }
                 Ok(())
             }
             ExpressionDesc::Match { expr, with } => {
                 write!(f, "{}match ", INDENT.repeat(self.indent))?;
-                write!(f, "{}", expr.desc.display(self.session, 0))?;
+                write!(f, "{}", expr.desc.display(0))?;
                 write!(f, " with")?;
-                for (i, case) in with.iter().enumerate() {
-                    if i == 0 {
-                        write!(f, "\n")?;
-                    } else {
-                        write!(f, "\n")?;
-                    }
+                for case in with.iter() {
+                    writeln!(f)?;
                     write!(
                         f,
                         "{}| {}",
                         INDENT.repeat(self.indent),
-                        case.lhs.desc.display(self.session, 0)
+                        case.lhs.desc.display(0)
                     )?;
                     if let Some(guard) = &case.guard {
-                        write!(f, " when {}", guard.desc.display(self.session, 0))?;
+                        write!(f, " when {}", guard.desc.display(0))?;
                     }
-                    write!(f, " ->\n")?;
-                    write!(
-                        f,
-                        "{}",
-                        case.expr.desc.display(self.session, self.indent + 1)
-                    )?;
+                    writeln!(f, " ->")?;
+                    write!(f, "{}", case.expr.desc.display(self.indent + 1))?;
                 }
                 Ok(())
             }
             ExpressionDesc::Fun { arg, body } => {
                 write!(f, "{}fun ", INDENT.repeat(self.indent))?;
-                write!(f, "{} ->\n", arg.desc.display(self.session, 0))?;
-                write!(f, "{}", body.desc.display(self.session, self.indent + 1))
+                writeln!(f, "{} ->", arg.desc.display(0))?;
+                write!(f, "{}", body.desc.display(self.indent + 1))
             }
             ExpressionDesc::Construct(long_ident, None) => {
-                write!(
-                    f,
-                    "{}{}",
-                    INDENT.repeat(self.indent),
-                    long_ident.display(self.session, 0)
-                )
+                write!(f, "{}{}", INDENT.repeat(self.indent), long_ident.display(0))
             }
             ExpressionDesc::Construct(long_ident, Some(expr)) => {
                 write!(
                     f,
                     "{}{} ",
                     INDENT.repeat(self.indent),
-                    long_ident.display(self.session, 0)
+                    long_ident.display(0)
                 )?;
-                write!(f, "{}", expr.desc.display(self.session, 0))
+                write!(f, "{}", expr.desc.display(0))
             }
             ExpressionDesc::Record(record_fields) => {
                 write!(f, "{}{{ ", INDENT.repeat(self.indent))?;
@@ -494,29 +450,19 @@ impl fmt::Display for ExpressionDescDisplay<'_, '_> {
                     write!(
                         f,
                         "{} = {}",
-                        field.name.display(self.session, 0),
-                        field.pat.desc.display(self.session, 0)
+                        field.name.display(0),
+                        field.pat.desc.display(0)
                     )?;
                 }
                 write!(f, " }}")
             }
             ExpressionDesc::Field(expr, long_ident) => {
                 write!(f, "{}", INDENT.repeat(self.indent))?;
-                write!(
-                    f,
-                    "{}.{}",
-                    expr.desc.display(self.session, 0),
-                    long_ident.display(self.session, 0)
-                )
+                write!(f, "{}.{}", expr.desc.display(0), long_ident.display(0))
             }
             ExpressionDesc::Application(fun, arg) => {
                 write!(f, "{}", INDENT.repeat(self.indent))?;
-                write!(
-                    f,
-                    "{} {}",
-                    fun.desc.display(self.session, 0),
-                    arg.desc.display(self.session, 0)
-                )
+                write!(f, "{} {}", fun.desc.display(0), arg.desc.display(0))
             }
             ExpressionDesc::SetField {
                 target,
@@ -527,9 +473,9 @@ impl fmt::Display for ExpressionDescDisplay<'_, '_> {
                 write!(
                     f,
                     "{}.{} <- {}",
-                    target.desc.display(self.session, 0),
-                    field.display(self.session, 0),
-                    value.desc.display(self.session, 0)
+                    target.desc.display(0),
+                    field.display(0),
+                    value.desc.display(0)
                 )
             }
             ExpressionDesc::IfThenElse {
@@ -538,42 +484,29 @@ impl fmt::Display for ExpressionDescDisplay<'_, '_> {
                 else_expr,
             } => {
                 write!(f, "{}if ", INDENT.repeat(self.indent))?;
-                write!(f, "{}", cond.desc.display(self.session, 0))?;
-                write!(f, " then\n")?;
-                write!(
-                    f,
-                    "{}",
-                    then_expr.desc.display(self.session, self.indent + 1)
-                )?;
+                write!(f, "{}", cond.desc.display(0))?;
+                writeln!(f, " then")?;
+                write!(f, "{}", then_expr.desc.display(self.indent + 1))?;
                 if let Some(else_expr) = else_expr {
-                    write!(f, "\n{}else\n", INDENT.repeat(self.indent))?;
-                    write!(
-                        f,
-                        "{}",
-                        else_expr.desc.display(self.session, self.indent + 1)
-                    )?;
+                    writeln!(f, "\n{}else", INDENT.repeat(self.indent))?;
+                    write!(f, "{}", else_expr.desc.display(self.indent + 1))?;
                 }
                 Ok(())
             }
             ExpressionDesc::Product(e1, e2) => {
                 write!(f, "{}", INDENT.repeat(self.indent))?;
-                write!(
-                    f,
-                    "{}, {}",
-                    e1.desc.display(self.session, 0),
-                    e2.desc.display(self.session, 0)
-                )
+                write!(f, "{}, {}", e1.desc.display(0), e2.desc.display(0))
             }
             ExpressionDesc::Sequence(e1, e2) => {
-                write!(f, "{}", e1.desc.display(self.session, self.indent))?;
-                write!(f, ";\n")?;
-                write!(f, "{}", e2.desc.display(self.session, self.indent))
+                write!(f, "{}", e1.desc.display(self.indent))?;
+                writeln!(f, ";")?;
+                write!(f, "{}", e2.desc.display(self.indent))
             }
             ExpressionDesc::While { cond, body } => {
                 write!(f, "{}while ", INDENT.repeat(self.indent))?;
-                write!(f, "{}", cond.desc.display(self.session, 0))?;
-                write!(f, " do\n")?;
-                write!(f, "{}", body.desc.display(self.session, self.indent + 1))?;
+                write!(f, "{}", cond.desc.display(0))?;
+                writeln!(f, " do")?;
+                write!(f, "{}", body.desc.display(self.indent + 1))?;
                 write!(f, "\n{}done", INDENT.repeat(self.indent))
             }
             ExpressionDesc::For {
@@ -587,9 +520,9 @@ impl fmt::Display for ExpressionDescDisplay<'_, '_> {
                     f,
                     "{}for {} = ",
                     INDENT.repeat(self.indent),
-                    pat.desc.display(self.session, 0)
+                    pat.desc.display(0)
                 )?;
-                write!(f, "{}", start.desc.display(self.session, 0))?;
+                write!(f, "{}", start.desc.display(0))?;
                 write!(
                     f,
                     " {} ",
@@ -598,19 +531,14 @@ impl fmt::Display for ExpressionDescDisplay<'_, '_> {
                         DirectionFlag::Downto => "downto",
                     }
                 )?;
-                write!(f, "{}", end.desc.display(self.session, 0))?;
-                write!(f, " do\n")?;
-                write!(f, "{}", body.desc.display(self.session, self.indent + 1))?;
+                write!(f, "{}", end.desc.display(0))?;
+                writeln!(f, " do")?;
+                write!(f, "{}", body.desc.display(self.indent + 1))?;
                 write!(f, "\n{}done", INDENT.repeat(self.indent))
             }
             ExpressionDesc::Constraint(e, t) => {
                 write!(f, "{}", INDENT.repeat(self.indent))?;
-                write!(
-                    f,
-                    "({} : {})",
-                    e.desc.display(self.session, 0),
-                    t.desc.display(self.session, 0)
-                )
+                write!(f, "({} : {})", e.desc.display(0), t.desc.display(0))
             }
             ExpressionDesc::Unit => write!(f, "{}()", INDENT.repeat(self.indent)),
             ExpressionDesc::Paren(expr) => {
@@ -618,7 +546,7 @@ impl fmt::Display for ExpressionDescDisplay<'_, '_> {
                     f,
                     "{}({})",
                     INDENT.repeat(self.indent),
-                    expr.desc.display(self.session, 0)
+                    expr.desc.display(0)
                 )
             }
             ExpressionDesc::BinaryOp(binary_op, left, right) => {
@@ -641,18 +569,18 @@ impl fmt::Display for ExpressionDescDisplay<'_, '_> {
                         return write!(
                             f,
                             "{} {} {}",
-                            left.desc.display(self.session, 0),
-                            sym.display(&self.session.symbol_interner),
-                            right.desc.display(self.session, 0)
+                            left.desc.display(0),
+                            resolve_symbol(*sym),
+                            right.desc.display(0)
                         );
                     }
                 };
                 write!(
                     f,
                     "{} {} {}",
-                    left.desc.display(self.session, 0),
+                    left.desc.display(0),
                     op_str,
-                    right.desc.display(self.session, 0)
+                    right.desc.display(0)
                 )
             }
             ExpressionDesc::List(exprs) => {
@@ -661,7 +589,7 @@ impl fmt::Display for ExpressionDescDisplay<'_, '_> {
                     if i > 0 {
                         write!(f, "; ")?;
                     }
-                    write!(f, "{}", expr.desc.display(self.session, 0))?;
+                    write!(f, "{}", expr.desc.display(0))?;
                 }
                 write!(f, "]")
             }

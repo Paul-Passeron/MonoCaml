@@ -15,7 +15,7 @@ impl MonoToCfg {
 
         let mut b = Builder::new(add_name, params, Ty::Int, &mut self.ctx);
         let res = b.add(&mut self.ctx, x.into(), y.into());
-        b.ret(&mut self.ctx, res.into());
+        b.ret(&self.ctx, res);
         let f = b.finalize();
         self.add_func(f);
         self.add_named_func("add", used);
@@ -31,7 +31,7 @@ impl MonoToCfg {
 
         let mut b = Builder::new(mul_name, params, Ty::Int, &mut self.ctx);
         let res = b.mul(&mut self.ctx, x.into(), y.into());
-        b.ret(&mut self.ctx, res.into());
+        b.ret(&self.ctx, res);
         let f = b.finalize();
         self.add_func(f);
         self.add_named_func("mul", used);

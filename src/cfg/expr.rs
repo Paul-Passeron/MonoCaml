@@ -95,7 +95,7 @@ impl Expr {
 
         for (i, (arg, expected_ty)) in args.iter().zip(params).enumerate() {
             let got_ty = arg.get_type(ctx);
-            if !got_ty.matches(&expected_ty) && !(got_ty.is_ptr() && expected_ty.is_ptr()) {
+            if !(got_ty.matches(&expected_ty) || got_ty.is_ptr() && expected_ty.is_ptr()) {
                 panic!(
                     "Native function {fun} expects argument {i} of type {expected_ty} but got {got_ty}"
                 )
@@ -104,11 +104,7 @@ impl Expr {
 
         let sig = fun.get_type(ctx).sig();
 
-        Self::NativeCall {
-            fun: fun,
-            args,
-            s: sig,
-        }
+        Self::NativeCall { fun, args, s: sig }
     }
 
     pub fn get_element_ptr(ctx: &TyCtx, ptr: Value, ty: Ty, index: usize) -> Self {

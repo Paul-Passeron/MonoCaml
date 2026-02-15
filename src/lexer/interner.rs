@@ -147,3 +147,12 @@ where
         self.map.get(s).copied()
     }
 }
+
+impl<S> Default for Interner<S>
+where
+    S: Copy + ExtractSymbToken,
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}

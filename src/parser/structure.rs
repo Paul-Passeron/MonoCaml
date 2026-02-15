@@ -45,8 +45,8 @@ impl<'a> Parser<'a> {
                 let pos = self.pos;
 
                 let eval = self.parse_eval();
-                if eval.is_ok() {
-                    items.push(eval.unwrap());
+                if let Ok(eval) = eval {
+                    items.push(eval);
                     continue;
                 }
                 self.pos = pos;

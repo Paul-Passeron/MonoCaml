@@ -47,10 +47,7 @@ impl Scope {
                     .map(|parent| parent.resolve_value(name, span))
             })
             .transpose()?
-            .ok_or_else(|| ResolutionError::UnboundValue {
-                name: name,
-                span: span,
-            })
+            .ok_or(ResolutionError::UnboundValue { name, span })
     }
 
     pub fn resolve_type(&self, name: Symbol, span: Span) -> Res<TypeId> {
@@ -58,16 +55,12 @@ impl Scope {
             .get(&name)
             .copied()
             .map(Ok)
-            .or_else(|| {
-                self.parent
-                    .as_ref()
-                    .map(|parent| parent.resolve_type(name, span))
-            })
+            .or(self
+                .parent
+                .as_ref()
+                .map(|parent| parent.resolve_type(name, span)))
             .transpose()?
-            .ok_or_else(|| ResolutionError::UnboundType {
-                name: name,
-                span: span,
-            })
+            .ok_or(ResolutionError::UnboundType { name, span })
     }
 
     pub fn resolve_type_param(&self, name: Symbol, span: Span) -> Res<TypeParamId> {
@@ -81,18 +74,14 @@ impl Scope {
                     .map(|parent| parent.resolve_type_param(name, span))
             })
             .transpose()?
-            .ok_or_else(|| ResolutionError::UnboundTypeParam {
-                name: name,
-                span: span,
-            })
+            .ok_or(ResolutionError::UnboundTypeParam { name, span })
     }
 
-    pub fn resolve_type_var(&self, name: Symbol, span: Span) -> Option<TypeVarId> {
+    pub fn resolve_type_var(&self, name: Symbol) -> Option<TypeVarId> {
         self.type_vars.get(&name).copied().or_else(|| {
             self.parent
                 .as_ref()
-                .map(|parent| parent.resolve_type_var(name, span))
-                .flatten()
+                .and_then(|parent| parent.resolve_type_var(name))
         })
     }
 

@@ -83,7 +83,7 @@ impl Ty {
 
     fn expect_funptr(&self) -> &Sig {
         match self {
-            Ty::FunPtr(sig) => &sig,
+            Ty::FunPtr(sig) => sig,
             _ => panic!("Expected function pointer but got {}", self),
         }
     }
@@ -212,7 +212,7 @@ impl Ty {
 }
 
 fn align_to(n: usize, align: usize) -> usize {
-    if n % align == 0 {
+    if n.is_multiple_of(align) {
         n
     } else {
         n + align - (n % align)

@@ -1,6 +1,7 @@
 use std::{
     collections::{HashMap, HashSet},
     hash::Hash,
+    mem::discriminant,
 };
 
 use crate::{
@@ -77,19 +78,19 @@ impl Value {
     }
 }
 
-impl Into<Value> for Const {
-    fn into(self) -> Value {
-        Value::Const(self)
+impl From<Const> for Value {
+    fn from(value: Const) -> Self {
+        Self::Const(value)
     }
 }
 
-impl Into<Value> for CfgVarUse {
-    fn into(self) -> Value {
-        Value::Var(self)
+impl From<CfgVarUse> for Value {
+    fn from(value: CfgVarUse) -> Self {
+        Self::Var(value)
     }
 }
 
-#[derive(Debug, Clone, Hash)]
+#[derive(Debug, Clone)]
 pub enum Ty {
     Int,
     String,
@@ -98,6 +99,20 @@ pub enum Ty {
     Struct(Vec<Self>),
     Union(Vec<Self>),
     FunPtr(Sig),
+}
+
+impl Hash for Ty {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        discriminant(self).hash(state);
+        match self {
+            Ty::Int => (),
+            Ty::String => (),
+            Ty::Void => (),
+            Ty::Ptr(ty) => ty.hash(state),
+            Ty::Union(items) | Ty::Struct(items) => items.hash(state),
+            Ty::FunPtr(sig) => sig.hash(state),
+        }
+    }
 }
 
 impl PartialEq for Ty {
@@ -221,13 +236,12 @@ impl Func {
                 panic!("Zero-sized parameter not allowed");
             }
         }
-        let res = Self {
+        Self {
             name,
             params,
             ret_ty,
             cfg,
-        };
-        res
+        }
     }
 
     pub fn name(&self) -> FunNameUse {

@@ -7,7 +7,7 @@ use crate::{
         expression::{BinaryOp, Constant},
         type_expr::TypeExpr,
     },
-    session::Session,
+    resolve_strlit, resolve_symbol,
 };
 
 pub type Pattern = Located<PatternDesc>;
@@ -52,49 +52,35 @@ impl PatternDesc {
     }
 }
 
-pub struct PatternDescDisplay<'a, 'b> {
+pub struct PatternDescDisplay<'a> {
     pub desc: &'a PatternDesc,
-    pub session: &'b Session,
     pub indent: usize,
 }
 
 impl PatternDesc {
-    pub fn display<'a, 'b>(
-        &'a self,
-        session: &'b Session,
-        indent: usize,
-    ) -> PatternDescDisplay<'a, 'b> {
-        PatternDescDisplay {
-            desc: self,
-            session,
-            indent,
-        }
+    pub fn display<'a>(&'a self, indent: usize) -> PatternDescDisplay<'a> {
+        PatternDescDisplay { desc: self, indent }
     }
 }
 
-const INDENT: &'static str = "    ";
+const INDENT: &str = "    ";
 
-impl fmt::Display for PatternDescDisplay<'_, '_> {
+impl fmt::Display for PatternDescDisplay<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", INDENT.repeat(self.indent))?;
         match &self.desc {
             PatternDesc::Any => write!(f, "_"),
             PatternDesc::Var(symbol) => {
-                write!(f, "{}", symbol.display(&self.session.symbol_interner))
+                write!(f, "{}", resolve_symbol(*symbol))
             }
             PatternDesc::Alias(pat, symbol) => {
-                write!(
-                    f,
-                    "{} as {}",
-                    pat.desc.display(self.session, 0),
-                    symbol.display(&self.session.symbol_interner)
-                )
+                write!(f, "{} as {}", pat.desc.display(0), resolve_symbol(*symbol))
             }
             PatternDesc::Constant(constant) => match constant {
                 Constant::Int(i) => write!(f, "{}", i),
                 Constant::Char(c) => write!(f, "'{}'", c),
                 Constant::String(s) => {
-                    write!(f, "\"{}\"", self.session.resolve_strlit(*s))
+                    write!(f, "\"{}\"", resolve_strlit(*s))
                 }
                 Constant::Float(fl) => write!(f, "{}", fl),
             },
@@ -117,20 +103,15 @@ impl fmt::Display for PatternDescDisplay<'_, '_> {
                     if i > 0 {
                         write!(f, ", ")?;
                     }
-                    write!(f, "{}", pat.desc.display(self.session, 0))?;
+                    write!(f, "{}", pat.desc.display(0))?;
                 }
                 write!(f, ")")
             }
             PatternDesc::Construct(long_ident, None) => {
-                write!(f, "{}", long_ident.display(self.session, 0))
+                write!(f, "{}", long_ident.display(0))
             }
             PatternDesc::Construct(long_ident, Some(pat)) => {
-                write!(
-                    f,
-                    "{} {}",
-                    long_ident.display(self.session, 0),
-                    pat.desc.display(self.session, 0)
-                )
+                write!(f, "{} {}", long_ident.display(0), pat.desc.display(0))
             }
             PatternDesc::Record(fields) => {
                 write!(f, "{{ ")?;
@@ -141,23 +122,18 @@ impl fmt::Display for PatternDescDisplay<'_, '_> {
                     write!(
                         f,
                         "{} = {}",
-                        field.name.display(self.session, 0),
-                        field.pat.desc.display(self.session, 0)
+                        field.name.display(0),
+                        field.pat.desc.display(0)
                     )?;
                 }
                 write!(f, " }}")
             }
             PatternDesc::Constraint(pat, typ) => {
-                write!(
-                    f,
-                    "({} : {})",
-                    pat.desc.display(self.session, 0),
-                    typ.desc.display(self.session, 0)
-                )
+                write!(f, "({} : {})", pat.desc.display(0), typ.desc.display(0))
             }
             PatternDesc::Unit => write!(f, "()"),
             PatternDesc::Paren(pat) => {
-                write!(f, "({})", pat.desc.display(self.session, 0))
+                write!(f, "({})", pat.desc.display(0))
             }
             PatternDesc::BinaryOp(op, lhs, rhs) => {
                 let op_str = match op {
@@ -178,18 +154,18 @@ impl fmt::Display for PatternDescDisplay<'_, '_> {
                         return write!(
                             f,
                             "{} {} {}",
-                            lhs.desc.display(self.session, 0),
-                            sym.display(&self.session.symbol_interner),
-                            rhs.desc.display(self.session, 0)
+                            lhs.desc.display(0),
+                            resolve_symbol(*sym),
+                            rhs.desc.display(0)
                         );
                     }
                 };
                 write!(
                     f,
                     "{} {} {}",
-                    lhs.desc.display(self.session, 0),
+                    lhs.desc.display(0),
                     op_str,
-                    rhs.desc.display(self.session, 0)
+                    rhs.desc.display(0)
                 )
             }
             PatternDesc::List(pats) => {
@@ -198,7 +174,7 @@ impl fmt::Display for PatternDescDisplay<'_, '_> {
                     if i > 0 {
                         write!(f, "; ")?;
                     }
-                    write!(f, "{}", pat.desc.display(self.session, 0))?;
+                    write!(f, "{}", pat.desc.display(0))?;
                 }
                 write!(f, "]")
             }
