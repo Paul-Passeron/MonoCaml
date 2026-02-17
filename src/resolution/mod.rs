@@ -1,8 +1,12 @@
+use std::mem;
+
 use crate::{
+    SESSION,
     lexer::interner::Symbol,
     parse_tree::{
         self, LongIdent,
-        expression::Expression,
+        expression::{Expression, ExpressionDesc},
+        pattern::PatternDesc,
         structure::{Structure, StructureItem, StructureItemDesc},
         type_declaration::{
             ConstructorArguments, ConstructorDeclaration, TypeDeclaration, TypeKind,
@@ -11,12 +15,10 @@ use crate::{
     },
     poly_ir::{
         TypeId, TypeParamId, ValueRef, VarMarker,
-        expr::ValueBinding,
+        expr::{Expr, ExprNode, ValueBinding},
         id::Arena,
-        item::{
-            Constructor, ConstructorArg, Item, ItemInfo, ItemNode, TypeDecl, TypeDeclInfo,
-            TypeDeclKind,
-        },
+        item::{Constructor, ConstructorArg, Item, ItemNode, TypeDecl, TypeDeclInfo, TypeDeclKind},
+        pattern::{Pattern, PatternNode},
         type_expr::{Type, TypeNode, TypeVarId},
     },
     resolution::{error::Res, scope::Scope},
@@ -30,7 +32,6 @@ pub mod scope;
 pub struct Resolver {
     pub types: Arena<TypeDeclInfo>,
     pub vars: Arena<VarMarker>,
-    pub items: Arena<ItemInfo>,
     scope: Scope,
     binder_depth: u32,
     type_vars: u32,
@@ -41,7 +42,6 @@ impl Resolver {
         let mut res = Self {
             types: Arena::new(),
             vars: Arena::new(),
-            items: Arena::new(),
             scope: Scope::new(),
             binder_depth: 0,
             type_vars: 0,
@@ -111,19 +111,110 @@ impl Resolver {
         }
     }
 
-    fn resolve_eval(&mut self, expr: &Expression) -> Res<Item> {
+    fn resolve_eval(&mut self, _expr: &Expression) -> Res<Item> {
         todo!()
     }
 
-    fn declare_value_binding(&mut self, binding: &parse_tree::expression::ValueBinding) -> Res<()> {
-        todo!()
+    fn resolve_pattern(&mut self, pat: &parse_tree::pattern::Pattern) -> Res<Pattern> {
+        let node = match &pat.desc {
+            PatternDesc::Any => PatternNode::Wildcard,
+            PatternDesc::Var(symbol) => {
+                let var_id = self.vars.alloc(VarMarker);
+                self.scope.bind_value(*symbol, ValueRef::Local(var_id));
+                PatternNode::Var(var_id)
+            }
+            PatternDesc::Constant(_c) => todo!(),
+            PatternDesc::Interval { .. } => todo!(),
+            PatternDesc::Tuple(_pats) => todo!(),
+            PatternDesc::Construct(_cons, _arg) => todo!(),
+            PatternDesc::Record(_record_fields) => todo!(),
+            PatternDesc::Constraint(_p, _ty) => todo!(),
+            PatternDesc::Unit => PatternNode::Tuple(vec![]),
+            PatternDesc::Paren(inner) => return self.resolve_pattern(inner),
+            PatternDesc::BinaryOp(_op, _lhs, _rhs) => todo!(),
+            PatternDesc::List(_locateds) => todo!(),
+        };
+        Ok(Pattern::new(node, pat.span))
+    }
+
+    fn resolve_pattern_with_scope(
+        &mut self,
+        pat: &parse_tree::pattern::Pattern,
+    ) -> Res<(Scope, Pattern)> {
+        let this_scope = mem::take(&mut self.scope);
+        self.scope.parent = Some(Box::new(this_scope));
+        let res = self.resolve_pattern(pat)?;
+        let mut to_take = mem::take(&mut self.scope);
+        let parent = to_take.parent.take().unwrap();
+        self.scope = *parent;
+        Ok((to_take, res))
+    }
+
+    fn declare_value_binding(
+        &mut self,
+        binding: &parse_tree::expression::ValueBinding,
+    ) -> Res<(Scope, Pattern)> {
+        self.resolve_pattern_with_scope(&binding.pat)
+    }
+
+    fn resolve_expression(&mut self, expr: &Expression) -> Res<Expr> {
+        let span = expr.span;
+        let node = match &expr.desc {
+            ExpressionDesc::Ident(LongIdent::Ident(name)) => {
+                let v_ref = self.scope.resolve_value(*name, span)?;
+                ExprNode::Var(v_ref)
+            }
+            x => todo!("{x:?}"),
+        };
+        Ok(Expr::new(node, span))
     }
 
     fn resolve_value_binding(
         &mut self,
+        scope: Scope,
+        pat: Pattern,
         binding: &parse_tree::expression::ValueBinding,
     ) -> Res<ValueBinding> {
-        todo!()
+        let this_scope = mem::take(&mut self.scope);
+        self.scope = scope;
+        self.scope.parent = Some(Box::new(this_scope));
+
+        let mut params = vec![];
+
+        for arg in &binding.args {
+            params.push(self.resolve_pattern(arg)?);
+        }
+
+        let ty = binding
+            .constraint
+            .as_ref()
+            .map(|ty| self.resolve_type_expr(&ty.typ))
+            .transpose()?;
+
+        let body = self.resolve_expression(&binding.expr)?;
+
+        let (id, name) = match &pat.node {
+            PatternNode::Var(id) => (*id, self.scope.lookup_var(*id).unwrap()),
+            _ => {
+                assert!(params.is_empty());
+                let new_symbol = SESSION.lock().unwrap().fresh_symbol();
+                let id = self.vars.alloc(VarMarker);
+                self.scope.bind_value(new_symbol, ValueRef::Local(id));
+                (id, new_symbol)
+            }
+        };
+
+        let res = ValueBinding {
+            id,
+            name,
+            params,
+            ty,
+            body,
+        };
+        let mut this_scope = mem::take(&mut self.scope);
+        let parent = this_scope.parent.take().unwrap();
+        self.scope = *parent;
+        Ok(res)
     }
 
     fn resolve_value(
@@ -133,15 +224,22 @@ impl Resolver {
         span: Span,
     ) -> Res<Item> {
         let bindings = if rec {
+            let mut v = vec![];
             for binding in bindings {
-                self.declare_value_binding(binding)?;
+                v.push(self.declare_value_binding(binding)?);
             }
             bindings
                 .iter()
-                .map(|b| self.resolve_value_binding(b))
+                .zip(v)
+                .map(|(b, (scope, pat))| self.resolve_value_binding(scope, pat, b))
                 .collect::<Res<_>>()?
         } else {
-            todo!()
+            let mut res = vec![];
+            for binding in bindings {
+                let (scope, pat) = self.declare_value_binding(binding)?;
+                res.push(self.resolve_value_binding(scope, pat, binding)?);
+            }
+            res
         };
         let node = ItemNode::Value {
             recursive: rec,
@@ -271,7 +369,7 @@ impl Resolver {
                     args: r_args,
                 }
             }
-            TypeExprDesc::Alias(ty_expr, name) => {
+            TypeExprDesc::Alias(_, _) => {
                 todo!()
             }
         };

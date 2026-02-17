@@ -16,8 +16,8 @@ pub type Pattern = Located<PatternDesc>;
 pub enum PatternDesc {
     Any, // _
     // TODO: Var takes ident symbol
-    Var(Symbol),                                    // x
-    Alias(Box<Pattern>, Symbol),                    // p as x
+    Var(Symbol), // x
+    // Alias(Box<Pattern>, Symbol),                    // p as x
     Constant(Constant),                             // 1, "a", ...
     Interval { start: Constant, end: Constant },    // 1..5
     Tuple(Vec<Pattern>),                            // (p1, p2, ...)
@@ -73,9 +73,9 @@ impl fmt::Display for PatternDescDisplay<'_> {
             PatternDesc::Var(symbol) => {
                 write!(f, "{}", resolve_symbol(*symbol))
             }
-            PatternDesc::Alias(pat, symbol) => {
-                write!(f, "{} as {}", pat.desc.display(0), resolve_symbol(*symbol))
-            }
+            // PatternDesc::Alias(pat, symbol) => {
+            //     write!(f, "{} as {}", pat.desc.display(0), resolve_symbol(*symbol))
+            // }
             PatternDesc::Constant(constant) => match constant {
                 Constant::Int(i) => write!(f, "{}", i),
                 Constant::Char(c) => write!(f, "'{}'", c),

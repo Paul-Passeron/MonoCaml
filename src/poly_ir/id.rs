@@ -1,8 +1,8 @@
 use std::{fmt::Debug, marker::PhantomData};
 
 pub struct Id<T> {
-    raw: u32,
-    _marker: PhantomData<fn() -> T>,
+    pub raw: u32,
+    pub _marker: PhantomData<fn() -> T>,
 }
 
 impl<T> std::fmt::Debug for Id<T> {
@@ -14,10 +14,7 @@ impl<T> std::fmt::Debug for Id<T> {
 
 impl<T> Clone for Id<T> {
     fn clone(&self) -> Self {
-        Self {
-            raw: self.raw,
-            _marker: PhantomData,
-        }
+        *self
     }
 }
 

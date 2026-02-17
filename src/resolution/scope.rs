@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::{
     lexer::interner::Symbol,
-    poly_ir::{TypeId, TypeParamId, ValueRef, type_expr::TypeVarId},
+    poly_ir::{TypeId, TypeParamId, ValueRef, VarId, type_expr::TypeVarId},
     resolution::error::{Res, ResolutionError},
     source_manager::loc::Span,
 };
@@ -99,6 +99,20 @@ impl Scope {
 
     pub fn set_parent(&mut self, parent: Self) {
         self.parent = Some(Box::new(parent))
+    }
+
+    pub fn lookup_var(&self, id: VarId) -> Option<Symbol> {
+        self.values
+            .iter()
+            .find_map(|(k, v)| match v {
+                ValueRef::Local(lid) if id == *lid => Some(Some(*k)),
+                _ => None,
+            })
+            .unwrap_or_else(|| {
+                self.parent
+                    .as_ref()
+                    .and_then(|parent| parent.lookup_var(id))
+            })
     }
 }
 
