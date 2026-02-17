@@ -1,5 +1,3 @@
-use std::mem;
-
 use crate::{
     SESSION,
     lexer::interner::Symbol,
@@ -35,6 +33,21 @@ pub struct Resolver {
     scope: Scope,
     binder_depth: u32,
     type_vars: u32,
+}
+
+fn flatten_product<'a>(expr: &'a Expression) -> Vec<&'a Expression> {
+    fn aux<'a>(e: &'a Expression, v: &mut Vec<&'a Expression>) {
+        match &e.desc {
+            ExpressionDesc::Product(x1, x2) => {
+                v.push(x1);
+                aux(x2, v);
+            }
+            _ => v.push(e),
+        }
+    }
+    let mut v = vec![];
+    aux(expr, &mut v);
+    v
 }
 
 impl Resolver {
@@ -145,24 +158,24 @@ impl Resolver {
         Ok(Pattern::new(node, pat.span))
     }
 
-    fn resolve_pattern_with_scope(
-        &mut self,
-        pat: &parse_tree::pattern::Pattern,
-    ) -> Res<(Scope, Pattern)> {
-        let this_scope = mem::take(&mut self.scope);
-        self.scope.parent = Some(Box::new(this_scope));
-        let res = self.resolve_pattern(pat)?;
-        let mut to_take = mem::take(&mut self.scope);
-        let parent = to_take.parent.take().unwrap();
-        self.scope = *parent;
-        Ok((to_take, res))
-    }
+    // fn resolve_pattern_with_scope(
+    //     &mut self,
+    //     pat: &parse_tree::pattern::Pattern,
+    // ) -> Res<(Scope, Pattern)> {
+    //     let this_scope = mem::take(&mut self.scope);
+    //     self.scope.parent = Some(Box::new(this_scope));
+    //     let res = self.resolve_pattern(pat)?;
+    //     let mut to_take = mem::take(&mut self.scope);
+    //     let parent = to_take.parent.take().unwrap();
+    //     self.scope = *parent;
+    //     Ok((to_take, res))
+    // }
 
     fn declare_value_binding(
         &mut self,
         binding: &parse_tree::expression::ValueBinding,
-    ) -> Res<(Scope, Pattern)> {
-        self.resolve_pattern_with_scope(&binding.pat)
+    ) -> Res<Pattern> {
+        self.resolve_pattern(&binding.pat)
     }
 
     fn resolve_expression(&mut self, expr: &Expression) -> Res<Expr> {
@@ -218,6 +231,21 @@ impl Resolver {
                     args: vec![arg],
                 }
             }
+            ExpressionDesc::Unit => ExprNode::Tuple(vec![]),
+            ExpressionDesc::Product(_, _) => {
+                let flattened = flatten_product(expr);
+                assert!(!flattened.is_empty());
+                if flattened.len() == 1 {
+                    return self.resolve_expression(&flattened[0]);
+                } else {
+                    ExprNode::Tuple(
+                        flattened
+                            .iter()
+                            .map(|x| self.resolve_expression(x))
+                            .collect::<Res<_>>()?,
+                    )
+                }
+            }
             x => todo!("{x:?}"),
         };
         Ok(Expr::new(node, span))
@@ -225,63 +253,58 @@ impl Resolver {
 
     fn resolve_value_binding(
         &mut self,
-        scope: Scope,
         pat: Pattern,
         binding: &parse_tree::expression::ValueBinding,
     ) -> Res<ValueBinding> {
-        let this_scope = mem::take(&mut self.scope);
-        self.scope = scope;
-        self.scope.parent = Some(Box::new(this_scope));
+        self.with_scope(|this| {
+            let mut params = vec![];
 
-        let mut params = vec![];
-
-        for arg in &binding.args {
-            params.push(self.resolve_pattern(arg)?);
-        }
-
-        let ty = binding
-            .constraint
-            .as_ref()
-            .map(|ty| self.resolve_type_expr(&ty.typ))
-            .transpose()?;
-
-        let body = self.resolve_expression(&binding.expr)?;
-
-        let (id, name, body) = match &pat.node {
-            PatternNode::Var(id) => (*id, self.scope.lookup_var(*id).unwrap(), body),
-            _ => {
-                assert!(params.is_empty());
-                let new_symbol = SESSION.lock().unwrap().fresh_symbol();
-                let id = self.vars.alloc(VarMarker);
-                self.scope.bind_value(new_symbol, ValueRef::Local(id));
-                let span = body.span;
-                let scrutinee = Expr::new(ExprNode::Var(ValueRef::Local(id)), span);
-                let new_body = Expr::new(
-                    ExprNode::Match {
-                        scrutinee: Box::new(scrutinee),
-                        cases: vec![MatchCase {
-                            pattern: pat,
-                            guard: None,
-                            body,
-                        }],
-                    },
-                    span,
-                );
-                (id, new_symbol, new_body)
+            for arg in &binding.args {
+                params.push(this.resolve_pattern(arg)?);
             }
-        };
 
-        let res = ValueBinding {
-            id,
-            name,
-            params,
-            ty,
-            body,
-        };
-        let mut this_scope = mem::take(&mut self.scope);
-        let parent = this_scope.parent.take().unwrap();
-        self.scope = *parent;
-        Ok(res)
+            let ty = binding
+                .constraint
+                .as_ref()
+                .map(|ty| this.resolve_type_expr(&ty.typ))
+                .transpose()?;
+
+            let body = this.resolve_expression(&binding.expr)?;
+
+            let (id, name, body) = match &pat.node {
+                PatternNode::Var(id) => (*id, this.scope.lookup_var(*id).unwrap(), body),
+                _ => {
+                    assert!(params.is_empty());
+                    let new_symbol = SESSION.lock().unwrap().fresh_symbol();
+                    let id = this.vars.alloc(VarMarker);
+                    this.scope.bind_value(new_symbol, ValueRef::Local(id));
+                    let span = body.span;
+                    let scrutinee = Expr::new(ExprNode::Var(ValueRef::Local(id)), span);
+                    let new_body = Expr::new(
+                        ExprNode::Match {
+                            scrutinee: Box::new(scrutinee),
+                            cases: vec![MatchCase {
+                                pattern: pat,
+                                guard: None,
+                                body,
+                            }],
+                        },
+                        span,
+                    );
+                    (id, new_symbol, new_body)
+                }
+            };
+
+            let res = ValueBinding {
+                id,
+                name,
+                params,
+                ty,
+                body,
+            };
+
+            Ok(res)
+        })
     }
 
     fn resolve_value(
@@ -298,13 +321,13 @@ impl Resolver {
             bindings
                 .iter()
                 .zip(v)
-                .map(|(b, (scope, pat))| self.resolve_value_binding(scope, pat, b))
+                .map(|(b, pat)| self.resolve_value_binding(pat, b))
                 .collect::<Res<_>>()?
         } else {
             let mut res = vec![];
             for binding in bindings {
-                let (scope, pat) = self.declare_value_binding(binding)?;
-                res.push(self.resolve_value_binding(scope, pat, binding)?);
+                let pat = self.declare_value_binding(binding)?;
+                res.push(self.resolve_value_binding(pat, binding)?);
             }
             res
         };

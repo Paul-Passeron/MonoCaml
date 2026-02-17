@@ -1,15 +1,17 @@
 use std::{collections::HashMap, fmt};
 
+use crate::SESSION;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 struct SymbToken(u32);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ConsSymbol(SymbToken);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct IdentSymbol(SymbToken);
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Symbol {
     Ident(IdentSymbol),
     Cons(ConsSymbol),
@@ -31,7 +33,7 @@ impl Symbol {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct StrLit(SymbToken);
 
 trait ExtractSymbToken {
@@ -112,6 +114,28 @@ impl Symbol {
             interner,
             symbol: *self,
         }
+    }
+}
+
+impl fmt::Display for Symbol {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", SESSION.lock().unwrap().resolve_symbol(*self))
+    }
+}
+
+impl fmt::Debug for Symbol {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", SESSION.lock().unwrap().resolve_symbol(*self))
+    }
+}
+
+impl fmt::Debug for StrLit {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "\"{}\"",
+            SESSION.lock().unwrap().resolve_strlit(*self).escape_debug()
+        )
     }
 }
 

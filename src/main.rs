@@ -97,7 +97,7 @@ fn intern_strlit(s: &str) -> StrLit {
 }
 
 fn main() {
-    let file_name = "examples/type_empty_cons.ml";
+    let file_name = "examples/test.ml";
     let contents = {
         let mut s = String::new();
         let mut f = File::open(file_name).unwrap();
@@ -131,14 +131,14 @@ fn main() {
     }
 
     if let Some(error) = error {
-        println!("Lexing error: {}", error)
+        eprintln!("Lexing error: {}", error)
     }
 
     let mut parser = Parser::new(id, &tokens).unwrap();
     let prog = match parser.parse_program() {
         Ok(p) => p,
         Err(e) => {
-            println!("Parsing error: {:?}", e);
+            eprintln!("Parsing error: {:?}", e);
             return;
         }
     };
@@ -148,5 +148,7 @@ fn main() {
     }
 
     let poly = Resolver::new().resolve_structure(&prog).unwrap();
-    println!("{poly:#?}")
+    for item in &poly {
+        println!("{:#?}", item.node);
+    }
 }
