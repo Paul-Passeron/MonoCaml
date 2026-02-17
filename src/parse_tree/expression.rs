@@ -10,7 +10,7 @@ use crate::{
     source_manager::loc::Span,
 };
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum Constant {
     Int(i64),
     Char(char),
@@ -37,7 +37,7 @@ pub enum UnaryOp {
     //TODO
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum BinaryOp {
     Plus,
     Minus,

@@ -2,13 +2,13 @@ use std::fmt;
 
 use crate::{SESSION, source_manager::FileId};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Loc {
     pub file: FileId,
     pub offset: usize,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Span {
     pub file: FileId,
     pub start: usize,
@@ -94,5 +94,17 @@ impl From<Loc> for LocKind {
 impl From<Span> for LocKind {
     fn from(value: Span) -> Self {
         Self::Span(value)
+    }
+}
+
+impl fmt::Debug for Loc {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Loc({self})")
+    }
+}
+
+impl fmt::Debug for Span {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Span{{ {self} }}")
     }
 }

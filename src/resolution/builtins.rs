@@ -1,12 +1,13 @@
 use crate::{
     intern_symbol,
-    poly_ir::{TypeId, ValueRef, item::TypeDeclInfo},
+    poly_ir::{TypeId, ValueRef, VarMarker, item::TypeDeclInfo},
     resolution::Resolver,
 };
 
 impl Resolver {
     pub(super) fn add_builtins(&mut self) {
         self.add_builtin_types();
+        self.add_builtin_values();
     }
 
     fn add_builtin_types(&mut self) {
@@ -20,6 +21,16 @@ impl Resolver {
         let option_ty = self.add_builtin_type("option", 1);
         self.add_builtin_constructor("None", option_ty, 0);
         self.add_builtin_constructor("Some", option_ty, 1);
+    }
+
+    fn add_builtin_value(&mut self, name: &str) {
+        let sym = intern_symbol(name);
+        let id = self.vars.alloc(VarMarker);
+        self.scope.bind_value(sym, ValueRef::Local(id));
+    }
+
+    fn add_builtin_values(&mut self) {
+        self.add_builtin_value("print_endline");
     }
 
     fn add_builtin_type(&mut self, name: &str, arity: usize) -> TypeId {

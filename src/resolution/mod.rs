@@ -15,7 +15,7 @@ use crate::{
     },
     poly_ir::{
         TypeId, TypeParamId, ValueRef, VarMarker,
-        expr::{Expr, ExprNode, ValueBinding},
+        expr::{Expr, ExprNode, MatchCase, ValueBinding},
         id::Arena,
         item::{Constructor, ConstructorArg, Item, ItemNode, TypeDecl, TypeDeclInfo, TypeDeclKind},
         pattern::{Pattern, PatternNode},
@@ -125,10 +125,18 @@ impl Resolver {
             }
             PatternDesc::Constant(_c) => todo!(),
             PatternDesc::Interval { .. } => todo!(),
-            PatternDesc::Tuple(_pats) => todo!(),
+            PatternDesc::Tuple(pats) => PatternNode::Tuple(
+                pats.iter()
+                    .map(|p| self.resolve_pattern(p))
+                    .collect::<Res<_>>()?,
+            ),
             PatternDesc::Construct(_cons, _arg) => todo!(),
             PatternDesc::Record(_record_fields) => todo!(),
-            PatternDesc::Constraint(_p, _ty) => todo!(),
+            PatternDesc::Constraint(p, ty) => {
+                let te = self.resolve_type_expr(ty)?;
+                let p = self.resolve_pattern(p)?;
+                PatternNode::Constraint(Box::new(p), te)
+            }
             PatternDesc::Unit => PatternNode::Tuple(vec![]),
             PatternDesc::Paren(inner) => return self.resolve_pattern(inner),
             PatternDesc::BinaryOp(_op, _lhs, _rhs) => todo!(),
@@ -164,6 +172,52 @@ impl Resolver {
                 let v_ref = self.scope.resolve_value(*name, span)?;
                 ExprNode::Var(v_ref)
             }
+            ExpressionDesc::Match { expr, with } => {
+                let scrutinee = self.resolve_expression(expr)?;
+                let arms = with
+                    .iter()
+                    .map(|arm| {
+                        self.with_scope(|this| {
+                            let pat = this.resolve_pattern(&arm.lhs)?;
+                            let guard = arm
+                                .guard
+                                .as_ref()
+                                .map(|g| this.resolve_expression(g))
+                                .transpose()?
+                                .map(Box::new);
+                            let arm = this.resolve_expression(&arm.expr)?;
+                            Ok(MatchCase {
+                                pattern: pat,
+                                guard,
+                                body: arm,
+                            })
+                        })
+                    })
+                    .collect::<Res<_>>()?;
+
+                ExprNode::Match {
+                    scrutinee: Box::new(scrutinee),
+                    cases: arms,
+                }
+            }
+            ExpressionDesc::BinaryOp(op, lhs, rhs) => {
+                let left = self.resolve_expression(lhs)?;
+                let right = self.resolve_expression(rhs)?;
+                ExprNode::BinaryOp {
+                    op: *op,
+                    left: Box::new(left),
+                    right: Box::new(right),
+                }
+            }
+            ExpressionDesc::Constant(x) => ExprNode::Const(*x),
+            ExpressionDesc::Application(f, a) => {
+                let func = self.resolve_expression(f)?;
+                let arg = self.resolve_expression(a)?;
+                ExprNode::Apply {
+                    func: Box::new(func),
+                    args: vec![arg],
+                }
+            }
             x => todo!("{x:?}"),
         };
         Ok(Expr::new(node, span))
@@ -193,14 +247,27 @@ impl Resolver {
 
         let body = self.resolve_expression(&binding.expr)?;
 
-        let (id, name) = match &pat.node {
-            PatternNode::Var(id) => (*id, self.scope.lookup_var(*id).unwrap()),
+        let (id, name, body) = match &pat.node {
+            PatternNode::Var(id) => (*id, self.scope.lookup_var(*id).unwrap(), body),
             _ => {
                 assert!(params.is_empty());
                 let new_symbol = SESSION.lock().unwrap().fresh_symbol();
                 let id = self.vars.alloc(VarMarker);
                 self.scope.bind_value(new_symbol, ValueRef::Local(id));
-                (id, new_symbol)
+                let span = body.span;
+                let scrutinee = Expr::new(ExprNode::Var(ValueRef::Local(id)), span);
+                let new_body = Expr::new(
+                    ExprNode::Match {
+                        scrutinee: Box::new(scrutinee),
+                        cases: vec![MatchCase {
+                            pattern: pat,
+                            guard: None,
+                            body,
+                        }],
+                    },
+                    span,
+                );
+                (id, new_symbol, new_body)
             }
         };
 
