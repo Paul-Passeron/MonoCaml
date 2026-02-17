@@ -27,6 +27,10 @@ impl Session {
         self.symbol_interner.resolve(symbol)
     }
 
+    pub fn fresh_symbol(&mut self) -> Symbol {
+        self.symbol_interner.fresh()
+    }
+
     pub fn lookup_symbol(&self, symbol: &str) -> Option<Symbol> {
         self.symbol_interner.lookup(symbol)
     }

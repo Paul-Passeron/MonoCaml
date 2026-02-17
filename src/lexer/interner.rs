@@ -146,6 +146,11 @@ where
     pub fn lookup(&self, s: &str) -> Option<S> {
         self.map.get(s).copied()
     }
+
+    pub fn fresh(&mut self) -> S {
+        let generated_name = format!("<@fresh_{}>", self.strings.len());
+        self.intern(&generated_name)
+    }
 }
 
 impl<S> Default for Interner<S>

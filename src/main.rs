@@ -91,6 +91,7 @@ fn intern_symbol(s: &str) -> Symbol {
     SESSION.lock().unwrap().intern_symbol(s)
 }
 
+#[allow(unused)]
 fn intern_strlit(s: &str) -> StrLit {
     SESSION.lock().unwrap().intern_strlit(s)
 }
