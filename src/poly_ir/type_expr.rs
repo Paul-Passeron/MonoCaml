@@ -3,7 +3,7 @@ use crate::poly_ir::{TypeId, TypeParamId};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TypeVarId(pub u32);
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Type {
     Infer,
     Param(TypeParamId),

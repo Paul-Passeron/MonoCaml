@@ -130,8 +130,26 @@ impl Resolver {
         }
     }
 
-    fn resolve_eval(&mut self, _expr: &Expression) -> Res<ResItem> {
-        todo!()
+    fn resolve_eval(&mut self, expr: &Expression) -> Res<ResItem> {
+        let resolved = self.resolve_expression(expr)?;
+        let new_symbol = SESSION.lock().unwrap().fresh_symbol();
+        let id = self.vars.alloc(VarMarker);
+        self.scope.bind_value(new_symbol, ValueRef::Local(id));
+        let span = resolved.span;
+        Ok(ResItem::new(
+            ItemNode::Value {
+                recursive: false,
+                bindings: vec![ResValueBinding {
+                    id,
+                    name: new_symbol,
+                    params: vec![],
+                    ty: resolved.ty.clone(),
+                    body: resolved,
+                }],
+            },
+            span,
+            (),
+        ))
     }
 
     fn resolve_pattern(&mut self, pat: &parse_tree::pattern::Pattern) -> Res<ResPattern> {
@@ -377,6 +395,7 @@ impl Resolver {
                         self.scope.bind_value(cons.name.desc, v_ref);
                     }
                 }
+                TypeKind::Alias(_) => (),
                 _ => todo!(),
             }
         }
