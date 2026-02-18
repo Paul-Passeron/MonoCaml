@@ -1,11 +1,10 @@
-use crate::poly_ir::{VarId, spanned::Spanned, type_expr::Type};
+use crate::poly_ir::{VarId, spanned::TypedNode};
 
-pub type Pattern = Spanned<PatternNode>;
+pub type Pattern<T> = TypedNode<PatternNode<T>, T>;
 
 #[derive(Debug)]
-pub enum PatternNode {
+pub enum PatternNode<T> {
     Wildcard,
     Var(VarId),
-    Tuple(Vec<Pattern>),
-    Constraint(Box<Pattern>, Type),
+    Tuple(Vec<Pattern<T>>),
 }

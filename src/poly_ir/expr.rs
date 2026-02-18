@@ -1,68 +1,68 @@
 use crate::{
     lexer::interner::Symbol,
     parse_tree::expression::{BinaryOp, Constant, UnaryOp},
-    poly_ir::{ValueRef, VarId, pattern::Pattern, spanned::Spanned, type_expr::Type},
+    poly_ir::{ValueRef, VarId, pattern::Pattern, spanned::TypedNode},
 };
 
-pub type Expr = Spanned<ExprNode>;
+pub type Expr<T> = TypedNode<ExprNode<T>, T>;
 
 #[derive(Debug)]
-pub enum ExprNode {
+pub enum ExprNode<T> {
     Var(ValueRef),
     Const(Constant),
     Let {
         recursive: bool,
-        bindings: Vec<ValueBinding>,
-        body: Box<Expr>,
+        bindings: Vec<ValueBinding<T>>,
+        body: Box<Expr<T>>,
     },
 
     Function {
-        cases: Vec<MatchCase>,
+        cases: Vec<MatchCase<T>>,
     },
     Apply {
-        func: Box<Expr>,
-        args: Vec<Expr>,
+        func: Box<Expr<T>>,
+        args: Vec<Expr<T>>,
     },
     Match {
-        scrutinee: Box<Expr>,
-        cases: Vec<MatchCase>,
+        scrutinee: Box<Expr<T>>,
+        cases: Vec<MatchCase<T>>,
     },
-    Tuple(Vec<Expr>),
+    Tuple(Vec<Expr<T>>),
     Construct {
         path: ValueRef,
-        arg: Option<Box<Expr>>,
+        arg: Option<Box<Expr<T>>>,
     },
     Sequence {
-        first: Box<Expr>,
-        second: Box<Expr>,
+        first: Box<Expr<T>>,
+        second: Box<Expr<T>>,
     },
     Constraint {
-        expr: Box<Expr>,
-        ty: Type,
+        expr: Box<Expr<T>>,
+        ty: T,
     },
     BinaryOp {
         op: BinaryOp,
-        left: Box<Expr>,
-        right: Box<Expr>,
+        left: Box<Expr<T>>,
+        right: Box<Expr<T>>,
     },
     UnaryOp {
         op: UnaryOp,
-        expr: Box<Expr>,
+        expr: Box<Expr<T>>,
     },
 }
 
 #[derive(Debug)]
-pub struct ValueBinding {
+pub struct ValueBinding<T> {
     pub id: VarId,
     pub name: Symbol,
-    pub params: Vec<Pattern>,
-    pub ty: Option<Type>,
-    pub body: Expr,
+    pub params: Vec<Pattern<T>>,
+    pub ty: T,
+    pub body: Expr<T>,
 }
 
 #[derive(Debug)]
-pub struct MatchCase {
-    pub pattern: Pattern,
-    pub guard: Option<Box<Expr>>,
-    pub body: Expr,
+pub struct MatchCase<T> {
+    pub pattern: Pattern<T>,
+    pub guard: Option<Box<Expr<T>>>,
+    pub body: Expr<T>,
 }

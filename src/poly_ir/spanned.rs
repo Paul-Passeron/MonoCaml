@@ -1,33 +1,37 @@
 use crate::source_manager::loc::Span;
 
 #[derive(Debug)]
-pub struct Spanned<T> {
+pub struct TypedNode<T, Ty> {
     pub node: T,
+    pub ty: Ty,
     pub span: Span,
 }
 
-impl<T> Spanned<T> {
-    pub fn new(node: T, span: Span) -> Self {
-        Self { node, span }
+pub type Spanned<T> = TypedNode<T, ()>;
+
+impl<T, Ty> TypedNode<T, Ty> {
+    pub fn new(node: T, span: Span, ty: Ty) -> Self {
+        Self { node, ty, span }
     }
 
-    pub fn as_ref(&self) -> Spanned<&T> {
-        Spanned {
+    pub fn as_ref(&self) -> TypedNode<&T, &Ty> {
+        TypedNode {
             node: &self.node,
+            ty: &self.ty,
             span: self.span,
         }
     }
 
-    pub fn map<U>(self, f: impl FnOnce(T) -> U) -> Spanned<U> {
-        Spanned {
-            node: f(self.node),
-            span: self.span,
-        }
-    }
+    // pub fn map<U>(self, f: impl FnOnce(T, Ty) -> U) -> TypedNode<U> {
+    //     TypedNode {
+    //         node: f(self.node, self.ty),
+    //         span: self.span,
+    //     }
+    // }
 }
 
-impl Span {
-    pub fn spanned<T>(&self, node: T) -> Spanned<T> {
-        Spanned::new(node, *self)
-    }
-}
+// impl Span {
+//     pub fn spanned<T>(&self, node: T) -> TypedNode<T> {
+//         TypedNode::new(node, *self)
+//     }
+// }

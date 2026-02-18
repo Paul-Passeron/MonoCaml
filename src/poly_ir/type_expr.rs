@@ -1,12 +1,10 @@
-use crate::poly_ir::{TypeId, TypeParamId, spanned::Spanned};
-
-pub type Type = Spanned<TypeNode>;
+use crate::poly_ir::{TypeId, TypeParamId};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TypeVarId(pub u32);
 
 #[derive(Debug)]
-pub enum TypeNode {
+pub enum Type {
     Infer,
     Param(TypeParamId),
     Var(TypeVarId),
@@ -22,7 +20,7 @@ pub enum TypeNode {
     },
 }
 
-impl TypeNode {
+impl Type {
     pub fn is_infer(&self) -> bool {
         matches!(self, Self::Infer)
     }
@@ -41,5 +39,11 @@ impl TypeNode {
 
     pub fn is_constr(&self) -> bool {
         matches!(self, Self::Constr { .. })
+    }
+}
+
+impl Default for Type {
+    fn default() -> Self {
+        Self::Infer
     }
 }
