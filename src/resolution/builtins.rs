@@ -12,6 +12,7 @@ impl Resolver {
 
     fn add_builtin_types(&mut self) {
         let _int_ty = self.add_builtin_type("int", 0);
+        let _bool_ty = self.add_builtin_type("bool", 0);
         let _string_ty = self.add_builtin_type("string", 0);
 
         let list_ty = self.add_builtin_type("list", 1);

@@ -7,7 +7,6 @@ pub mod pattern;
 pub mod spanned;
 pub mod type_expr;
 
-pub type ItemId = Id<item::ItemInfo>;
 pub type TypeId = Id<item::TypeDeclInfo>;
 pub type VarId = Id<VarMarker>;
 pub struct VarMarker;
@@ -21,6 +20,5 @@ pub struct TypeParamId {
 #[derive(Debug, Clone, Copy)]
 pub enum ValueRef {
     Local(VarId),
-    Global(ItemId),
     Constructor { type_id: TypeId, index: u32 },
 }
