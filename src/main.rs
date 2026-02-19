@@ -30,6 +30,7 @@ pub mod backend;
 pub mod cfg;
 pub mod examples;
 pub mod helpers;
+pub mod inference;
 pub mod lexer;
 pub mod lower;
 pub mod mono_ir;
