@@ -24,12 +24,12 @@ pub fn test_ast_with_ctx<S: ToString>(ast: UAst, prog_name: S, ctx: AstCtx) {
     let p = PathBuf::from(prog_name.clone());
     let _ = std::fs::remove_file(&p);
     compile_ast_with_ctx(ast, prog_name.clone(), ctx);
-    assert!(std::fs::exists(&p).is_ok());
-    process::Command::new(prog_name.clone())
+    assert!(std::fs::exists(&p).unwrap());
+    process::Command::new(p)
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .spawn()
-        .unwrap()
+        .expect(format!("Failed to spawn process for {}", prog_name).as_str())
         .wait()
         .unwrap()
         .exit_ok()

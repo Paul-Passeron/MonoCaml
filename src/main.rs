@@ -49,7 +49,7 @@ fn compile_ast_with_ctx<S: ToString>(ast: Ast<()>, prog_name: S, ctx: AstCtx) {
     let prog_name = prog_name.to_string();
     println!("{}", ast.display());
     let prog = MonoToCfg::compile(ast, ctx);
-    println!("{prog}");
+    // println!("{prog}");
 
     let _ = prog
         .compile(LLVMBackend::new(PathBuf::from(format!("./{prog_name}"))))
@@ -97,7 +97,7 @@ fn intern_strlit(s: &str) -> StrLit {
 }
 
 fn main() {
-    let file_name = "examples/test.ml";
+    let file_name = "examples/types.ml";
     let contents = {
         let mut s = String::new();
         let mut f = File::open(file_name).unwrap();

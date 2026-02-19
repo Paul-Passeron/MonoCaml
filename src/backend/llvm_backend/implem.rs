@@ -13,11 +13,9 @@ use inkwell::passes::PassManager;
 use inkwell::types::{AnyTypeEnum, BasicMetadataTypeEnum, BasicType, BasicTypeEnum};
 use inkwell::values::{AnyValue, AnyValueEnum, BasicValueEnum, FunctionValue, PointerValue};
 use std::collections::HashMap;
-use std::fs::File;
 use std::io::Write;
-use std::path::PathBuf;
 use std::process::Command;
-use tempfile::env::temp_dir;
+use tempfile::Builder as TempFileBuilder;
 
 pub(super) struct LLVMBackendImpl<'ctx> {
     pub context: &'ctx Context,
@@ -519,7 +517,6 @@ impl<'ctx> LLVMBackendImpl<'ctx> {
         let f_val = self.funs[&f.name()];
         self.build_cfg(f_val, f);
         assert!(f_val.verify(true));
-        println!("Function built: {}", f.name());
         self.fpm.run_on(&f_val);
     }
 
@@ -760,55 +757,65 @@ impl<'ctx> LLVMBackendImpl<'ctx> {
 
     fn create_pool_allocators(&mut self, boxed_types: &HashMap<String, Ty>) {
         let current_dir = std::env::current_dir().unwrap().join("runtime");
-        let dir = temp_dir();
-        let p = dir.as_path().join("temp.c");
-        let mut f = File::create(&p).unwrap();
 
-        writeln!(
-            f,
-            "#include \"{}\"",
-            current_dir.join("runtime.c").display()
-        )
-        .unwrap();
+        let temp_c_file = TempFileBuilder::new()
+            .prefix("monocaml_runtime_")
+            .suffix(".c")
+            .tempfile()
+            .expect("Failed to create temporary C file");
 
-        writeln!(
-            f,
-            "#pragma clang diagnostic ignored \"-Wincompatible-pointer-types\""
-        )
-        .unwrap();
+        {
+            let mut f = temp_c_file.as_file();
 
-        for (name, ty) in boxed_types {
-            self.define_c_type_pro(ty.into_inner().clone(), Some(name), &mut f);
+            writeln!(
+                f,
+                "#include \"{}\"",
+                current_dir.join("runtime.c").display()
+            )
+            .unwrap();
+
+            writeln!(
+                f,
+                "#pragma clang diagnostic ignored \"-Wincompatible-pointer-types\""
+            )
+            .unwrap();
+
+            for (name, ty) in boxed_types {
+                self.define_c_type_pro(ty.into_inner().clone(), Some(name), &mut f);
+            }
+
+            for name in boxed_types.keys() {
+                writeln!(f, "setup_pool({name})").unwrap();
+            }
+            f.flush().unwrap();
         }
 
-        for name in boxed_types.keys() {
-            writeln!(f, "setup_pool({name})").unwrap();
-        }
-
-        println!("p is {}", p.display());
+        let temp_llvm_file = TempFileBuilder::new()
+            .prefix("monocaml_runtime_")
+            .suffix(".llvm")
+            .tempfile()
+            .expect("Failed to create temporary LLVM file");
+        let llvm_path = temp_llvm_file.path().to_owned();
 
         let mut cmd = Command::new("clang-16");
         let cmd = cmd
-            .arg(p)
+            .arg(temp_c_file.path())
             .arg("-S")
             .arg("-emit-llvm")
             .arg("-I./runtime")
             .arg("-o")
-            .arg("./runtime.llvm");
+            .arg(&llvm_path);
         let output = cmd
             .output()
             .map_err(|_| "Failed to compile runtime library".to_string())
             .unwrap();
 
-        println!("{}", String::from_utf8(output.stderr).unwrap());
+        if !output.stderr.is_empty() {
+            println!("[ERROR] `{}`", String::from_utf8(output.stderr).unwrap());
+        }
+        let mem = MemoryBuffer::create_from_file(&llvm_path).unwrap();
 
-        let mem =
-            MemoryBuffer::create_from_file(&PathBuf::from("runtime.llvm")).inspect_err(|_| {
-                let _ = std::fs::remove_file(PathBuf::from("./runtime.llvm"));
-            });
-        let _ = std::fs::remove_file(PathBuf::from("./runtime.llvm"));
-
-        let runtime_module = self.context.create_module_from_ir(mem.unwrap()).unwrap();
+        let runtime_module = self.context.create_module_from_ir(mem).unwrap();
 
         self.module.link_in_module(runtime_module).unwrap();
     }

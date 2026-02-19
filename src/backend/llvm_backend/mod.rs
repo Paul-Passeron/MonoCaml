@@ -6,10 +6,9 @@ use inkwell::context::Context;
 use inkwell::targets::{
     CodeModel, FileType, InitializationConfig, RelocMode, Target, TargetMachine,
 };
-use std::fs::File;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use tempfile::env::temp_dir;
+use tempfile::Builder;
 
 mod implem;
 
@@ -33,36 +32,54 @@ impl Backend for LLVMBackend {
                 .map_err(|x| println!("{}", x.to_str().unwrap()))
                 .unwrap();
             backend.mpm.run_on(&backend.module);
+
             for function in backend.module.get_functions() {
                 backend.fpm.run_on(&function);
+
+                if function.get_name().to_str().unwrap() == "main" {
+                    println!("Found main !")
+                }
             }
 
-            println!("{}", backend.module.to_string());
             let triple = TargetMachine::get_default_triple();
             let target = Target::from_triple(&triple).unwrap();
             let target_machine = target
                 .create_target_machine(
                     &triple,
-                    "generic", // CPU
-                    "",        // Features
+                    "generic",
+                    "",
                     OptimizationLevel::Aggressive,
                     RelocMode::PIC,
                     CodeModel::Default,
                 )
                 .expect("Failed to create target machine");
-            let dir = temp_dir();
-            let p = dir.as_path().join("temp.o");
-            let _ = File::create(&p).unwrap();
+
+            let temp_file = Builder::new()
+                .prefix("monocaml_")
+                .suffix(".s")
+                .tempfile()
+                .expect("Failed to create temporary file");
+
+            let temp_path = temp_file.into_temp_path();
+
             target_machine
-                .write_to_file(&backend.module, FileType::Object, &p)
+                .write_to_file(&backend.module, FileType::Assembly, &temp_path)
                 .unwrap();
-            let _ = Command::new("cc")
-                .arg(p)
+            let out = Command::new("gcc")
+                .arg(&temp_path)
                 .arg("-o")
-                .arg(self.output_path)
+                .arg(&self.output_path)
+                .arg("-no-pie")
                 .output()
                 .map_err(|_| "Failed to compile runtime library".to_string())
                 .unwrap();
+
+            if !out.status.success() {
+                panic!(
+                    "Failed to compile runtime library: {}",
+                    String::from_utf8_lossy(&out.stderr)
+                );
+            }
         }
 
         Ok(context)
@@ -76,3 +93,4 @@ impl LLVMBackend {
         }
     }
 }
+
