@@ -433,7 +433,6 @@ impl MonoToCfg {
     }
 
     pub fn drop_ty(&mut self, val: Value, ty: &AstTy, b: &mut Builder) {
-        println!("Ty is {ty}");
         let cfg_ty = self.ast_ty_to_ty(ty);
         assert!(cfg_ty.matches(&val.get_type(&self.ctx)));
         match ty {
@@ -464,7 +463,6 @@ impl MonoToCfg {
     }
 
     pub fn borrow_ty(&mut self, val: Value, ty: &AstTy, b: &mut Builder) {
-        println!("Ty is {ty}");
         let cfg_ty = self.ast_ty_to_ty(ty);
         assert!(cfg_ty.matches(&val.get_type(&self.ctx)));
         match ty {
