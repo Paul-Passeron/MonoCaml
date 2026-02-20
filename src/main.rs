@@ -13,6 +13,7 @@ use lazy_static::lazy_static;
 use crate::{
     backend::llvm_backend::LLVMBackend,
     cfg::{FunName, Label, var::CfgVar},
+    inference::InferenceCtx,
     lexer::{
         Lexer,
         error::LexingError,
@@ -98,7 +99,7 @@ fn intern_strlit(s: &str) -> StrLit {
 }
 
 fn main() {
-    let file_name = "examples/types.ml";
+    let file_name = "examples/eval.ml";
     let contents = {
         let mut s = String::new();
         let mut f = File::open(file_name).unwrap();
@@ -148,8 +149,15 @@ fn main() {
         println!("{}", item.desc.display(0));
     }
 
-    let poly = Resolver::new().resolve_structure(&prog).unwrap();
-    for item in &poly {
-        println!("{:#?}", item.node);
+    let mut resolver = Resolver::new();
+
+    let poly = resolver.resolve_structure(&prog).unwrap();
+
+    let mut infer_ctx = InferenceCtx::new(&resolver.types);
+
+    let inferred = infer_ctx.infer_program(&poly).unwrap();
+
+    for item in &inferred {
+        println!("{item:#?}")
     }
 }
