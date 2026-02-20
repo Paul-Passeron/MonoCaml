@@ -1,29 +1,28 @@
-use crate::{intern_symbol, lexer::interner::Symbol, poly_ir::type_expr::TypeVarId};
+use crate::{inference::InferVarId, intern_symbol, lexer::interner::Symbol, poly_ir::id::Id};
 
 pub type SolvedTy = MonoTy;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum MonoTy {
     Var(TyVar),
     Con(TyCon),
-    Forall(TyForall),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct TyForall {
     pub tyvars: Vec<TyVar>,
     pub ty: Box<MonoTy>,
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct TyVar {
-    pub id: TypeVarId,
+    pub id: InferVarId,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct TyCon {
     pub name: Symbol,
-    pub args: Vec<MonoTy>,
+    pub args: Vec<Id<MonoTy>>,
 }
 
 impl MonoTy {
@@ -35,13 +34,9 @@ impl MonoTy {
         matches!(self, Self::Con(_))
     }
 
-    pub fn is_forall(&self) -> bool {
-        matches!(self, Self::Forall(_))
-    }
-
-    pub fn as_var(&self) -> Option<TyVar> {
+    pub fn as_var(&self) -> Option<&TyVar> {
         match self {
-            MonoTy::Var(ty_var) => Some(*ty_var),
+            MonoTy::Var(ty_var) => Some(ty_var),
             _ => None,
         }
     }
@@ -49,13 +44,6 @@ impl MonoTy {
     pub fn as_con(&self) -> Option<&TyCon> {
         match self {
             MonoTy::Con(ty_con) => Some(ty_con),
-            _ => None,
-        }
-    }
-
-    pub fn as_forall(&self) -> Option<&TyForall> {
-        match self {
-            MonoTy::Forall(forall) => Some(forall),
             _ => None,
         }
     }
@@ -74,35 +62,28 @@ impl MonoTy {
         }
     }
 
-    pub fn into_forall(self) -> Option<TyForall> {
-        match self {
-            MonoTy::Forall(forall) => Some(forall),
-            _ => None,
-        }
-    }
-
-    pub fn list_ty(ty: Self) -> Self {
+    pub fn list_ty(ty: Id<Self>) -> Self {
         MonoTy::Con(TyCon {
             name: intern_symbol("list"),
             args: vec![ty],
         })
     }
 
-    pub fn func_ty(arg: Self, ret: Self) -> Self {
+    pub fn func_ty(arg: Id<Self>, ret: Id<Self>) -> Self {
         MonoTy::Con(TyCon {
             name: intern_symbol("->"),
             args: vec![arg, ret],
         })
     }
 
-    pub fn option_ty(ty: Self) -> Self {
+    pub fn option_ty(ty: Id<Self>) -> Self {
         MonoTy::Con(TyCon {
             name: intern_symbol("option"),
             args: vec![ty],
         })
     }
 
-    pub fn result_ty(ok: Self, err: Self) -> Self {
+    pub fn result_ty(ok: Id<Self>, err: Id<Self>) -> Self {
         MonoTy::Con(TyCon {
             name: intern_symbol("result"),
             args: vec![ok, err],
@@ -136,27 +117,9 @@ impl Into<MonoTy> for TyVar {
     }
 }
 
-impl Into<TyVar> for TypeVarId {
-    fn into(self) -> TyVar {
-        TyVar { id: self }
-    }
-}
-
-impl Into<MonoTy> for TypeVarId {
-    fn into(self) -> MonoTy {
-        MonoTy::Var(self.into())
-    }
-}
-
-impl Into<MonoTy> for TyForall {
-    fn into(self) -> MonoTy {
-        MonoTy::Forall(self)
-    }
-}
-
 impl TyVar {
-    pub fn new(id: TypeVarId) -> Self {
-        id.into()
+    pub fn new(id: InferVarId) -> Self {
+        Self { id }
     }
 }
 
@@ -170,14 +133,14 @@ impl TyForall {
 }
 
 impl TyCon {
-    pub fn new(name: Symbol, args: Vec<impl Into<MonoTy>>) -> Self {
+    pub fn new(name: Symbol, args: Vec<Id<MonoTy>>) -> Self {
         Self {
             name,
             args: args.into_iter().map(Into::into).collect(),
         }
     }
 
-    pub fn from_name(name: impl Into<String>, args: Vec<impl Into<MonoTy>>) -> Self {
+    pub fn from_name(name: impl Into<String>, args: Vec<Id<MonoTy>>) -> Self {
         let name = name.into();
         let symb = intern_symbol(name.as_str());
         Self::new(symb, args)
