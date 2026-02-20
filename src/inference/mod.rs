@@ -1,17 +1,19 @@
-use std::{collections::HashMap, sync::atomic::AtomicU32};
+use std::collections::HashMap;
 
 use crate::{
     inference::{
         error::Res,
-        solved_ty::{MonoTy, TyForall},
+        solved_ty::{MonoTy, TyCon, TyForall, TyVar},
     },
     poly_ir::{
         VarId,
+        expr::{Expr, ValueBinding},
         id::{Arena, Id},
+        item::{Item, ItemNode, TypeDeclInfo},
+        pattern::{Pattern, PatternNode},
+        type_expr::{Type, TypeVarId},
     },
 };
-
-use lazy_static::lazy_static;
 
 pub mod error;
 pub mod solved_ty;
@@ -24,11 +26,12 @@ pub struct InfMarker;
 pub type InferVarId = Id<InfMarker>;
 
 #[derive(Debug)]
-pub struct InferenceCtx {
+pub struct InferenceCtx<'a> {
     pub map: HashMap<VarId, TyForall>,
     pub tys: Arena<MonoTy>,
     pub forwards: HashMap<Id<MonoTy>, Id<MonoTy>>,
     pub inf: Arena<InfMarker>,
+    pub decls: &'a Arena<TypeDeclInfo>,
 }
 
 impl Id<MonoTy> {
@@ -69,7 +72,17 @@ impl MonoTy {
     }
 }
 
-impl InferenceCtx {
+impl<'a> InferenceCtx<'a> {
+    pub fn new(decls: &'a Arena<TypeDeclInfo>) -> Self {
+        Self {
+            map: HashMap::new(),
+            tys: Arena::new(),
+            forwards: HashMap::new(),
+            inf: Arena::new(),
+            decls,
+        }
+    }
+
     pub fn occurence_unify(&mut self, ty1: Id<MonoTy>, ty2: Id<MonoTy>) -> Res<()> {
         let mono1 = ty1.get(self);
         let mono2 = ty2.get(self);
@@ -125,5 +138,135 @@ impl InferenceCtx {
     #[inline(always)]
     pub fn fresh(&mut self) -> InferVarId {
         self.inf.alloc(InfMarker)
+    }
+
+    fn get_ty(&mut self, ty: MonoTy) -> Id<MonoTy> {
+        for (id, t) in self.tys.iter() {
+            if t == &ty {
+                return id;
+            }
+        }
+        self.tys.alloc(ty)
+    }
+
+    fn type_to_mono(&mut self, ty: &Type) -> Id<MonoTy> {
+        match ty {
+            Type::Infer => {
+                let fresh = self.fresh();
+                let id = self.tys.alloc(MonoTy::Var(TyVar { id: fresh }));
+                id
+            }
+            Type::Arrow { param, result } => {
+                let mono_arg = self.type_to_mono(param);
+                let mono_ret = self.type_to_mono(result);
+                self.get_ty(MonoTy::func_ty(mono_arg, mono_ret))
+            }
+            Type::Tuple(items) => {
+                let tys = items.iter().map(|x| self.type_to_mono(x)).collect();
+                self.get_ty(MonoTy::tuple_ty(tys))
+            }
+            Type::Constr { id, args } => {
+                let name = self.decls[*id].name;
+                let tys = args.iter().map(|x| self.type_to_mono(x)).collect();
+                let mono = MonoTy::Con(TyCon { name, args: tys });
+                self.get_ty(mono)
+            }
+            _ => todo!(),
+        }
+    }
+
+    pub fn infer_expr(&mut self, expr: &Expr<Type>) -> Res<Expr<Id<MonoTy>>> {
+        todo!()
+    }
+
+    pub fn infer_pattern(&mut self, pattern: &Pattern<Type>) -> Res<Pattern<Id<MonoTy>>> {
+        let (node, ty) = match pattern.as_ref().node {
+            PatternNode::Wildcard => (PatternNode::Wildcard, self.fresh_ty()),
+            PatternNode::Var(id) => (PatternNode::Var(*id), self.fresh_ty()),
+            PatternNode::Tuple(typed_nodes) => {
+                let nodes = typed_nodes
+                    .iter()
+                    .map(|node| self.infer_pattern(node))
+                    .collect::<Res<Vec<_>>>()?;
+
+                let mono = MonoTy::tuple_ty(nodes.iter().map(|x| x.ty).collect());
+                let ty = self.get_ty(mono);
+                (PatternNode::Tuple(nodes), ty)
+            }
+        };
+        Ok(Pattern::new(node, pattern.span, ty))
+    }
+
+    pub fn infer_item(&mut self, item: &Item<Type>) -> Res<Item<Id<MonoTy>>> {
+        let node = item.as_ref().node;
+        let span = item.span;
+        match node {
+            ItemNode::Type { .. } => todo!(),
+            ItemNode::Value {
+                bindings,
+                recursive,
+            } => {
+                let mut new_bindings = vec![];
+                let pats: Vec<_> = bindings
+                    .iter()
+                    .map(|binding| self.infer_pattern(&binding.pat))
+                    .collect::<Res<_>>()?;
+                let params = bindings
+                    .iter()
+                    .map(|binding| {
+                        binding
+                            .params
+                            .iter()
+                            .map(|param| self.infer_pattern(&param))
+                            .collect::<Res<Vec<_>>>()
+                    })
+                    .collect::<Res<Vec<_>>>()?;
+                for ((pat, params), expr) in pats
+                    .into_iter()
+                    .zip(params)
+                    .zip(bindings.iter().map(|b| &b.body))
+                {
+                    let body = self.infer_expr(expr)?;
+                    let full_ty = params.iter().rev().fold(body.ty, |acc, param_ty| {
+                        self.get_ty(MonoTy::func_ty(param_ty.ty, acc))
+                    });
+                    self.unify_j(pat.ty, full_ty)?;
+                    let scheme = self.generalize(full_ty);
+                    self.bind_pattern_to_context(&pat, &scheme);
+                    new_bindings.push(ValueBinding {
+                        pat,
+                        params,
+                        ty: full_ty,
+                        body,
+                    })
+                }
+                Ok(Item::new(
+                    ItemNode::Value {
+                        recursive: *recursive,
+                        bindings: new_bindings,
+                    },
+                    span,
+                    (),
+                ))
+            }
+        }
+    }
+
+    pub fn generalize(&mut self, ty: Id<MonoTy>) -> TyForall {
+        todo!()
+    }
+
+    pub fn bind_pattern_to_context<T>(&mut self, pat: &Pattern<T>, scheme: &TyForall) {
+        todo!()
+    }
+
+    pub fn infer_program(&mut self, items: &[Item<Type>]) -> Res<Vec<Item<Id<MonoTy>>>> {
+        items.iter().map(|item| self.infer_item(item)).collect()
+    }
+
+    pub fn fresh_ty(&mut self) -> Id<MonoTy> {
+        let id = self.fresh();
+        let mono = MonoTy::Var(TyVar { id });
+        self.tys.alloc(mono)
     }
 }

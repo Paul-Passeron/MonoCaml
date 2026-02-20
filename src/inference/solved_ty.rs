@@ -62,6 +62,13 @@ impl MonoTy {
         }
     }
 
+    pub fn tuple_ty(args: Vec<Id<Self>>) -> Self {
+        MonoTy::Con(TyCon {
+            name: intern_symbol("*"),
+            args,
+        })
+    }
+
     pub fn list_ty(ty: Id<Self>) -> Self {
         MonoTy::Con(TyCon {
             name: intern_symbol("list"),
