@@ -74,6 +74,17 @@ impl MonoTy {
 }
 
 impl InferenceCtx {
+    pub fn occurence_unify(&mut self, ty1: Id<MonoTy>, ty2: Id<MonoTy>) -> Res<()> {
+        let mono1 = ty1.get(self);
+        let mono2 = ty2.get(self);
+        if mono1.occurs_in(mono2, self) {
+            Err("Occurs check failed".into())
+        } else {
+            ty1.make_equal_to(ty2, self);
+            Ok(())
+        }
+    }
+
     pub fn unify_j(&mut self, ty1: Id<MonoTy>, ty2: Id<MonoTy>) -> Res<()> {
         let ty1 = ty1.find(self);
         let ty2 = ty2.find(self);
@@ -81,39 +92,37 @@ impl InferenceCtx {
         let mono1 = ty1.get(self);
         let mono2 = ty2.get(self);
         if mono1.is_var() {
-            if mono1.occurs_in(mono2, self) {
-                Err("Occurs check failed".into())
-            } else {
-                ty1.make_equal_to(ty2, self);
-                Ok(())
-            }
-        } else if mono2.is_var() {
-            self.unify_j(ty2, ty1)
-        } else {
-            match (mono1, mono2) {
-                (MonoTy::Con(con1), MonoTy::Con(con2)) => {
-                    if con1.name != con2.name {
-                        Err(format!("Con type mismatch: {} != {}", con1.name, con2.name))
-                    } else if con1.args.len() != con2.args.len() {
-                        Err(format!(
-                            "Con type {} arg len mismatch : {} != {}",
-                            con1.name,
-                            con1.args.len(),
-                            con2.args.len()
-                        ))
-                    } else {
-                        con1.args
-                            .iter()
-                            .copied()
-                            .zip(con2.args.iter().copied())
-                            .collect::<Vec<_>>()
-                            .into_iter()
-                            .map(|(l, r)| self.unify_j(l, r))
-                            .collect()
-                    }
+            self.occurence_unify(ty1, ty2)?;
+            return Ok(());
+        }
+        if mono2.is_var() {
+            self.occurence_unify(ty2, ty1)?;
+            return Ok(());
+        }
+        match (mono1, mono2) {
+            (MonoTy::Con(con1), MonoTy::Con(con2)) => {
+                if con1.name != con2.name {
+                    return Err(format!("Con type mismatch: {} != {}", con1.name, con2.name));
                 }
-                _ => Err("Unexpected type".into()),
+                if con1.args.len() != con2.args.len() {
+                    return Err(format!(
+                        "Con type {} arg len mismatch : {} != {}",
+                        con1.name,
+                        con1.args.len(),
+                        con2.args.len()
+                    ));
+                }
+
+                con1.args
+                    .iter()
+                    .copied()
+                    .zip(con2.args.iter().copied())
+                    .collect::<Vec<_>>()
+                    .into_iter()
+                    .map(|(l, r)| self.unify_j(l, r))
+                    .collect()
             }
+            _ => Err("Unexpected type".into()),
         }
     }
 }
