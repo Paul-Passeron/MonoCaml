@@ -140,8 +140,7 @@ impl Resolver {
             ItemNode::Value {
                 recursive: false,
                 bindings: vec![ResValueBinding {
-                    id,
-                    name: new_symbol,
+                    pat: ResPattern::new(PatternNode::Wildcard, span, Type::default()),
                     params: vec![],
                     ty: resolved.ty.clone(),
                     body: resolved,
@@ -297,35 +296,8 @@ impl Resolver {
 
             let body = this.resolve_expression(&binding.expr)?;
 
-            let (id, name, body) = match &pat.node {
-                PatternNode::Var(id) => (*id, this.scope.lookup_var(*id).unwrap(), body),
-                _ => {
-                    assert!(params.is_empty());
-                    let new_symbol = SESSION.lock().unwrap().fresh_symbol();
-                    let id = this.vars.alloc(VarMarker);
-                    this.scope.bind_value(new_symbol, ValueRef::Local(id));
-                    let span = body.span;
-                    let scrutinee =
-                        Expr::new(ExprNode::Var(ValueRef::Local(id)), span, Type::default());
-                    let new_body = Expr::new(
-                        ExprNode::Match {
-                            scrutinee: Box::new(scrutinee),
-                            cases: vec![MatchCase {
-                                pattern: pat,
-                                guard: None,
-                                body,
-                            }],
-                        },
-                        span,
-                        Type::default(),
-                    );
-                    (id, new_symbol, new_body)
-                }
-            };
-
             let res = ValueBinding {
-                id,
-                name,
+                pat,
                 params,
                 ty: ty.unwrap_or_default(),
                 body,

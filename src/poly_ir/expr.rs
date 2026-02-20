@@ -1,7 +1,6 @@
 use crate::{
-    lexer::interner::Symbol,
     parse_tree::expression::{BinaryOp, Constant, UnaryOp},
-    poly_ir::{ValueRef, VarId, pattern::Pattern, spanned::TypedNode},
+    poly_ir::{ValueRef, pattern::Pattern, spanned::TypedNode},
 };
 
 pub type Expr<T> = TypedNode<ExprNode<T>, T>;
@@ -53,8 +52,7 @@ pub enum ExprNode<T> {
 
 #[derive(Debug)]
 pub struct ValueBinding<T> {
-    pub id: VarId,
-    pub name: Symbol,
+    pub pat: Pattern<T>,
     pub params: Vec<Pattern<T>>,
     pub ty: T,
     pub body: Expr<T>,
