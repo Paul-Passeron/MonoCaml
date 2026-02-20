@@ -21,8 +21,3 @@ type pair_option = (int * bool) option
 type color = Red | Green | Blue
 type option_t = None | Some of int
 type tree = Leaf | Node of int * tree * tree
-
-type other_cons = Cons of {
-    foo: int;
-    bar: baz foobar;
-}

@@ -13,6 +13,6 @@ let first_fun (x: 'a) : 'a -> 'a = failwith "todo"
 let second_fun (x: 'a) : 'a -> 'b = failwith "todo"
 
 let _ =
-    let f = first_fun 5 in
-    let f2 = second_fun "hello" in
-    let f3 = second_fun (fun x -> 5) in ()
+    let _f = first_fun 5 in
+    let _f2 = second_fun "hello" in
+    let _f3 = second_fun (fun x -> 5) in ()

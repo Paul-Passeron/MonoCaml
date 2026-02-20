@@ -23,10 +23,6 @@ pub struct InfMarker;
 
 pub type InferVarId = Id<InfMarker>;
 
-lazy_static! {
-    static ref NEXT_VAR_ID: AtomicU32 = AtomicU32::new(0);
-}
-
 #[derive(Debug)]
 pub struct InferenceCtx {
     pub map: HashMap<VarId, TyForall>,
@@ -124,5 +120,10 @@ impl InferenceCtx {
             }
             _ => Err("Unexpected type".into()),
         }
+    }
+
+    #[inline(always)]
+    pub fn fresh(&mut self) -> InferVarId {
+        self.inf.alloc(InfMarker)
     }
 }
