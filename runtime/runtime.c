@@ -1,3 +1,4 @@
+#define STD_IMPL
 #include "runtime.h"
 #include <stdint.h>
 #include <stdio.h>
