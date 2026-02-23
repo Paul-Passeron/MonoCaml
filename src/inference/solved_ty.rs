@@ -104,6 +104,27 @@ impl MonoTy {
         })
     }
 
+    pub fn char_ty() -> Self {
+        MonoTy::Con(TyCon {
+            name: intern_symbol("char"),
+            args: vec![],
+        })
+    }
+
+    pub fn string_ty() -> Self {
+        MonoTy::Con(TyCon {
+            name: intern_symbol("string"),
+            args: vec![],
+        })
+    }
+
+    pub fn float_ty() -> Self {
+        MonoTy::Con(TyCon {
+            name: intern_symbol("float"),
+            args: vec![],
+        })
+    }
+
     pub fn bool_ty() -> Self {
         MonoTy::Con(TyCon {
             name: intern_symbol("bool"),

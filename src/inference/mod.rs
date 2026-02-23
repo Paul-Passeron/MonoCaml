@@ -1,17 +1,18 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::{
     inference::{
         error::Res,
         solved_ty::{MonoTy, TyCon, TyForall, TyVar},
     },
+    parse_tree::expression::Constant,
     poly_ir::{
         VarId,
-        expr::{Expr, ValueBinding},
+        expr::{Expr, ExprNode, ValueBinding},
         id::{Arena, Id},
         item::{Item, ItemNode, TypeDeclInfo},
         pattern::{Pattern, PatternNode},
-        type_expr::{Type, TypeVarId},
+        type_expr::Type,
     },
 };
 
@@ -149,6 +150,7 @@ impl<'a> InferenceCtx<'a> {
         self.tys.alloc(ty)
     }
 
+    #[allow(unused)]
     fn type_to_mono(&mut self, ty: &Type) -> Id<MonoTy> {
         match ty {
             Type::Infer => {
@@ -175,8 +177,48 @@ impl<'a> InferenceCtx<'a> {
         }
     }
 
+    pub fn get_ty_of_const(&mut self, constant: &Constant) -> Id<MonoTy> {
+        let mono = match constant {
+            Constant::Int(_) => MonoTy::int_ty(),
+            Constant::Char(_) => MonoTy::char_ty(),
+            Constant::String(_) => MonoTy::string_ty(),
+            Constant::Float(_) => MonoTy::float_ty(),
+        };
+        self.get_ty(mono)
+    }
+
     pub fn infer_expr(&mut self, expr: &Expr<Type>) -> Res<Expr<Id<MonoTy>>> {
-        todo!()
+        let span = expr.span;
+        match expr.as_ref().node {
+            ExprNode::Var(_) => todo!(),
+            ExprNode::Const(constant) => {
+                let node = ExprNode::Const(*constant);
+                let ty = self.get_ty_of_const(constant);
+                Ok(Expr::new(node, span, ty))
+            }
+            ExprNode::Let { .. } => todo!(),
+            ExprNode::Function { .. } => todo!(),
+            ExprNode::Apply { .. } => todo!(),
+            ExprNode::Match { .. } => todo!(),
+            ExprNode::Tuple(_) => todo!(),
+            ExprNode::Construct { .. } => todo!(),
+            ExprNode::Sequence { first, second } => {
+                let inferred_first = self.infer_expr(first)?;
+                let inferred_second = self.infer_expr(second)?;
+                let ty = inferred_second.ty;
+                Ok(Expr::new(
+                    ExprNode::Sequence {
+                        first: Box::new(inferred_first),
+                        second: Box::new(inferred_second),
+                    },
+                    span,
+                    ty,
+                ))
+            }
+            ExprNode::Constraint { .. } => todo!(),
+            ExprNode::BinaryOp { .. } => todo!(),
+            ExprNode::UnaryOp { .. } => todo!(),
+        }
     }
 
     pub fn infer_pattern(&mut self, pattern: &Pattern<Type>) -> Res<Pattern<Id<MonoTy>>> {
@@ -232,7 +274,7 @@ impl<'a> InferenceCtx<'a> {
                     });
                     self.unify_j(pat.ty, full_ty)?;
                     let scheme = self.generalize(full_ty);
-                    self.bind_pattern_to_context(&pat, &scheme);
+                    self.bind_pattern_to_context(&pat, scheme);
                     new_bindings.push(ValueBinding {
                         pat,
                         params,
@@ -252,12 +294,68 @@ impl<'a> InferenceCtx<'a> {
         }
     }
 
-    pub fn generalize(&mut self, ty: Id<MonoTy>) -> TyForall {
-        todo!()
+    fn collect_vars(&mut self, ty: Id<MonoTy>) -> Vec<InferVarId> {
+        fn aux(ty: &MonoTy, ctx: &InferenceCtx, set: &mut HashSet<InferVarId>) {
+            match ty {
+                MonoTy::Var(ty_var) => {
+                    set.insert(ty_var.id);
+                }
+                MonoTy::Con(ty_con) => ty_con.args.iter().for_each(|x| aux(x.get(ctx), ctx, set)),
+            }
+        }
+        let mut s = HashSet::new();
+        aux(ty.get(self), self, &mut s);
+        let mut v: Vec<_> = s.into_iter().collect();
+        v.sort();
+        v
     }
 
-    pub fn bind_pattern_to_context<T>(&mut self, pat: &Pattern<T>, scheme: &TyForall) {
-        todo!()
+    fn subst(&mut self, ty: &MonoTy, vars: &HashMap<InferVarId, InferVarId>) -> Id<MonoTy> {
+        let t = match ty {
+            MonoTy::Var(ty_var) => MonoTy::Var(TyVar {
+                id: vars[&ty_var.id],
+            }),
+            MonoTy::Con(TyCon { name, args }) => MonoTy::Con(TyCon {
+                name: *name,
+                args: args
+                    .iter()
+                    .map(|t| t.get(self).clone())
+                    .collect::<Vec<_>>()
+                    .iter()
+                    .map(|t| self.subst(t, vars))
+                    .collect(),
+            }),
+        };
+        self.get_ty(t)
+    }
+
+    pub fn generalize(&mut self, ty: Id<MonoTy>) -> TyForall {
+        let vars = self.collect_vars(ty);
+        let new_vars: Vec<_> = vars.iter().map(|_| self.fresh()).collect();
+        let vars: HashMap<InferVarId, InferVarId> =
+            HashMap::from_iter(vars.into_iter().zip(new_vars.iter().copied()));
+
+        let res = self.subst(&ty.get(self).clone(), &vars);
+
+        TyForall {
+            tyvars: new_vars.into_iter().map(|x| TyVar { id: x }).collect(),
+            ty: Box::new(res.get(self).clone()),
+        }
+    }
+
+    pub fn bind_pattern_to_context<T>(&mut self, pat: &Pattern<T>, scheme: TyForall) {
+        match pat.as_ref().node {
+            PatternNode::Wildcard => (),
+            PatternNode::Var(id) => {
+                self.map.insert(*id, scheme);
+            }
+            PatternNode::Tuple(_pats) => todo!(),
+        }
+    }
+
+    pub fn instantiate(&mut self, forall: &TyForall) -> Id<MonoTy> {
+        let replacement = HashMap::from_iter(forall.tyvars.iter().map(|id| (id.id, self.fresh())));
+        self.subst(&forall.ty, &replacement)
     }
 
     pub fn infer_program(&mut self, items: &[Item<Type>]) -> Res<Vec<Item<Id<MonoTy>>>> {
@@ -268,5 +366,28 @@ impl<'a> InferenceCtx<'a> {
         let id = self.fresh();
         let mono = MonoTy::Var(TyVar { id });
         self.tys.alloc(mono)
+    }
+}
+
+impl Id<MonoTy> {
+    pub fn display(&self, ctx: &InferenceCtx) -> String {
+        let end = self.find(ctx);
+        let mono = end.get(ctx);
+        match mono {
+            MonoTy::Var(ty_var) => format!("{{TyVar({})}}", ty_var.id.raw()),
+            MonoTy::Con(ty_con) => {
+                format!(
+                    "{}{}{}",
+                    ty_con
+                        .args
+                        .iter()
+                        .map(|x| x.display(ctx))
+                        .collect::<Vec<_>>()
+                        .join(" "),
+                    if ty_con.args.is_empty() { "" } else { " " },
+                    ty_con.name
+                )
+            }
+        }
     }
 }
