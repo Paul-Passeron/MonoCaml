@@ -5,7 +5,7 @@ use crate::{
         error::Res,
         solved_ty::{MonoTy, TyCon, TyForall, TyVar},
     },
-    parse_tree::expression::Constant,
+    parse_tree::expression::{BinaryOp, Constant},
     poly_ir::{
         ValueRef, VarId,
         expr::{Expr, ExprNode, ValueBinding},
@@ -14,6 +14,7 @@ use crate::{
         pattern::{Pattern, PatternNode},
         type_expr::Type,
     },
+    resolution::VarInfo,
 };
 
 pub mod error;
@@ -33,6 +34,7 @@ pub struct InferenceCtx<'a> {
     pub forwards: HashMap<Id<MonoTy>, Id<MonoTy>>,
     pub inf: Arena<InfMarker>,
     pub decls: &'a Arena<TypeDeclInfo>,
+    pub names: &'a Arena<VarInfo>,
 }
 
 impl Id<MonoTy> {
@@ -52,7 +54,11 @@ impl Id<MonoTy> {
 
     pub fn make_equal_to(&self, other: Id<MonoTy>, ctx: &mut InferenceCtx) {
         let chain_end = self.find(ctx);
-        assert!(chain_end.get(ctx).is_var(), "Already resolved");
+
+        assert!(
+            chain_end.get(ctx).is_var() || chain_end == other,
+            "Already resolved"
+        );
         ctx.forwards.insert(chain_end, other);
     }
 }
@@ -72,13 +78,14 @@ impl MonoTy {
 }
 
 impl<'a> InferenceCtx<'a> {
-    pub fn new(decls: &'a Arena<TypeDeclInfo>) -> Self {
+    pub fn new(decls: &'a Arena<TypeDeclInfo>, names: &'a Arena<VarInfo>) -> Self {
         Self {
             map: HashMap::new(),
             tys: Arena::new(),
             forwards: HashMap::new(),
             inf: Arena::new(),
             decls,
+            names,
         }
     }
 
@@ -193,6 +200,7 @@ impl<'a> InferenceCtx<'a> {
 
                 let ty = match id {
                     ValueRef::Local(id) => {
+                        println!("Looking for the scheme of {}", self.names[*id].name);
                         let scheme = self.map[id].clone();
                         self.instantiate(&scheme)
                     }
@@ -210,7 +218,14 @@ impl<'a> InferenceCtx<'a> {
             ExprNode::Function { .. } => todo!(),
             ExprNode::Apply { .. } => todo!(),
             ExprNode::Match { .. } => todo!(),
-            ExprNode::Tuple(_) => todo!(),
+            ExprNode::Tuple(exprs) => {
+                let inf: Vec<_> = exprs
+                    .iter()
+                    .map(|e| self.infer_expr(e))
+                    .collect::<Res<_>>()?;
+                let t = self.get_ty(MonoTy::tuple_ty(inf.iter().map(|x| x.ty).collect()));
+                Ok(Expr::new(ExprNode::Tuple(inf), span, t))
+            }
             ExprNode::Construct { .. } => todo!(),
             ExprNode::Sequence { first, second } => {
                 let inferred_first = self.infer_expr(first)?;
@@ -226,7 +241,10 @@ impl<'a> InferenceCtx<'a> {
                 ))
             }
             ExprNode::Constraint { .. } => todo!(),
-            ExprNode::BinaryOp { .. } => todo!(),
+            ExprNode::BinaryOp { op, left, right } => {
+                let (node, ty) = self.infer_binary_op(*op, left, right)?;
+                Ok(Expr::new(node, span, ty))
+            }
             ExprNode::UnaryOp { .. } => todo!(),
         }
     }
@@ -278,13 +296,24 @@ impl<'a> InferenceCtx<'a> {
                     .zip(params)
                     .zip(bindings.iter().map(|b| &b.body))
                 {
+                    for param in params.iter() {
+                        self.bind_pattern_to_context(
+                            param,
+                            TyForall {
+                                tyvars: vec![],
+                                ty: Box::new(param.ty.get(self).clone()),
+                            },
+                        )?;
+                    }
+
                     let body = self.infer_expr(expr)?;
                     let full_ty = params.iter().rev().fold(body.ty, |acc, param_ty| {
                         self.get_ty(MonoTy::func_ty(param_ty.ty, acc))
                     });
                     self.unify_j(pat.ty, full_ty)?;
                     let scheme = self.generalize(full_ty);
-                    self.bind_pattern_to_context(&pat, scheme);
+                    self.bind_pattern_to_context(&pat, scheme)?;
+
                     new_bindings.push(ValueBinding {
                         pat,
                         params,
@@ -323,7 +352,11 @@ impl<'a> InferenceCtx<'a> {
     fn subst(&mut self, ty: &MonoTy, vars: &HashMap<InferVarId, InferVarId>) -> Id<MonoTy> {
         let t = match ty {
             MonoTy::Var(ty_var) => MonoTy::Var(TyVar {
-                id: vars[&ty_var.id],
+                id: if let Some(id) = vars.get(&ty_var.id) {
+                    *id
+                } else {
+                    ty_var.id
+                },
             }),
             MonoTy::Con(TyCon { name, args }) => MonoTy::Con(TyCon {
                 name: *name,
@@ -340,6 +373,7 @@ impl<'a> InferenceCtx<'a> {
     }
 
     pub fn generalize(&mut self, ty: Id<MonoTy>) -> TyForall {
+        let ty = ty.find(self);
         let vars = self.collect_vars(ty);
         let new_vars: Vec<_> = vars.iter().map(|_| self.fresh()).collect();
         let vars: HashMap<InferVarId, InferVarId> =
@@ -353,14 +387,31 @@ impl<'a> InferenceCtx<'a> {
         }
     }
 
-    pub fn bind_pattern_to_context<T>(&mut self, pat: &Pattern<T>, scheme: TyForall) {
+    pub fn bind_pattern_to_context<T>(&mut self, pat: &Pattern<T>, scheme: TyForall) -> Res<()> {
         match pat.as_ref().node {
             PatternNode::Wildcard => (),
             PatternNode::Var(id) => {
                 self.map.insert(*id, scheme);
             }
-            PatternNode::Tuple(_pats) => todo!(),
+            PatternNode::Tuple(pats) => match &*scheme.ty {
+                MonoTy::Con(TyCon { name, args }) if &name.to_string() == "*" => {
+                    if args.len() != pats.len() {
+                        return Err("Tuple pattern length mismatch".to_string());
+                    }
+                    for (arg, pat) in args.iter().zip(pats.iter()) {
+                        self.bind_pattern_to_context(
+                            pat,
+                            TyForall {
+                                tyvars: vec![],
+                                ty: Box::new(arg.get(self).clone()),
+                            },
+                        )?;
+                    }
+                }
+                _ => return Err("Expected tuple type".to_string()),
+            },
         }
+        Ok(())
     }
 
     pub fn instantiate(&mut self, forall: &TyForall) -> Id<MonoTy> {
@@ -377,6 +428,32 @@ impl<'a> InferenceCtx<'a> {
         let mono = MonoTy::Var(TyVar { id });
         self.tys.alloc(mono)
     }
+
+    fn infer_binary_op(
+        &mut self,
+        op: BinaryOp,
+        left: &Expr<Type>,
+        right: &Expr<Type>,
+    ) -> Res<(ExprNode<Id<MonoTy>>, Id<MonoTy>)> {
+        match &op {
+            BinaryOp::Plus | BinaryOp::Minus | BinaryOp::Star | BinaryOp::Div => {
+                let left = self.infer_expr(left)?;
+                let right = self.infer_expr(right)?;
+                let int_ty = self.get_ty(MonoTy::int_ty());
+                left.ty.make_equal_to(int_ty, self);
+                right.ty.make_equal_to(int_ty, self);
+                Ok((
+                    ExprNode::BinaryOp {
+                        op,
+                        left: Box::new(left),
+                        right: Box::new(right),
+                    },
+                    int_ty,
+                ))
+            }
+            _ => todo!(),
+        }
+    }
 }
 
 impl Id<MonoTy> {
@@ -386,17 +463,30 @@ impl Id<MonoTy> {
         match mono {
             MonoTy::Var(ty_var) => format!("{{TyVar({})}}", ty_var.id.raw()),
             MonoTy::Con(ty_con) => {
-                format!(
-                    "{}{}{}",
-                    ty_con
-                        .args
-                        .iter()
-                        .map(|x| x.display(ctx))
-                        .collect::<Vec<_>>()
-                        .join(" "),
-                    if ty_con.args.is_empty() { "" } else { " " },
-                    ty_con.name
-                )
+                let s = ty_con.name.to_string();
+                if &s == "*" || &s == "->" {
+                    format!(
+                        "({})",
+                        ty_con
+                            .args
+                            .iter()
+                            .map(|x| x.display(ctx))
+                            .collect::<Vec<_>>()
+                            .join(format!(" {s} ").as_str()),
+                    )
+                } else {
+                    format!(
+                        "{}{}{}",
+                        ty_con
+                            .args
+                            .iter()
+                            .map(|x| x.display(ctx))
+                            .collect::<Vec<_>>()
+                            .join(" "),
+                        if ty_con.args.is_empty() { "" } else { " " },
+                        ty_con.name
+                    )
+                }
             }
         }
     }
