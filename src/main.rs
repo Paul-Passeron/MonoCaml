@@ -153,7 +153,7 @@ fn main() {
 
     let poly = resolver.resolve_structure(&prog).unwrap();
 
-    let mut infer_ctx = InferenceCtx::new(&resolver.types);
+    let mut infer_ctx = InferenceCtx::new(&resolver.types, &resolver.vars);
 
     let inferred = infer_ctx.infer_program(&poly).unwrap();
 
