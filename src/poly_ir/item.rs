@@ -21,7 +21,7 @@ pub struct ItemInfo {
     pub name: Symbol,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TypeDecl {
     pub id: TypeId,
     pub name: Symbol,
@@ -35,19 +35,19 @@ pub struct TypeDeclInfo {
     pub arity: usize,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum TypeDeclKind {
     Alias(Type),
     Variant(Vec<Constructor>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Constructor {
     pub name: Symbol,
     pub arg: Option<ConstructorArg>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ConstructorArg {
     Tuple(Vec<Type>),
 }

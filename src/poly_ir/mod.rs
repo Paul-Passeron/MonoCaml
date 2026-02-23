@@ -6,6 +6,7 @@ pub mod item;
 pub mod pattern;
 pub mod spanned;
 pub mod type_expr;
+pub mod typed_node_map;
 
 pub type TypeId = Id<item::TypeDeclInfo>;
 pub type VarId = Id<VarMarker>;

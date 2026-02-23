@@ -14,6 +14,7 @@ impl<T, Ty> TypedNode<T, Ty> {
         Self { node, ty, span }
     }
 
+    #[inline(always)]
     pub fn as_ref(&self) -> TypedNode<&T, &Ty> {
         TypedNode {
             node: &self.node,
