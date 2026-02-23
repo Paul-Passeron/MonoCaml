@@ -3,8 +3,9 @@ use crate::poly_ir::{TypeId, TypeParamId};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TypeVarId(pub u32);
 
-#[derive(Debug, Clone)]
+#[derive(Default, Debug, Clone)]
 pub enum Type {
+    #[default]
     Infer,
     Param(TypeParamId),
     Var(TypeVarId),
@@ -39,11 +40,5 @@ impl Type {
 
     pub fn is_constr(&self) -> bool {
         matches!(self, Self::Constr { .. })
-    }
-}
-
-impl Default for Type {
-    fn default() -> Self {
-        Self::Infer
     }
 }

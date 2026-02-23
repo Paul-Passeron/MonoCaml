@@ -133,15 +133,15 @@ impl MonoTy {
     }
 }
 
-impl Into<MonoTy> for TyCon {
-    fn into(self) -> MonoTy {
-        MonoTy::Con(self)
+impl From<TyCon> for MonoTy {
+    fn from(val: TyCon) -> Self {
+        MonoTy::Con(val)
     }
 }
 
-impl Into<MonoTy> for TyVar {
-    fn into(self) -> MonoTy {
-        MonoTy::Var(self)
+impl From<TyVar> for MonoTy {
+    fn from(val: TyVar) -> Self {
+        MonoTy::Var(val)
     }
 }
 
@@ -152,9 +152,9 @@ impl TyVar {
 }
 
 impl TyForall {
-    pub fn new(vars: Vec<impl Into<TyVar>>, ty: impl Into<MonoTy>) -> Self {
+    pub fn new(vars: Vec<TyVar>, ty: impl Into<MonoTy>) -> Self {
         Self {
-            tyvars: vars.into_iter().map(Into::into).collect(),
+            tyvars: vars,
             ty: Box::new(ty.into()),
         }
     }
@@ -162,10 +162,7 @@ impl TyForall {
 
 impl TyCon {
     pub fn new(name: Symbol, args: Vec<Id<MonoTy>>) -> Self {
-        Self {
-            name,
-            args: args.into_iter().map(Into::into).collect(),
-        }
+        Self { name, args }
     }
 
     pub fn from_name(name: impl Into<String>, args: Vec<Id<MonoTy>>) -> Self {

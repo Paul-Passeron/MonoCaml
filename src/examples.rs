@@ -29,7 +29,7 @@ pub fn test_ast_with_ctx<S: ToString>(ast: UAst, prog_name: S, ctx: AstCtx) {
         .stdout(Stdio::null())
         .stderr(Stdio::null())
         .spawn()
-        .expect(format!("Failed to spawn process for {}", prog_name).as_str())
+        .unwrap_or_else(|_| panic!("Failed to spawn process for {}", prog_name))
         .wait()
         .unwrap()
         .exit_ok()

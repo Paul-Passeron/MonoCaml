@@ -134,8 +134,7 @@ impl<'a> InferenceCtx<'a> {
                     .zip(con2.args.iter().copied())
                     .collect::<Vec<_>>()
                     .into_iter()
-                    .map(|(l, r)| self.unify_j(l, r))
-                    .collect()
+                    .try_for_each(|(l, r)| self.unify_j(l, r))
             }
             _ => Err("Unexpected type".into()),
         }
@@ -160,8 +159,7 @@ impl<'a> InferenceCtx<'a> {
         match ty {
             Type::Infer => {
                 let fresh = self.fresh();
-                let id = self.tys.alloc(MonoTy::Var(TyVar { id: fresh }));
-                id
+                self.tys.alloc(MonoTy::Var(TyVar { id: fresh }))
             }
             Type::Arrow { param, result } => {
                 let mono_arg = self.type_to_mono(param);
@@ -287,7 +285,7 @@ impl<'a> InferenceCtx<'a> {
                         binding
                             .params
                             .iter()
-                            .map(|param| self.infer_pattern(&param))
+                            .map(|param| self.infer_pattern(param))
                             .collect::<Res<Vec<_>>>()
                     })
                     .collect::<Res<Vec<_>>>()?;

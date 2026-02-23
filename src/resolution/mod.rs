@@ -46,7 +46,7 @@ pub struct Resolver {
     type_vars: u32,
 }
 
-fn flatten_product<'a>(expr: &'a Expression) -> Vec<&'a Expression> {
+fn flatten_product(expr: &Expression) -> Vec<&Expression> {
     fn aux<'a>(e: &'a Expression, v: &mut Vec<&'a Expression>) {
         match &e.desc {
             ExpressionDesc::Product(x1, x2) => {
@@ -63,7 +63,7 @@ fn flatten_product<'a>(expr: &'a Expression) -> Vec<&'a Expression> {
     v
 }
 
-fn flatten_product_pattern<'a>(pat: &'a pattern::Pattern) -> Vec<&'a pattern::Pattern> {
+fn flatten_product_pattern(pat: &pattern::Pattern) -> Vec<&pattern::Pattern> {
     fn aux<'a>(p: &'a pattern::Pattern, v: &mut Vec<&'a pattern::Pattern>) {
         match &p.desc {
             PatternDesc::Product(x1, x2) => {
@@ -184,20 +184,12 @@ impl Resolver {
             }
             PatternDesc::Constant(_c) => todo!(),
             PatternDesc::Interval { .. } => todo!(),
-            PatternDesc::Product(_, _) => {
-                let flattened = flatten_product_pattern(pat);
-                assert!(!flattened.is_empty());
-                if flattened.len() == 1 {
-                    return self.resolve_pattern(&flattened[0]);
-                } else {
-                    PatternNode::Tuple(
-                        flattened
-                            .iter()
-                            .map(|x| self.resolve_pattern(x))
-                            .collect::<Res<_>>()?,
-                    )
-                }
-            }
+            PatternDesc::Product(_, _) => PatternNode::Tuple(
+                flatten_product_pattern(pat)
+                    .iter()
+                    .map(|x| self.resolve_pattern(x))
+                    .collect::<Res<_>>()?,
+            ),
             PatternDesc::Construct(_cons, _arg) => todo!(),
             PatternDesc::Record(_record_fields) => todo!(),
             PatternDesc::Constraint(p, ty) => {
@@ -275,20 +267,12 @@ impl Resolver {
                 }
             }
             ExpressionDesc::Unit => ExprNode::Tuple(vec![]),
-            ExpressionDesc::Product(_, _) => {
-                let flattened = flatten_product(expr);
-                assert!(!flattened.is_empty());
-                if flattened.len() == 1 {
-                    return self.resolve_expression(&flattened[0]);
-                } else {
-                    ExprNode::Tuple(
-                        flattened
-                            .iter()
-                            .map(|x| self.resolve_expression(x))
-                            .collect::<Res<_>>()?,
-                    )
-                }
-            }
+            ExpressionDesc::Product(_, _) => ExprNode::Tuple(
+                flatten_product(expr)
+                    .iter()
+                    .map(|x| self.resolve_expression(x))
+                    .collect::<Res<_>>()?,
+            ),
             ExpressionDesc::Paren(e) => return self.resolve_expression(e),
             x => todo!("{x:?}"),
         };
