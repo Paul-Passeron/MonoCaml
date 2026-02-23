@@ -1,7 +1,7 @@
 use crate::{
     intern_symbol,
-    poly_ir::{TypeId, ValueRef, VarMarker, item::TypeDeclInfo},
-    resolution::Resolver,
+    poly_ir::{TypeId, ValueRef, item::TypeDeclInfo},
+    resolution::{Resolver, VarInfo},
 };
 
 impl Resolver {
@@ -26,7 +26,7 @@ impl Resolver {
 
     fn add_builtin_value(&mut self, name: &str) {
         let sym = intern_symbol(name);
-        let id = self.vars.alloc(VarMarker);
+        let id = self.vars.alloc(VarInfo { name: sym });
         self.scope.bind_value(sym, ValueRef::Local(id));
     }
 

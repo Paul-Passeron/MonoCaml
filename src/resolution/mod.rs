@@ -4,7 +4,7 @@ use crate::{
     parse_tree::{
         self, LongIdent,
         expression::{Expression, ExpressionDesc},
-        pattern::PatternDesc,
+        pattern::{self, PatternDesc},
         structure::{Structure, StructureItem, StructureItemDesc},
         type_declaration::{
             ConstructorArguments, ConstructorDeclaration, TypeDeclaration, TypeKind,
@@ -12,7 +12,7 @@ use crate::{
         type_expr::{TypeExpr, TypeExprDesc},
     },
     poly_ir::{
-        TypeId, TypeParamId, ValueRef, VarMarker,
+        TypeId, TypeParamId, ValueRef,
         expr::{Expr, ExprNode, MatchCase, ValueBinding},
         id::Arena,
         item::{Constructor, ConstructorArg, Item, ItemNode, TypeDecl, TypeDeclInfo, TypeDeclKind},
@@ -33,9 +33,14 @@ pub type ResExpr = Expr<ResType>;
 pub type ResPattern = Pattern<ResType>;
 pub type ResValueBinding = ValueBinding<ResType>;
 
+#[derive(Debug)]
+pub struct VarInfo {
+    pub name: Symbol,
+}
+
 pub struct Resolver {
     pub types: Arena<TypeDeclInfo>,
-    pub vars: Arena<VarMarker>,
+    pub vars: Arena<VarInfo>,
     scope: Scope,
     binder_depth: u32,
     type_vars: u32,
@@ -45,8 +50,10 @@ fn flatten_product<'a>(expr: &'a Expression) -> Vec<&'a Expression> {
     fn aux<'a>(e: &'a Expression, v: &mut Vec<&'a Expression>) {
         match &e.desc {
             ExpressionDesc::Product(x1, x2) => {
-                v.push(x1);
-                aux(x2, v);
+                // v.push(x1);
+                // aux(x2, v);
+                aux(x1, v);
+                v.push(x2);
             }
             _ => v.push(e),
         }
@@ -54,6 +61,21 @@ fn flatten_product<'a>(expr: &'a Expression) -> Vec<&'a Expression> {
     let mut v = vec![];
     aux(expr, &mut v);
     v
+}
+
+fn flatten_product_pattern<'a>(pat: &'a pattern::Pattern) -> Vec<&'a pattern::Pattern> {
+    fn aux<'a>(p: &'a pattern::Pattern, v: &mut Vec<&'a pattern::Pattern>) {
+        match &p.desc {
+            PatternDesc::Product(x1, x2) => {
+                aux(x1, v);
+                v.push(x2)
+            }
+            _ => v.push(p),
+        }
+    }
+    let mut v = vec![];
+    aux(pat, &mut v);
+    dbg!(v)
 }
 
 impl Resolver {
@@ -133,7 +155,7 @@ impl Resolver {
     fn resolve_eval(&mut self, expr: &Expression) -> Res<ResItem> {
         let resolved = self.resolve_expression(expr)?;
         let new_symbol = SESSION.lock().unwrap().fresh_symbol();
-        let id = self.vars.alloc(VarMarker);
+        let id = self.vars.alloc(VarInfo { name: new_symbol });
         self.scope.bind_value(new_symbol, ValueRef::Local(id));
         let span = resolved.span;
         Ok(ResItem::new(
@@ -156,17 +178,26 @@ impl Resolver {
         let node = match &pat.desc {
             PatternDesc::Any => PatternNode::Wildcard,
             PatternDesc::Var(symbol) => {
-                let var_id = self.vars.alloc(VarMarker);
+                let var_id = self.vars.alloc(VarInfo { name: *symbol });
                 self.scope.bind_value(*symbol, ValueRef::Local(var_id));
                 PatternNode::Var(var_id)
             }
             PatternDesc::Constant(_c) => todo!(),
             PatternDesc::Interval { .. } => todo!(),
-            PatternDesc::Tuple(pats) => PatternNode::Tuple(
-                pats.iter()
-                    .map(|p| self.resolve_pattern(p))
-                    .collect::<Res<_>>()?,
-            ),
+            PatternDesc::Product(_, _) => {
+                let flattened = flatten_product_pattern(pat);
+                assert!(!flattened.is_empty());
+                if flattened.len() == 1 {
+                    return self.resolve_pattern(&flattened[0]);
+                } else {
+                    PatternNode::Tuple(
+                        flattened
+                            .iter()
+                            .map(|x| self.resolve_pattern(x))
+                            .collect::<Res<_>>()?,
+                    )
+                }
+            }
             PatternDesc::Construct(_cons, _arg) => todo!(),
             PatternDesc::Record(_record_fields) => todo!(),
             PatternDesc::Constraint(p, ty) => {
@@ -182,19 +213,6 @@ impl Resolver {
         };
         Ok(Pattern::new(node, pat.span, opt_ty.unwrap_or_default()))
     }
-
-    // fn resolve_pattern_with_scope(
-    //     &mut self,
-    //     pat: &parse_tree::pattern::Pattern,
-    // ) -> Res<(Scope, Pattern)> {
-    //     let this_scope = mem::take(&mut self.scope);
-    //     self.scope.parent = Some(Box::new(this_scope));
-    //     let res = self.resolve_pattern(pat)?;
-    //     let mut to_take = mem::take(&mut self.scope);
-    //     let parent = to_take.parent.take().unwrap();
-    //     self.scope = *parent;
-    //     Ok((to_take, res))
-    // }
 
     fn declare_value_binding(
         &mut self,
@@ -271,6 +289,7 @@ impl Resolver {
                     )
                 }
             }
+            ExpressionDesc::Paren(e) => return self.resolve_expression(e),
             x => todo!("{x:?}"),
         };
         Ok(Expr::new(node, span, Type::default()))
@@ -326,8 +345,31 @@ impl Resolver {
         } else {
             let mut res = vec![];
             for binding in bindings {
+                let (params, ty, body) = self.with_scope(|this| {
+                    let mut params = vec![];
+
+                    for arg in &binding.args {
+                        params.push(this.resolve_pattern(arg)?);
+                    }
+
+                    let ty = binding
+                        .constraint
+                        .as_ref()
+                        .map(|ty| this.resolve_type_expr(&ty.typ))
+                        .transpose()?;
+
+                    let body = this.resolve_expression(&binding.expr)?;
+
+                    Ok((params, ty.unwrap_or_default(), body))
+                })?;
                 let pat = self.declare_value_binding(binding)?;
-                res.push(self.resolve_value_binding(pat, binding)?);
+                let b = ValueBinding {
+                    pat,
+                    params,
+                    ty,
+                    body,
+                };
+                res.push(b);
             }
             res
         };

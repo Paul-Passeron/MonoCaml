@@ -33,7 +33,13 @@ impl<'a> Parser<'a> {
                     } else if elems.len() == 1 {
                         PatternDesc::paren(elems.into_iter().next().unwrap())
                     } else {
-                        PatternDesc::tuple(elems)
+                        let mut iter = elems.into_iter();
+                        let first = iter.next().unwrap();
+                        iter.fold(first, |acc, elem| {
+                            let span = span.split().0.span(&elem.span.split().1);
+                            Pattern::new(PatternDesc::product(acc, elem), span)
+                        })
+                        .desc
                     };
                     Ok(Pattern::new(desc, span))
                 };
@@ -144,7 +150,12 @@ impl<'a> Parser<'a> {
                 Assoc::Right => prec,
             };
             let rhs = self.parse_binary_pat(next_min)?;
-            let desc = PatternDesc::binary_op(op.try_into().unwrap(), lhs, rhs);
+
+            let desc = if op == TokenKind::Comma {
+                PatternDesc::product(lhs, rhs)
+            } else {
+                PatternDesc::binary_op(op.try_into().unwrap(), lhs, rhs)
+            };
             let end = self.span().split().1;
             lhs = Pattern::new(desc, start.span(&end));
         }

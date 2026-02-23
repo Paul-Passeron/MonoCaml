@@ -1,5 +1,7 @@
 use id::Id;
 
+use crate::resolution::VarInfo;
+
 pub mod expr;
 pub mod id;
 pub mod item;
@@ -9,8 +11,7 @@ pub mod type_expr;
 pub mod typed_node_map;
 
 pub type TypeId = Id<item::TypeDeclInfo>;
-pub type VarId = Id<VarMarker>;
-pub struct VarMarker;
+pub type VarId = Id<VarInfo>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TypeParamId {

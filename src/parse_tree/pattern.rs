@@ -18,14 +18,14 @@ pub enum PatternDesc {
     // TODO: Var takes ident symbol
     Var(Symbol), // x
     // Alias(Box<Pattern>, Symbol),                    // p as x
-    Constant(Constant),                             // 1, "a", ...
-    Interval { start: Constant, end: Constant },    // 1..5
-    Tuple(Vec<Pattern>),                            // (p1, p2, ...)
-    Construct(LongIdent, Option<Box<Pattern>>),     // C, C p, C (p1, ...)
-    Record(Vec<RecordField<Box<Pattern>>>),         // {l1 = p1; ...}
-    Constraint(Box<Pattern>, TypeExpr),             // (p: t)
-    Unit,                                           // ()
-    Paren(Box<Pattern>),                            // (x)
+    Constant(Constant),                          // 1, "a", ...
+    Interval { start: Constant, end: Constant }, // 1..5
+    Product(Box<Pattern>, Box<Pattern>),
+    Construct(LongIdent, Option<Box<Pattern>>), // C, C p, C (p1, ...)
+    Record(Vec<RecordField<Box<Pattern>>>),     // {l1 = p1; ...}
+    Constraint(Box<Pattern>, TypeExpr),         // (p: t)
+    Unit,                                       // ()
+    Paren(Box<Pattern>),                        // (x)
     BinaryOp(BinaryOp, Box<Pattern>, Box<Pattern>), // a :: b
     List(Vec<Pattern>),
 }
@@ -35,8 +35,8 @@ impl PatternDesc {
         Self::Paren(Box::new(pat))
     }
 
-    pub fn tuple(pats: Vec<Pattern>) -> Self {
-        Self::Tuple(pats)
+    pub fn product(a: Pattern, b: Pattern) -> Self {
+        Self::Product(Box::new(a), Box::new(b))
     }
 
     pub fn constraint(pat: Pattern, te: TypeExpr) -> Self {
@@ -97,15 +97,8 @@ impl fmt::Display for PatternDescDisplay<'_> {
                     _ => write!(f, "?"),
                 }
             }
-            PatternDesc::Tuple(pats) => {
-                write!(f, "(")?;
-                for (i, pat) in pats.iter().enumerate() {
-                    if i > 0 {
-                        write!(f, ", ")?;
-                    }
-                    write!(f, "{}", pat.desc.display(0))?;
-                }
-                write!(f, ")")
+            PatternDesc::Product(a, b) => {
+                write!(f, "{}, {}", a.desc.display(0), b.desc.display(0))
             }
             PatternDesc::Construct(long_ident, None) => {
                 write!(f, "{}", long_ident.display(0))

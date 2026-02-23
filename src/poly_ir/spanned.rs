@@ -22,17 +22,4 @@ impl<T, Ty> TypedNode<T, Ty> {
             span: self.span,
         }
     }
-
-    // pub fn map<U>(self, f: impl FnOnce(T, Ty) -> U) -> TypedNode<U> {
-    //     TypedNode {
-    //         node: f(self.node, self.ty),
-    //         span: self.span,
-    //     }
-    // }
 }
-
-// impl Span {
-//     pub fn spanned<T>(&self, node: T) -> TypedNode<T> {
-//         TypedNode::new(node, *self)
-//     }
-// }
