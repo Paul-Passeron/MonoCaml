@@ -7,7 +7,7 @@ use crate::{
     },
     parse_tree::expression::Constant,
     poly_ir::{
-        VarId,
+        ValueRef, VarId,
         expr::{Expr, ExprNode, ValueBinding},
         id::{Arena, Id},
         item::{Item, ItemNode, TypeDeclInfo},
@@ -43,9 +43,7 @@ impl Id<MonoTy> {
     pub fn find(&self, ctx: &InferenceCtx) -> Id<MonoTy> {
         if self.get(ctx).is_con() {
             *self
-        } else if let Some(val) = ctx.forwards.get(self)
-            && val.get(ctx).is_var()
-        {
+        } else if let Some(val) = ctx.forwards.get(self) {
             val.find(ctx)
         } else {
             *self
@@ -190,7 +188,19 @@ impl<'a> InferenceCtx<'a> {
     pub fn infer_expr(&mut self, expr: &Expr<Type>) -> Res<Expr<Id<MonoTy>>> {
         let span = expr.span;
         match expr.as_ref().node {
-            ExprNode::Var(_) => todo!(),
+            ExprNode::Var(id) => {
+                let node = ExprNode::Var(*id);
+
+                let ty = match id {
+                    ValueRef::Local(id) => {
+                        let scheme = self.map[id].clone();
+                        self.instantiate(&scheme)
+                    }
+                    ValueRef::Constructor { .. } => todo!(),
+                };
+
+                Ok(Expr::new(node, span, ty))
+            }
             ExprNode::Const(constant) => {
                 let node = ExprNode::Const(*constant);
                 let ty = self.get_ty_of_const(constant);
