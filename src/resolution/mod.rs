@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use crate::{
     SESSION,
     lexer::interner::Symbol,
@@ -12,7 +14,7 @@ use crate::{
         type_expr::{TypeExpr, TypeExprDesc},
     },
     poly_ir::{
-        TypeId, TypeParamId, ValueRef,
+        TypeId, TypeParamId, ValueRef, VarId,
         expr::{Expr, ExprNode, MatchCase, ValueBinding},
         id::Arena,
         item::{Constructor, ConstructorArg, Item, ItemNode, TypeDecl, TypeDeclInfo, TypeDeclKind},
@@ -41,6 +43,7 @@ pub struct VarInfo {
 pub struct Resolver {
     pub types: Arena<TypeDeclInfo>,
     pub vars: Arena<VarInfo>,
+    pub builtins: HashMap<Symbol, VarId>,
     scope: Scope,
     binder_depth: u32,
     type_vars: u32,
@@ -84,6 +87,7 @@ impl Resolver {
             types: Arena::new(),
             vars: Arena::new(),
             scope: Scope::new(),
+            builtins: HashMap::new(),
             binder_depth: 0,
             type_vars: 0,
         };
