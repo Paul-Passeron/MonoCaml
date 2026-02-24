@@ -14,7 +14,7 @@ pub struct TyForall {
     pub ty: Box<MonoTy>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct TyVar {
     pub id: InferVarId,
 }
@@ -63,10 +63,14 @@ impl MonoTy {
     }
 
     pub fn tuple_ty(args: Vec<Id<Self>>) -> Self {
-        MonoTy::Con(TyCon {
-            name: intern_symbol("*"),
-            args,
-        })
+        if args.is_empty() {
+            Self::unit_ty()
+        } else {
+            MonoTy::Con(TyCon {
+                name: intern_symbol("*"),
+                args,
+            })
+        }
     }
 
     pub fn list_ty(ty: Id<Self>) -> Self {

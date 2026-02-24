@@ -78,7 +78,7 @@ fn flatten_product_pattern(pat: &pattern::Pattern) -> Vec<&pattern::Pattern> {
     }
     let mut v = vec![];
     aux(pat, &mut v);
-    dbg!(v)
+    v
 }
 
 impl Resolver {
@@ -109,7 +109,6 @@ impl Resolver {
         res
     }
 
-    #[inline(always)]
     fn new_type_param(&self, index: u32) -> TypeParamId {
         TypeParamId {
             depth: self.binder_depth,

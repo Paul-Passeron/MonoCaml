@@ -35,6 +35,7 @@ impl Resolver {
         self.add_builtin_value("print_endline");
         self.add_builtin_value("print_string");
         self.add_builtin_value("print_int");
+        self.add_builtin_value("failwith");
     }
 
     fn add_builtin_type(&mut self, name: &str, arity: usize) -> TypeId {

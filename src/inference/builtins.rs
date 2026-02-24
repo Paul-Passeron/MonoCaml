@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use crate::{
     inference::{
         InferenceCtx,
-        solved_ty::{MonoTy, TyForall},
+        solved_ty::{MonoTy, TyForall, TyVar},
     },
     intern_symbol,
     lexer::interner::Symbol,
@@ -28,6 +28,11 @@ impl<'a> InferenceCtx<'a> {
                 TyForall::mono(string_unit.clone()),
             ),
             (intern_symbol("print_int"), TyForall::mono(int_unit.clone())),
+            (intern_symbol("failwith"), {
+                let tick_a = TyVar { id: self.fresh() };
+                let func_ty = MonoTy::func_ty(string_ty, self.get_ty(tick_a.into()));
+                TyForall::new(vec![tick_a], func_ty)
+            }),
         ]);
 
         let schemes_symbs = schemes.keys().copied().collect::<HashSet<_>>();

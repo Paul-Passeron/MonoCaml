@@ -306,14 +306,18 @@ impl<'a> InferenceCtx<'a> {
             PatternNode::Wildcard => (PatternNode::Wildcard, self.fresh_ty()),
             PatternNode::Var(id) => (PatternNode::Var(*id), self.fresh_ty()),
             PatternNode::Tuple(typed_nodes) => {
-                let nodes = typed_nodes
-                    .iter()
-                    .map(|node| self.infer_pattern(node))
-                    .collect::<Res<Vec<_>>>()?;
+                if typed_nodes.is_empty() {
+                    let nodes = typed_nodes
+                        .iter()
+                        .map(|node| self.infer_pattern(node))
+                        .collect::<Res<Vec<_>>>()?;
 
-                let mono = MonoTy::tuple_ty(nodes.iter().map(|x| x.ty).collect());
-                let ty = self.get_ty(mono);
-                (PatternNode::Tuple(nodes), ty)
+                    let mono = MonoTy::tuple_ty(nodes.iter().map(|x| x.ty).collect());
+                    let ty = self.get_ty(mono);
+                    (PatternNode::Tuple(nodes), ty)
+                } else {
+                    (PatternNode::Tuple(vec![]), self.get_ty(MonoTy::unit_ty()))
+                }
             }
         };
         Ok(Pattern::new(node, pattern.span, ty))
@@ -463,23 +467,34 @@ impl<'a> InferenceCtx<'a> {
             PatternNode::Var(id) => {
                 self.map.insert(*id, scheme);
             }
-            PatternNode::Tuple(pats) => match &*scheme.ty {
-                MonoTy::Con(TyCon { name, args }) if &name.to_string() == "*" => {
-                    if args.len() != pats.len() {
-                        return Err("Tuple pattern length mismatch".to_string());
+            PatternNode::Tuple(pats) => {
+                if !pats.is_empty() {
+                    match &*scheme.ty {
+                        MonoTy::Con(TyCon { name, args }) if &name.to_string() == "*" => {
+                            if args.len() != pats.len() {
+                                return Err("Tuple pattern length mismatch".to_string());
+                            }
+                            for (arg, pat) in args.iter().zip(pats.iter()) {
+                                self.bind_pattern_to_context(
+                                    pat,
+                                    TyForall {
+                                        tyvars: vec![],
+                                        ty: Box::new(arg.get(self).clone()),
+                                    },
+                                )?;
+                            }
+                        }
+                        _ => return Err("Expected tuple type".to_string()),
                     }
-                    for (arg, pat) in args.iter().zip(pats.iter()) {
-                        self.bind_pattern_to_context(
-                            pat,
-                            TyForall {
-                                tyvars: vec![],
-                                ty: Box::new(arg.get(self).clone()),
-                            },
-                        )?;
+                } else {
+                    if let Some(ty_con) = scheme.ty.as_con()
+                        && &ty_con.name.to_string() == "unit"
+                    {
+                    } else {
+                        return Err("Expected unit type.".to_string());
                     }
                 }
-                _ => return Err("Expected tuple type".to_string()),
-            },
+            }
         }
         Ok(())
     }
