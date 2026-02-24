@@ -96,19 +96,7 @@ impl<'a> Parser<'a> {
                 self.loc(),
             )),
         }?;
-        if self.at(TokenKind::Colon)
-            && !matches!(res.desc, PatternDesc::Constraint(_, _))
-            && !matches!(res.desc, PatternDesc::Paren(_))
-        {
-            self.advance();
-            let constraint = self.parse_type_expr()?;
-            let end = self.loc();
-            let span = start.span(&end);
-            let desc = PatternDesc::Constraint(Box::new(res), constraint);
-            Ok(Pattern::new(desc, span))
-        } else {
-            Ok(res)
-        }
+        Ok(res)
     }
 
     fn parse_constructor_pat(&mut self) -> ParseRes<Pattern> {
