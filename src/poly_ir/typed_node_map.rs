@@ -77,9 +77,9 @@ impl<T> Expr<T> {
             ExprNode::Function { cases } => ExprNode::Function {
                 cases: cases.iter().map(|x| x.map(ctx, f)).collect(),
             },
-            ExprNode::Apply { func, args } => ExprNode::Apply {
+            ExprNode::Apply { func, arg } => ExprNode::Apply {
                 func: Box::new(func.map(ctx, f)),
-                args: args.iter().map(|arg| arg.map(ctx, f)).collect(),
+                arg: Box::new(arg.map(ctx, f)),
             },
             ExprNode::Match { scrutinee, cases } => ExprNode::Match {
                 scrutinee: Box::new(scrutinee.map(ctx, f)),
@@ -108,6 +108,16 @@ impl<T> Expr<T> {
             ExprNode::UnaryOp { op, expr } => ExprNode::UnaryOp {
                 op: *op,
                 expr: Box::new(expr.map(ctx, f)),
+            },
+            ExprNode::Unit => ExprNode::Unit,
+            ExprNode::IfThenElse {
+                cond,
+                then_expr,
+                else_expr,
+            } => ExprNode::IfThenElse {
+                cond: Box::new(cond.map(ctx, f)),
+                then_expr: Box::new(then_expr.map(ctx, f)),
+                else_expr: Box::new(else_expr.map(ctx, f)),
             },
         };
         Expr::new(node, span, t)

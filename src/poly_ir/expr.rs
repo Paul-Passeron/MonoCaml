@@ -20,7 +20,7 @@ pub enum ExprNode<T> {
     },
     Apply {
         func: Box<Expr<T>>,
-        args: Vec<Expr<T>>,
+        arg: Box<Expr<T>>,
     },
     Match {
         scrutinee: Box<Expr<T>>,
@@ -47,6 +47,12 @@ pub enum ExprNode<T> {
     UnaryOp {
         op: UnaryOp,
         expr: Box<Expr<T>>,
+    },
+    Unit,
+    IfThenElse {
+        cond: Box<Expr<T>>,
+        then_expr: Box<Expr<T>>,
+        else_expr: Box<Expr<T>>,
     },
 }
 

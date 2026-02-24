@@ -263,7 +263,7 @@ impl Resolver {
                 let arg = self.resolve_expression(a)?;
                 ExprNode::Apply {
                     func: Box::new(func),
-                    args: vec![arg],
+                    arg: Box::new(arg),
                 }
             }
             ExpressionDesc::Unit => ExprNode::Tuple(vec![]),
@@ -274,6 +274,28 @@ impl Resolver {
                     .collect::<Res<_>>()?,
             ),
             ExpressionDesc::Paren(e) => return self.resolve_expression(e),
+            ExpressionDesc::IfThenElse {
+                cond,
+                then_expr,
+                else_expr,
+            } => {
+                let r_cond = self.resolve_expression(cond)?;
+                let r_then_expr = self.resolve_expression(then_expr)?;
+                let r_else_expr = else_expr
+                    .as_ref()
+                    .map(|expr| self.resolve_expression(expr))
+                    .transpose()?
+                    .unwrap_or_else(|| {
+                        let l = r_then_expr.span.split().1;
+                        let span = l.span(&l);
+                        Expr::new(ExprNode::Unit, span, Default::default())
+                    });
+                ExprNode::IfThenElse {
+                    cond: Box::new(r_cond),
+                    then_expr: Box::new(r_then_expr),
+                    else_expr: Box::new(r_else_expr),
+                }
+            }
             x => todo!("{x:?}"),
         };
         Ok(Expr::new(node, span, Type::default()))
