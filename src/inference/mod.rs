@@ -538,13 +538,12 @@ impl<'a> InferenceCtx<'a> {
                         }
                         _ => return Err("Expected tuple type".to_string()),
                     }
+                } else if let Some(ty_con) = scheme.ty.as_con()
+                    && &ty_con.name.to_string() == "unit"
+                {
+                    // pass
                 } else {
-                    if let Some(ty_con) = scheme.ty.as_con()
-                        && &ty_con.name.to_string() == "unit"
-                    {
-                    } else {
-                        return Err("Expected unit type.".to_string());
-                    }
+                    return Err("Expected unit type.".to_string());
                 }
             }
         }
@@ -561,7 +560,7 @@ impl<'a> InferenceCtx<'a> {
         match end.get(self).clone() {
             MonoTy::Var(ty_var) => SolvedTy::Var(ty_var),
             MonoTy::Con(TyCon { name, args }) => SolvedTy::Con(SolvedCon {
-                name: name,
+                name,
                 args: args.iter().map(|x| self.into_solved(*x)).collect(),
             }),
         }
@@ -594,7 +593,7 @@ impl<'a> InferenceCtx<'a> {
         // inferring items
         let inferred = items
             .iter()
-            .map(|item| self.infer_item(item).map(|ok| ok))
+            .map(|item| self.infer_item(item))
             .collect::<Res<Vec<_>>>()?;
 
         // Cleaning up the free variables
