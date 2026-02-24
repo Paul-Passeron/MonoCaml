@@ -35,6 +35,7 @@ pub mod poly_ir;
 pub mod resolution;
 pub mod session;
 pub mod source_manager;
+pub mod specialize;
 
 #[allow(unused)]
 fn compile_ast<S: ToString>(ast: Ast<()>, prog_name: S) {
