@@ -1,6 +1,16 @@
 use crate::{inference::InferVarId, intern_symbol, lexer::interner::Symbol, poly_ir::id::Id};
 
-pub type SolvedTy = MonoTy;
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum SolvedTy {
+    Var(TyVar),
+    Con(SolvedCon),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct SolvedCon {
+    pub name: Symbol,
+    pub args: Vec<SolvedTy>,
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum MonoTy {

@@ -158,6 +158,9 @@ fn main() {
     let inferred = infer_ctx.infer_program(&poly).unwrap();
 
     for item in &inferred {
-        println!("{:#?}", item.map(&infer_ctx, &mut |x, ctx| x.display(ctx)))
+        println!(
+            "{:#?}",
+            item.map(&infer_ctx, &mut |x, _| format!("{:?}", x))
+        )
     }
 }

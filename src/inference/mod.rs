@@ -3,7 +3,7 @@ use std::collections::{HashMap, HashSet};
 use crate::{
     inference::{
         error::Res,
-        solved_ty::{MonoTy, TyCon, TyForall, TyVar},
+        solved_ty::{MonoTy, SolvedCon, SolvedTy, TyCon, TyForall, TyVar},
     },
     lexer::interner::Symbol,
     parse_tree::expression::{BinaryOp, Constant},
@@ -556,8 +556,60 @@ impl<'a> InferenceCtx<'a> {
         self.subst(&forall.ty, &replacement)
     }
 
-    pub fn infer_program(&mut self, items: &[Item<Type>]) -> Res<Vec<Item<Id<MonoTy>>>> {
-        items.iter().map(|item| self.infer_item(item)).collect()
+    pub fn into_solved(&self, ty: Id<MonoTy>) -> SolvedTy {
+        let end = ty.find(self);
+        match end.get(self).clone() {
+            MonoTy::Var(ty_var) => SolvedTy::Var(ty_var),
+            MonoTy::Con(TyCon { name, args }) => SolvedTy::Con(SolvedCon {
+                name: name,
+                args: args.iter().map(|x| self.into_solved(*x)).collect(),
+            }),
+        }
+    }
+
+    pub fn infer_program(&mut self, items: &[Item<Type>]) -> Res<Vec<Item<SolvedTy>>> {
+        fn replace_infer(
+            ty: &SolvedTy,
+            ctx: &mut (HashMap<InferVarId, InferVarId>, Arena<InfMarker>),
+        ) -> SolvedTy {
+            match ty {
+                SolvedTy::Var(ty_var) => {
+                    let id = if let Some(id) = ctx.0.get(&ty_var.id) {
+                        *id
+                    } else {
+                        let id = ctx.1.alloc(InfMarker);
+                        println!("ALLOCATING {id:?}");
+                        ctx.0.insert(ty_var.id, id);
+                        id
+                    };
+                    SolvedTy::Var(TyVar { id })
+                }
+                SolvedTy::Con(SolvedCon { name, args }) => SolvedTy::Con(SolvedCon {
+                    name: *name,
+                    args: args.iter().map(|x| replace_infer(x, ctx)).collect(),
+                }),
+            }
+        }
+
+        // inferring items
+        let inferred = items
+            .iter()
+            .map(|item| self.infer_item(item).map(|ok| ok))
+            .collect::<Res<Vec<_>>>()?;
+
+        // Cleaning up the free variables
+        let replace_ctx = &mut (HashMap::new(), Arena::new());
+
+        Ok(inferred
+            .into_iter()
+            .map(|id| {
+                id
+                    // From MonoTy to SolvedTy
+                    .map(self, &mut |id, ctx| ctx.into_solved(*id))
+                    // Cleaning up the unnused `InferVarId`s
+                    .map_mut(replace_ctx, &mut |ty, ctx| replace_infer(ty, ctx))
+            })
+            .collect())
     }
 
     pub fn fresh_ty(&mut self) -> Id<MonoTy> {
