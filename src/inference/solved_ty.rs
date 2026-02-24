@@ -159,11 +159,15 @@ impl TyVar {
 }
 
 impl TyForall {
-    pub fn new(vars: Vec<TyVar>, ty: impl Into<MonoTy>) -> Self {
+    pub fn new(vars: Vec<TyVar>, ty: MonoTy) -> Self {
         Self {
             tyvars: vars,
-            ty: Box::new(ty.into()),
+            ty: Box::new(ty),
         }
+    }
+
+    pub fn mono(ty: MonoTy) -> Self {
+        Self::new(vec![], ty)
     }
 }
 

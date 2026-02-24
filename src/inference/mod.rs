@@ -5,6 +5,7 @@ use crate::{
         error::Res,
         solved_ty::{MonoTy, TyCon, TyForall, TyVar},
     },
+    lexer::interner::Symbol,
     parse_tree::expression::{BinaryOp, Constant},
     poly_ir::{
         ValueRef, VarId,
@@ -17,6 +18,7 @@ use crate::{
     resolution::VarInfo,
 };
 
+pub mod builtins;
 pub mod error;
 pub mod solved_ty;
 
@@ -35,6 +37,7 @@ pub struct InferenceCtx<'a> {
     pub inf: Arena<InfMarker>,
     pub decls: &'a Arena<TypeDeclInfo>,
     pub names: &'a Arena<VarInfo>,
+    pub builtins: &'a HashMap<Symbol, VarId>,
 }
 
 impl Id<MonoTy> {
@@ -51,22 +54,6 @@ impl Id<MonoTy> {
             *self
         }
     }
-
-    // pub fn make_equal_to(&self, other: Id<MonoTy>, ctx: &mut InferenceCtx) {
-    //     let chain_end = self.find(ctx);
-    //     let (a, b) = if chain_end.get(ctx).is_var() {
-    //         (other.find(ctx), *self)
-    //     } else {
-    //         (chain_end, other)
-    //     };
-    //     assert!(
-    //         a.get(ctx).is_var() || a == b,
-    //         "Already resolved ({} vs {})",
-    //         a.display(ctx),
-    //         b.display(ctx)
-    //     );
-    //     ctx.forwards.insert(a, b);
-    // }
 
     pub fn make_equal_to(&self, other: Id<MonoTy>, ctx: &mut InferenceCtx) {
         let chain_end = self.find(ctx);
@@ -94,15 +81,22 @@ impl MonoTy {
 }
 
 impl<'a> InferenceCtx<'a> {
-    pub fn new(decls: &'a Arena<TypeDeclInfo>, names: &'a Arena<VarInfo>) -> Self {
-        Self {
+    pub fn new(
+        decls: &'a Arena<TypeDeclInfo>,
+        names: &'a Arena<VarInfo>,
+        builtins: &'a HashMap<Symbol, VarId>,
+    ) -> Self {
+        let mut res = Self {
             map: HashMap::new(),
             tys: Arena::new(),
             forwards: HashMap::new(),
             inf: Arena::new(),
             decls,
             names,
-        }
+            builtins,
+        };
+        res.init_builtins();
+        res
     }
 
     pub fn occurence_unify(&mut self, ty1: Id<MonoTy>, ty2: Id<MonoTy>) -> Res<()> {

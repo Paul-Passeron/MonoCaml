@@ -99,7 +99,7 @@ fn intern_strlit(s: &str) -> StrLit {
 }
 
 fn main() {
-    let file_name = "examples/eval.ml";
+    let file_name = "examples/hello_world.ml";
     let contents = {
         let mut s = String::new();
         let mut f = File::open(file_name).unwrap();
@@ -153,7 +153,7 @@ fn main() {
 
     let poly = resolver.resolve_structure(&prog).unwrap();
 
-    let mut infer_ctx = InferenceCtx::new(&resolver.types, &resolver.vars);
+    let mut infer_ctx = InferenceCtx::new(&resolver.types, &resolver.vars, &resolver.builtins);
 
     let inferred = infer_ctx.infer_program(&poly).unwrap();
 
