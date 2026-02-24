@@ -9,7 +9,7 @@ use crate::{
     },
     helpers::unique::Use,
     mono_ir::{
-        Ast, AstKind, MatchCase, Var,
+        Ast, MatchCase, Var,
         pattern::Pattern,
         types::{AstCtx, AstTy},
     },
@@ -88,7 +88,7 @@ impl MonoToCfg {
         res
     }
 
-    pub fn compile<T: Clone>(ast: Ast<T>, ctx: AstCtx) -> Program {
+    pub fn compile(ast: Ast, ctx: AstCtx) -> Program {
         let entry = FunName::fresh();
         let entry_use = Use::from(&entry);
         let mut res = Self::new(entry_use, ctx);
@@ -191,13 +191,13 @@ impl MonoToCfg {
         self.ast_ty_to_ty_pro(t, true)
     }
 
-    fn normalize_lambda<T: Clone>(&mut self, a: Ast<T>) -> (Option<(Var, AstTy, Ty)>, Ast<T>) {
+    fn normalize_lambda(&mut self, a: Ast) -> (Option<(Var, AstTy, Ty)>, Ast) {
         let ty = self.get_type_of_ast(&a);
         if !ty.repr_closure() {
             return (None, a);
         }
-        match a.extract() {
-            AstKind::Lambda { arg, body, arg_ty } => (
+        match a {
+            Ast::Lambda { arg, body, arg_ty } => (
                 {
                     let cfg_arg_ty = self.ast_ty_to_ty(&arg_ty);
                     Some((arg, arg_ty, cfg_arg_ty))
@@ -210,10 +210,10 @@ impl MonoToCfg {
         }
     }
 
-    fn is_sat_aux<T: Clone>(&self, ast: &Ast<T>, remaining: usize) -> bool {
-        match ast.expr() {
-            AstKind::App { fun, .. } => match fun.as_ref().expr() {
-                AstKind::Native(x) => {
+    fn is_sat_aux(&self, ast: &Ast, remaining: usize) -> bool {
+        match ast {
+            Ast::App { fun, .. } => match fun.as_ref() {
+                Ast::Native(x) => {
                     let name = &self.ctx.natives[x];
                     let sig = &self.ctx.sigs[name];
                     let l = sig.params().len();
@@ -225,40 +225,40 @@ impl MonoToCfg {
         }
     }
 
-    fn ast_is_saturated<T: Clone>(&self, ast: &Ast<T>) -> bool {
-        match ast.expr() {
-            AstKind::App { .. } => self.is_sat_aux(ast, 1),
+    fn ast_is_saturated(&self, ast: &Ast) -> bool {
+        match ast {
+            Ast::App { .. } => self.is_sat_aux(ast, 1),
             _ => false,
         }
     }
 
-    fn get_sat_aux<T: Clone>(&self, ast: Ast<T>, v: &mut Vec<Ast<T>>) -> FunNameUse {
-        match ast.extract() {
-            AstKind::App { fun, arg } => {
+    fn get_sat_aux(&self, ast: Ast, v: &mut Vec<Ast>) -> FunNameUse {
+        match ast {
+            Ast::App { fun, arg } => {
                 let res = self.get_sat_aux(*fun, v);
                 v.push(*arg);
                 res
             }
-            AstKind::Native(x) => self.ctx.natives[&x].clone(),
+            Ast::Native(x) => self.ctx.natives[&x].clone(),
             _ => panic!("Not a saturated call"),
         }
     }
 
-    fn get_saturated_args_and_fun<T: Clone>(&self, ast: Ast<T>) -> (Vec<Ast<T>>, FunNameUse) {
+    fn get_saturated_args_and_fun(&self, ast: Ast) -> (Vec<Ast>, FunNameUse) {
         let mut v = vec![];
         let f = self.get_sat_aux(ast, &mut v);
         (v, f)
     }
 
-    fn aux<T: Clone>(&mut self, ast: &Ast<T>, b: &mut Builder) -> Value {
-        match ast.expr() {
-            AstKind::Str(s) => Const::String(s.clone()).into(),
-            AstKind::Int(i) => Const::Int(*i).into(),
-            AstKind::Var(var) => Value::Var(self.map[var].clone()),
-            AstKind::Lambda { arg, body, arg_ty } => {
+    fn aux(&mut self, ast: &Ast, b: &mut Builder) -> Value {
+        match ast {
+            Ast::Str(s) => Const::String(s.clone()).into(),
+            Ast::Int(i) => Const::Int(*i).into(),
+            Ast::Var(var) => Value::Var(self.map[var].clone()),
+            Ast::Lambda { arg, body, arg_ty } => {
                 self.compile_lambda(*arg, arg_ty.clone(), body.as_ref().clone(), b)
             }
-            AstKind::App { fun, arg } => {
+            Ast::App { fun, arg } => {
                 if self.ast_is_saturated(ast) {
                     let (args, name) = self.get_saturated_args_and_fun(ast.clone());
                     let vals = args.iter().map(|x| self.aux(x, b)).collect();
@@ -274,16 +274,16 @@ impl MonoToCfg {
                 b.native_call(&mut self.ctx, fun_ptr.into(), vec![env_ptr.into(), arg_val])
                     .into()
             }
-            AstKind::Seq { fst, snd } => {
+            Ast::Seq { fst, snd } => {
                 let _ = self.aux(fst, b);
                 self.aux(snd, b)
             }
-            AstKind::Tuple(asts) => {
+            Ast::Tuple(asts) => {
                 let vals = asts.iter().map(|x| self.aux(x, b)).collect();
                 b.aggregate(&mut self.ctx, vals)
             }
-            AstKind::Native(name) => self.get_native_closure(name.clone(), b),
-            AstKind::LetBinding {
+            Ast::Native(name) => self.get_native_closure(name.clone(), b),
+            Ast::LetBinding {
                 bound,
                 bound_ty,
                 value,
@@ -301,12 +301,12 @@ impl MonoToCfg {
                     self.compile_nonrec_let(b, bound, bound_ty, value, in_expr)
                 }
             }
-            AstKind::If {
+            Ast::If {
                 cond,
                 then_e,
                 else_e,
             } => self.compile_if(b, cond, then_e, else_e),
-            AstKind::Cons {
+            Ast::Cons {
                 enum_name,
                 case,
                 arg,
@@ -320,20 +320,20 @@ impl MonoToCfg {
                 )
                 .into()
             }
-            AstKind::Match { expr, cases } => {
+            Ast::Match { expr, cases } => {
                 let target = self.get_type_of_case(&cases[0]);
                 self.compile_match(expr, cases, b, target)
             }
         }
     }
 
-    fn compile_nonrec_let<T: Clone>(
+    fn compile_nonrec_let(
         &mut self,
         b: &mut Builder,
         bound: &Var,
         bound_ty: &AstTy,
-        value: &Ast<T>,
-        in_expr: &Ast<T>,
+        value: &Ast,
+        in_expr: &Ast,
     ) -> Value {
         let val = self.aux(value, b);
         let bound_ty = self.ast_ty_to_ty(bound_ty);
@@ -344,13 +344,7 @@ impl MonoToCfg {
         self.aux(in_expr, b)
     }
 
-    fn compile_if<T: Clone>(
-        &mut self,
-        b: &mut Builder,
-        cond: &Ast<T>,
-        then_e: &Ast<T>,
-        else_e: &Ast<T>,
-    ) -> Value {
+    fn compile_if(&mut self, b: &mut Builder, cond: &Ast, then_e: &Ast, else_e: &Ast) -> Value {
         let compiled_cond = self.aux(cond, b);
         let then_bb = Label::fresh();
         let else_bb = Label::fresh();
@@ -392,12 +386,12 @@ impl MonoToCfg {
         })
     }
 
-    fn compile_rec_let<T: Clone>(
+    fn compile_rec_let(
         &mut self,
         bound: Var,
         bound_ty: AstTy,
-        value: Ast<T>,
-        in_expr: Ast<T>,
+        value: Ast,
+        in_expr: Ast,
         b: &mut Builder,
     ) -> Value {
         let cfg_bound_ty = self.ast_ty_to_ty(&bound_ty);
@@ -579,7 +573,7 @@ impl MonoToCfg {
         res
     }
 
-    fn capture<T: Clone>(&self, param: &Var, ast: &Ast<T>) -> Vec<Var> {
+    fn capture(&self, param: &Var, ast: &Ast) -> Vec<Var> {
         let mut free_vars = ast.free_vars();
         free_vars.remove(param);
         let mut res = free_vars.into_iter().collect::<Vec<_>>();
@@ -587,12 +581,12 @@ impl MonoToCfg {
         res
     }
 
-    fn get_type_of_ast<T: Clone>(&mut self, ast: &Ast<T>) -> Ty {
-        match ast.expr() {
-            AstKind::Str(_) => Ty::String,
-            AstKind::Int(_) => Ty::Int,
-            AstKind::Var(var) => self.type_map[var].clone(),
-            AstKind::Lambda { arg, arg_ty, body } => {
+    fn get_type_of_ast(&mut self, ast: &Ast) -> Ty {
+        match ast {
+            Ast::Str(_) => Ty::String,
+            Ast::Int(_) => Ty::Int,
+            Ast::Var(var) => self.type_map[var].clone(),
+            Ast::Lambda { arg, arg_ty, body } => {
                 let cfg_arg_ty = {
                     if !self.type_map.contains_key(arg) {
                         let cfg_arg_ty = self.ast_ty_to_ty(arg_ty);
@@ -606,20 +600,18 @@ impl MonoToCfg {
 
                 self.get_closure(cfg_arg_ty, ty)
             }
-            AstKind::App { fun, .. } => {
+            Ast::App { fun, .. } => {
                 let typeof_fun = self.get_type_of_ast(fun);
                 typeof_fun.field(0).sig().ret().clone()
             }
-            AstKind::Seq { snd, .. } => self.get_type_of_ast(snd),
-            AstKind::Tuple(asts) => {
-                Ty::Struct(asts.iter().map(|x| self.get_type_of_ast(x)).collect())
-            }
-            AstKind::Native(name) => {
+            Ast::Seq { snd, .. } => self.get_type_of_ast(snd),
+            Ast::Tuple(asts) => Ty::Struct(asts.iter().map(|x| self.get_type_of_ast(x)).collect()),
+            Ast::Native(name) => {
                 let f = &self.ctx.natives[name];
                 let sig = &self.ctx.sigs[f];
                 self.curry(sig)
             }
-            AstKind::LetBinding {
+            Ast::LetBinding {
                 bound,
                 bound_ty,
                 in_expr,
@@ -629,7 +621,7 @@ impl MonoToCfg {
                 self.type_map.insert(*bound, bound_ty);
                 self.get_type_of_ast(in_expr)
             }
-            AstKind::If {
+            Ast::If {
                 cond,
                 then_e,
                 else_e,
@@ -644,8 +636,8 @@ impl MonoToCfg {
                 }
                 t
             }
-            AstKind::Cons { enum_name, .. } => self.ast_ty_to_ty(&AstTy::named(enum_name)),
-            AstKind::Match { expr, cases } => {
+            Ast::Cons { enum_name, .. } => self.ast_ty_to_ty(&AstTy::named(enum_name)),
+            Ast::Match { expr, cases } => {
                 assert!(!cases.is_empty());
                 self.get_type_of_case(&cases[0])
             }
@@ -673,12 +665,12 @@ impl MonoToCfg {
         }
     }
 
-    fn get_type_of_case<T: Clone>(&mut self, case: &MatchCase<T>) -> Ty {
+    fn get_type_of_case(&mut self, case: &MatchCase) -> Ty {
         self.collect_types_in_pat(&case.pat);
         self.get_type_of_ast(&case.expr)
     }
 
-    fn get_ast_type_of_case<T: Clone>(&mut self, case: &MatchCase<T>) -> AstTy {
+    fn get_ast_type_of_case(&mut self, case: &MatchCase) -> AstTy {
         self.collect_types_in_pat(&case.pat);
         self.get_ast_ty_of(&case.expr)
     }
@@ -720,13 +712,7 @@ impl MonoToCfg {
         b.native_call(&mut self.ctx, print_func.into(), vec![print_arg.into()]);
     }
 
-    fn compile_lambda<T: Clone>(
-        &mut self,
-        arg: Var,
-        ty: AstTy,
-        body: Ast<T>,
-        b: &mut Builder,
-    ) -> Value {
+    fn compile_lambda(&mut self, arg: Var, ty: AstTy, body: Ast, b: &mut Builder) -> Value {
         let old_ctx = self.ctx.clone();
         let old_map = self.map.clone();
 
@@ -1019,32 +1005,30 @@ impl MonoToCfg {
         innermost_use
     }
 
-    fn get_ast_ty_of<T: Clone>(&mut self, a: &Ast<T>) -> AstTy {
-        match a.expr() {
-            AstKind::Str(_) => AstTy::String,
-            AstKind::Int(_) => AstTy::Int,
-            AstKind::Var(var) => self.ast_tys[var].clone(),
-            AstKind::Lambda { arg, arg_ty, body } => {
+    fn get_ast_ty_of(&mut self, a: &Ast) -> AstTy {
+        match a {
+            Ast::Str(_) => AstTy::String,
+            Ast::Int(_) => AstTy::Int,
+            Ast::Var(var) => self.ast_tys[var].clone(),
+            Ast::Lambda { arg, arg_ty, body } => {
                 self.ast_tys.insert(*arg, arg_ty.clone());
                 let ret = self.get_ast_ty_of(body);
                 AstTy::fun(arg_ty.clone(), ret)
             }
-            AstKind::App { fun, .. } => {
+            Ast::App { fun, .. } => {
                 let f_ty = self.get_ast_ty_of(fun);
                 match f_ty {
                     AstTy::Fun { ret, .. } => *ret,
                     x => unreachable!("{x}"),
                 }
             }
-            AstKind::Seq { fst, snd } => {
+            Ast::Seq { fst, snd } => {
                 let _ = self.get_ast_ty_of(fst);
                 self.get_ast_ty_of(snd)
             }
-            AstKind::Tuple(asts) => {
-                AstTy::Tuple(asts.iter().map(|x| self.get_ast_ty_of(x)).collect())
-            }
-            AstKind::Native(x) => self.ast_ctx.natives[x].clone(),
-            AstKind::LetBinding {
+            Ast::Tuple(asts) => AstTy::Tuple(asts.iter().map(|x| self.get_ast_ty_of(x)).collect()),
+            Ast::Native(x) => self.ast_ctx.natives[x].clone(),
+            Ast::LetBinding {
                 bound,
                 bound_ty,
                 value,
@@ -1054,7 +1038,7 @@ impl MonoToCfg {
                 let _ = self.get_ast_ty_of(value);
                 self.get_ast_ty_of(in_expr)
             }
-            AstKind::If {
+            Ast::If {
                 cond,
                 then_e,
                 else_e,
@@ -1063,8 +1047,8 @@ impl MonoToCfg {
                 let _ = self.get_ast_ty_of(then_e);
                 self.get_ast_ty_of(else_e)
             }
-            AstKind::Cons { enum_name, .. } => AstTy::Named(enum_name.clone()),
-            AstKind::Match { expr, cases } => {
+            Ast::Cons { enum_name, .. } => AstTy::Named(enum_name.clone()),
+            Ast::Match { expr, cases } => {
                 assert!(!cases.is_empty());
                 self.get_ast_type_of_case(&cases[0])
             }
@@ -1158,10 +1142,10 @@ impl MonoToCfg {
         }
     }
 
-    fn compile_match<T: Clone>(
+    fn compile_match(
         &mut self,
-        expr: &Ast<T>,
-        cases: &[MatchCase<T>],
+        expr: &Ast,
+        cases: &[MatchCase],
         b: &mut Builder,
         target_ty: Ty,
     ) -> Value {
