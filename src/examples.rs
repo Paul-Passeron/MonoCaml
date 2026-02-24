@@ -1,6 +1,9 @@
+#![allow(unused)]
+
 use std::{
+    io::Read,
     path::PathBuf,
-    process::{self, Stdio},
+    process::{self, Command, Stdio},
 };
 
 use rand::{Rng, rngs::ThreadRng};
@@ -12,8 +15,21 @@ use crate::{
         pattern::Pattern,
         types::{AstCtx, AstTy, EnumCase, EnumDef},
     },
-    run_and_check_output,
 };
+
+fn run_and_check_output(program: &str, args: &[&str], expected: &str) -> std::io::Result<bool> {
+    let mut child = Command::new(program)
+        .args(args)
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()?;
+
+    let mut stdout = String::new();
+    child.stdout.take().unwrap().read_to_string(&mut stdout)?;
+    child.wait()?;
+
+    Ok(stdout.contains(expected))
+}
 
 pub fn test_ast<S: ToString>(ast: UAst, prog_name: S) {
     test_ast_with_ctx(ast, prog_name, Default::default());

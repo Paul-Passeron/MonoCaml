@@ -10,6 +10,7 @@ pub struct Session {
     pub strlit_interner: Interner<StrLit>,
 }
 
+#[allow(unused)]
 impl Session {
     pub fn new(source_manager: SourceManager) -> Self {
         Self {

@@ -1,12 +1,6 @@
 #![feature(normalize_lexically, exit_status_error)]
 
-use std::{
-    fs::File,
-    io::Read,
-    path::PathBuf,
-    process::{Command, Stdio},
-    sync::Mutex,
-};
+use std::{fs::File, io::Read, path::PathBuf, sync::Mutex};
 
 use lazy_static::lazy_static;
 
@@ -61,20 +55,6 @@ fn compile_ast_with_ctx<S: ToString>(ast: Ast<()>, prog_name: S, ctx: AstCtx) {
     CfgVar::reset();
     Label::reset();
     FunName::reset();
-}
-
-fn run_and_check_output(program: &str, args: &[&str], expected: &str) -> std::io::Result<bool> {
-    let mut child = Command::new(program)
-        .args(args)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .spawn()?;
-
-    let mut stdout = String::new();
-    child.stdout.take().unwrap().read_to_string(&mut stdout)?;
-    child.wait()?;
-
-    Ok(stdout.contains(expected))
 }
 
 lazy_static! {
