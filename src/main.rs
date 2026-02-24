@@ -35,14 +35,13 @@ pub mod poly_ir;
 pub mod resolution;
 pub mod session;
 pub mod source_manager;
-pub mod specialize;
 
 #[allow(unused)]
-fn compile_ast<S: ToString>(ast: Ast<()>, prog_name: S) {
+fn compile_ast<S: ToString>(ast: Ast, prog_name: S) {
     compile_ast_with_ctx(ast, prog_name, AstCtx::default())
 }
 
-fn compile_ast_with_ctx<S: ToString>(ast: Ast<()>, prog_name: S, ctx: AstCtx) {
+fn compile_ast_with_ctx<S: ToString>(ast: Ast, prog_name: S, ctx: AstCtx) {
     let prog_name = prog_name.to_string();
     println!("{}", ast.display());
     let prog = MonoToCfg::compile(ast, ctx);
@@ -80,7 +79,7 @@ fn intern_strlit(s: &str) -> StrLit {
 }
 
 fn main() {
-    let file_name = "examples/fail.ml";
+    let file_name = "examples/hello_world.ml";
     let contents = {
         let mut s = String::new();
         let mut f = File::open(file_name).unwrap();
