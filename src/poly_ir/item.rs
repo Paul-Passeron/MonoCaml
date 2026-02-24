@@ -3,9 +3,10 @@ use crate::{
     poly_ir::{TypeId, expr::ValueBinding, spanned::TypedNode, type_expr::Type},
 };
 
-pub type Item<T> = TypedNode<ItemNode<T>, ()>;
+pub type GenItem<Ty, M> = TypedNode<ItemNode<Ty>, M>;
+pub type Item<T> = GenItem<T, ()>;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ItemNode<T> {
     Value {
         recursive: bool,

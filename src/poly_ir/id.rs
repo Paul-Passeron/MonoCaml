@@ -52,7 +52,7 @@ impl<T> Hash for Id<T> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Arena<T> {
     entries: Vec<T>,
 }

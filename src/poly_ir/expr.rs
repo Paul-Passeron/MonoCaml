@@ -1,11 +1,11 @@
 use crate::{
     parse_tree::expression::{BinaryOp, Constant, UnaryOp},
-    poly_ir::{ValueRef, pattern::Pattern, spanned::TypedNode},
+    poly_ir::{ValueRef, id::Id, pattern::Pattern, spanned::TypedNode},
 };
 
 pub type Expr<T> = TypedNode<ExprNode<T>, T>;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ExprNode<T> {
     Var(ValueRef),
     Const(Constant),
@@ -59,16 +59,19 @@ pub enum ExprNode<T> {
         body: Box<Expr<T>>,
     },
 }
+pub struct VBMarker;
+pub type ValueBindingId = Id<VBMarker>;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ValueBinding<T> {
+    pub id: ValueBindingId,
     pub pat: Pattern<T>,
     pub params: Vec<Pattern<T>>,
     pub ty: T,
     pub body: Expr<T>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MatchCase<T> {
     pub pattern: Pattern<T>,
     pub guard: Option<Box<Expr<T>>>,

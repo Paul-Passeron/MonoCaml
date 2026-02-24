@@ -24,7 +24,7 @@ pub mod solved_ty;
 
 // Implementing Algorithm J for the moment
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct InfMarker;
 
 pub type InferVarId = Id<InfMarker>;
@@ -381,11 +381,10 @@ impl<'a> InferenceCtx<'a> {
                     .collect::<Res<Vec<_>>>()
             })
             .collect::<Res<Vec<_>>>()?;
-        for (((pat, params), expr), constr) in pats
+        for ((pat, params), (expr, constr, id)) in pats
             .into_iter()
             .zip(params)
-            .zip(bindings.iter().map(|b| &b.body))
-            .zip(bindings.iter().map(|b| &b.ty))
+            .zip(bindings.iter().map(|b| (&b.body, &b.ty, b.id)))
         {
             let opt_body_ty = if rec {
                 let body = self.fresh_ty();
@@ -426,8 +425,8 @@ impl<'a> InferenceCtx<'a> {
             self.unify_j(pat.ty, full_ty)?;
             let scheme = self.generalize(full_ty);
             self.bind_pattern_to_context(&pat, scheme)?;
-
             new_bindings.push(ValueBinding {
+                id,
                 pat,
                 params,
                 ty: full_ty,

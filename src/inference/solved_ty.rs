@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use crate::{inference::InferVarId, intern_symbol, lexer::interner::Symbol, poly_ir::id::Id};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -10,6 +12,71 @@ pub enum SolvedTy {
 pub struct SolvedCon {
     pub name: Symbol,
     pub args: Vec<SolvedTy>,
+}
+
+impl SolvedTy {
+    pub fn int_ty() -> Self {
+        Self::Con(SolvedCon {
+            name: intern_symbol("int"),
+            args: vec![],
+        })
+    }
+
+    pub fn bool_ty() -> Self {
+        Self::Con(SolvedCon {
+            name: intern_symbol("bool"),
+            args: vec![],
+        })
+    }
+
+    pub fn unit_ty() -> Self {
+        Self::Con(SolvedCon {
+            name: intern_symbol("unit"),
+            args: vec![],
+        })
+    }
+
+    pub fn string_ty() -> Self {
+        Self::Con(SolvedCon {
+            name: intern_symbol("string"),
+            args: vec![],
+        })
+    }
+
+    pub fn list_ty(ty: SolvedTy) -> Self {
+        Self::Con(SolvedCon {
+            name: intern_symbol("list"),
+            args: vec![ty],
+        })
+    }
+
+    pub fn tuple_ty(tys: Vec<SolvedTy>) -> Self {
+        Self::Con(SolvedCon {
+            name: intern_symbol("*"),
+            args: tys,
+        })
+    }
+
+    pub fn func_ty(arg: SolvedTy, ret: SolvedTy) -> Self {
+        Self::Con(SolvedCon {
+            name: intern_symbol("->"),
+            args: vec![arg, ret],
+        })
+    }
+
+    pub fn free_vars(&self) -> HashSet<InferVarId> {
+        fn aux(ty: &SolvedTy, s: &mut HashSet<InferVarId>) {
+            match ty {
+                SolvedTy::Var(ty_var) => {
+                    s.insert(ty_var.id);
+                }
+                SolvedTy::Con(solved_con) => solved_con.args.iter().for_each(|t| aux(t, s)),
+            }
+        }
+        let mut s = HashSet::new();
+        aux(self, &mut s);
+        s
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]

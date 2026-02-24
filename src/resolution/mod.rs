@@ -15,7 +15,7 @@ use crate::{
     },
     poly_ir::{
         TypeId, TypeParamId, ValueRef, VarId,
-        expr::{Expr, ExprNode, MatchCase, ValueBinding},
+        expr::{Expr, ExprNode, MatchCase, VBMarker, ValueBinding},
         id::Arena,
         item::{Constructor, ConstructorArg, Item, ItemNode, TypeDecl, TypeDeclInfo, TypeDeclKind},
         pattern::{Pattern, PatternNode},
@@ -43,6 +43,7 @@ pub struct VarInfo {
 pub struct Resolver {
     pub types: Arena<TypeDeclInfo>,
     pub vars: Arena<VarInfo>,
+    pub vbs: Arena<VBMarker>,
     pub builtins: HashMap<Symbol, VarId>,
     scope: Scope,
     binder_depth: u32,
@@ -86,6 +87,7 @@ impl Resolver {
         let mut res = Self {
             types: Arena::new(),
             vars: Arena::new(),
+            vbs: Arena::new(),
             scope: Scope::new(),
             builtins: HashMap::new(),
             binder_depth: 0,
@@ -165,6 +167,7 @@ impl Resolver {
             ItemNode::Value {
                 recursive: false,
                 bindings: vec![ResValueBinding {
+                    id: self.vbs.alloc(VBMarker),
                     pat: ResPattern::new(PatternNode::Wildcard, span, Type::default()),
                     params: vec![],
                     ty: resolved.ty.clone(),
@@ -346,7 +349,10 @@ impl Resolver {
 
             let body = this.resolve_expression(&binding.expr)?;
 
+            let id = this.vbs.alloc(VBMarker);
+
             let res = ValueBinding {
+                id,
                 pat,
                 params,
                 ty: ty.unwrap_or_default(),
@@ -394,6 +400,7 @@ impl Resolver {
                 })?;
                 let pat = self.declare_value_binding(binding)?;
                 let b = ValueBinding {
+                    id: self.vbs.alloc(VBMarker),
                     pat,
                     params,
                     ty,

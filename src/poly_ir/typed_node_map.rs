@@ -50,6 +50,7 @@ impl<T> ValueBinding<T> {
         let ty = f(&self.ty, ctx);
         let body = self.body.map(ctx, f);
         ValueBinding {
+            id: self.id,
             pat,
             params,
             ty,
@@ -67,6 +68,7 @@ impl<T> ValueBinding<T> {
         let ty = f(&self.ty, ctx);
         let body = self.body.map_mut(ctx, f);
         ValueBinding {
+            id: self.id,
             pat,
             params,
             ty,

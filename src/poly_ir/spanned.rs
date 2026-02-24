@@ -1,6 +1,6 @@
 use crate::source_manager::loc::Span;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TypedNode<T, Ty> {
     pub node: T,
     pub ty: Ty,

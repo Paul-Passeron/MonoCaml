@@ -2,7 +2,7 @@ use crate::poly_ir::{VarId, spanned::TypedNode};
 
 pub type Pattern<T> = TypedNode<PatternNode<T>, T>;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum PatternNode<T> {
     Wildcard,
     Var(VarId),
