@@ -97,6 +97,13 @@ impl MonoTy {
         })
     }
 
+    pub fn unit_ty() -> Self {
+        MonoTy::Con(TyCon {
+            name: intern_symbol("unit"),
+            args: vec![],
+        })
+    }
+
     pub fn int_ty() -> Self {
         MonoTy::Con(TyCon {
             name: intern_symbol("int"),

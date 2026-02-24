@@ -52,6 +52,22 @@ impl Id<MonoTy> {
         }
     }
 
+    // pub fn make_equal_to(&self, other: Id<MonoTy>, ctx: &mut InferenceCtx) {
+    //     let chain_end = self.find(ctx);
+    //     let (a, b) = if chain_end.get(ctx).is_var() {
+    //         (other.find(ctx), *self)
+    //     } else {
+    //         (chain_end, other)
+    //     };
+    //     assert!(
+    //         a.get(ctx).is_var() || a == b,
+    //         "Already resolved ({} vs {})",
+    //         a.display(ctx),
+    //         b.display(ctx)
+    //     );
+    //     ctx.forwards.insert(a, b);
+    // }
+
     pub fn make_equal_to(&self, other: Id<MonoTy>, ctx: &mut InferenceCtx) {
         let chain_end = self.find(ctx);
 
@@ -214,7 +230,23 @@ impl<'a> InferenceCtx<'a> {
             }
             ExprNode::Let { .. } => todo!(),
             ExprNode::Function { .. } => todo!(),
-            ExprNode::Apply { .. } => todo!(),
+            ExprNode::Apply { func, arg } => {
+                let ifunc = self.infer_expr(func)?;
+                let iarg = self.infer_expr(arg)?;
+                let arg_ty = self.fresh_ty();
+                let res_ty = self.fresh_ty();
+                let func_ty = self.get_ty(MonoTy::func_ty(arg_ty, res_ty));
+                self.unify_j(ifunc.ty, func_ty)?;
+                self.unify_j(iarg.ty, arg_ty)?;
+                Ok(Expr::new(
+                    ExprNode::Apply {
+                        func: Box::new(ifunc),
+                        arg: Box::new(iarg),
+                    },
+                    span,
+                    res_ty,
+                ))
+            }
             ExprNode::Match { .. } => todo!(),
             ExprNode::Tuple(exprs) => {
                 let inf: Vec<_> = exprs
@@ -244,6 +276,34 @@ impl<'a> InferenceCtx<'a> {
                 Ok(Expr::new(node, span, ty))
             }
             ExprNode::UnaryOp { .. } => todo!(),
+            ExprNode::Unit => Ok(Expr::new(
+                ExprNode::Unit,
+                span,
+                self.get_ty(MonoTy::unit_ty()),
+            )),
+            ExprNode::IfThenElse {
+                cond,
+                then_expr,
+                else_expr,
+            } => {
+                let i_cond = self.infer_expr(cond)?;
+                let i_then_expr = self.infer_expr(then_expr)?;
+                let i_else_expr = self.infer_expr(else_expr)?;
+                let bool_ty = self.get_ty(MonoTy::bool_ty());
+                self.unify_j(i_cond.ty, bool_ty)?;
+                let arms_ty = self.fresh_ty();
+                self.unify_j(i_then_expr.ty, arms_ty)?;
+                self.unify_j(i_else_expr.ty, arms_ty)?;
+                Ok(Expr::new(
+                    ExprNode::IfThenElse {
+                        cond: Box::new(i_cond),
+                        then_expr: Box::new(i_then_expr),
+                        else_expr: Box::new(i_else_expr),
+                    },
+                    span,
+                    arms_ty,
+                ))
+            }
         }
     }
 
@@ -294,6 +354,21 @@ impl<'a> InferenceCtx<'a> {
                     .zip(params)
                     .zip(bindings.iter().map(|b| &b.body))
                 {
+                    let opt_body_ty = if *recursive {
+                        let body = self.fresh_ty();
+                        let full_ty = params.iter().rev().fold(body, |acc, param_ty| {
+                            self.get_ty(MonoTy::func_ty(param_ty.ty, acc))
+                        });
+                        let scheme = TyForall {
+                            tyvars: vec![],
+                            ty: Box::new(full_ty.get(self).clone()),
+                        };
+                        self.bind_pattern_to_context(&pat, scheme)?;
+                        Some(body)
+                    } else {
+                        None
+                    };
+
                     for param in params.iter() {
                         self.bind_pattern_to_context(
                             param,
@@ -308,6 +383,9 @@ impl<'a> InferenceCtx<'a> {
                     let full_ty = params.iter().rev().fold(body.ty, |acc, param_ty| {
                         self.get_ty(MonoTy::func_ty(param_ty.ty, acc))
                     });
+                    if let Some(body_ty) = opt_body_ty {
+                        self.unify_j(body.ty, body_ty)?;
+                    }
                     self.unify_j(pat.ty, full_ty)?;
                     let scheme = self.generalize(full_ty);
                     self.bind_pattern_to_context(&pat, scheme)?;
@@ -438,8 +516,8 @@ impl<'a> InferenceCtx<'a> {
                 let left = self.infer_expr(left)?;
                 let right = self.infer_expr(right)?;
                 let int_ty = self.get_ty(MonoTy::int_ty());
-                left.ty.make_equal_to(int_ty, self);
-                right.ty.make_equal_to(int_ty, self);
+                self.unify_j(left.ty, int_ty)?;
+                self.unify_j(right.ty, int_ty)?;
                 Ok((
                     ExprNode::BinaryOp {
                         op,
@@ -449,7 +527,23 @@ impl<'a> InferenceCtx<'a> {
                     int_ty,
                 ))
             }
-            _ => todo!(),
+            BinaryOp::GEq | BinaryOp::GT | BinaryOp::LEq | BinaryOp::LT => {
+                let left = self.infer_expr(left)?;
+                let right = self.infer_expr(right)?;
+                let bool_ty = self.get_ty(MonoTy::bool_ty());
+                let int_ty = self.get_ty(MonoTy::int_ty());
+                self.unify_j(left.ty, int_ty)?;
+                self.unify_j(right.ty, int_ty)?;
+                Ok((
+                    ExprNode::BinaryOp {
+                        op,
+                        left: Box::new(left),
+                        right: Box::new(right),
+                    },
+                    bool_ty,
+                ))
+            }
+            x => todo!("{x:#?}"),
         }
     }
 }
