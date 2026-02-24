@@ -9,8 +9,8 @@
     inner (fun (x: int) -> 5);
     inner (fun (z: string) -> "hey") *)
 
-let first_fun (x: 'a) : 'a -> 'a = failwith "todo"
-let second_fun (x: 'a) : 'a -> 'b = failwith "todo"
+let first_fun x = failwith "todo 1"
+let second_fun x = failwith "todo 2"
 
 let _ =
     let _f = first_fun 5 in
