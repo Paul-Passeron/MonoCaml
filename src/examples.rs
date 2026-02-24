@@ -31,11 +31,11 @@ fn run_and_check_output(program: &str, args: &[&str], expected: &str) -> std::io
     Ok(stdout.contains(expected))
 }
 
-pub fn test_ast<S: ToString>(ast: UAst, prog_name: S) {
+pub fn test_ast<S: ToString>(ast: Ast, prog_name: S) {
     test_ast_with_ctx(ast, prog_name, Default::default());
 }
 
-pub fn test_ast_with_ctx<S: ToString>(ast: UAst, prog_name: S, ctx: AstCtx) {
+pub fn test_ast_with_ctx<S: ToString>(ast: Ast, prog_name: S, ctx: AstCtx) {
     let prog_name = prog_name.to_string();
     let p = PathBuf::from(prog_name.clone());
     let _ = std::fs::remove_file(&p);
@@ -121,79 +121,71 @@ mod tests {
     }
 }
 
-type UAst = Ast<()>;
-
 #[allow(unused)]
-fn test_ast_1() -> UAst {
+fn test_ast_1() -> Ast {
     let x = Var::fresh();
     let y = Var::fresh();
-    UAst::lambda(
+    Ast::lambda(
         x,
         AstTy::int(),
-        UAst::lambda(
+        Ast::lambda(
             y,
             AstTy::int(),
-            UAst::app(
-                UAst::app(
-                    UAst::native("add"),
-                    UAst::seq(
-                        UAst::app(UAst::native("print_int"), UAst::var(x)),
-                        UAst::var(x),
-                    ),
+            Ast::app(
+                Ast::app(
+                    Ast::native("add"),
+                    Ast::seq(Ast::app(Ast::native("print_int"), Ast::var(x)), Ast::var(x)),
                 ),
-                UAst::var(y),
+                Ast::var(y),
             ),
         ),
     )
 }
 
 #[allow(unused)]
-fn test_ast_2() -> UAst {
+fn test_ast_2() -> Ast {
     let x = Var::fresh();
     let y = Var::fresh();
-    UAst::app(
-        UAst::app(
-            UAst::lambda(
+    Ast::app(
+        Ast::app(
+            Ast::lambda(
                 x,
                 AstTy::int(),
-                UAst::lambda(
+                Ast::lambda(
                     y,
                     AstTy::int(),
-                    UAst::app(
-                        UAst::app(
-                            UAst::native("add"),
-                            UAst::seq(
-                                UAst::app(UAst::native("print_int"), UAst::var(x)),
-                                UAst::var(x),
-                            ),
+                    Ast::app(
+                        Ast::app(
+                            Ast::native("add"),
+                            Ast::seq(Ast::app(Ast::native("print_int"), Ast::var(x)), Ast::var(x)),
                         ),
-                        UAst::var(y),
+                        Ast::var(y),
                     ),
                 ),
             ),
-            UAst::int(5),
+            Ast::int(5),
         ),
-        UAst::int(6),
+        Ast::int(6),
     )
 }
 
 #[allow(unused)]
-fn test_ast_3() -> UAst {
+fn test_ast_3() -> Ast {
     let x = Var::fresh();
     let y = Var::fresh();
     let z = Var::fresh();
-    let wrapper = UAst::lambda(
+    let wrapper = Ast::lambda(
         x,
         AstTy::Int,
-        UAst::lambda(
+        Ast::lambda(
             y,
             AstTy::Int,
-            UAst::lambda(
+            Ast::lambda(
                 z,
                 AstTy::fun(AstTy::Int, AstTy::Int),
-                UAst::app(
-                    UAst::app(UAst::native("add"), UAst::app(UAst::var(z), UAst::var(x))),
-                    UAst::app(UAst::var(z), UAst::var(y)),
+                Ast::app(
+                    Ast::app(Ast::native("add"), Ast::app(Ast::var(z), Ast::var(x))),
+                    Ast::app(Ast::var(z), Ast::var(y)),
                 ),
             ),
         ),
@@ -201,199 +193,190 @@ fn test_ast_3() -> UAst {
 
     let a = Var::fresh();
 
-    let print_ret = UAst::lambda(
+    let print_ret = Ast::lambda(
         a,
         AstTy::Int,
-        UAst::seq(
-            UAst::app(UAst::native("print_int"), UAst::var(a)),
-            UAst::var(a),
-        ),
+        Ast::seq(Ast::app(Ast::native("print_int"), Ast::var(a)), Ast::var(a)),
     );
 
-    UAst::app(
-        UAst::app(UAst::app(wrapper, UAst::int(69)), UAst::int(420)),
+    Ast::app(
+        Ast::app(Ast::app(wrapper, Ast::int(69)), Ast::int(420)),
         print_ret,
     )
 }
 
 #[allow(unused)]
-fn test_ast_4() -> UAst {
-    UAst::app(UAst::native("print_int"), test_ast_3())
+fn test_ast_4() -> Ast {
+    Ast::app(Ast::native("print_int"), test_ast_3())
 }
 
 #[allow(unused)]
-fn test_ast_5() -> UAst {
+fn test_ast_5() -> Ast {
     let x = Var::fresh();
 
-    UAst::let_in(
+    Ast::let_in(
         x,
         AstTy::Int,
-        UAst::int(5),
-        UAst::app(
-            UAst::native("print_int"),
-            UAst::app(UAst::app(UAst::native("add"), UAst::int(64)), UAst::var(x)),
+        Ast::int(5),
+        Ast::app(
+            Ast::native("print_int"),
+            Ast::app(Ast::app(Ast::native("add"), Ast::int(64)), Ast::var(x)),
         ),
     )
 }
 
 #[allow(unused)]
-fn test_ast_6() -> UAst {
+fn test_ast_6() -> Ast {
     let x = Var::fresh();
 
-    UAst::let_in(
+    Ast::let_in(
         x,
         AstTy::fun(AstTy::Int, AstTy::Tuple(vec![])),
-        UAst::native("print_int"),
-        UAst::app(UAst::var(x), UAst::int(420)),
+        Ast::native("print_int"),
+        Ast::app(Ast::var(x), Ast::int(420)),
     )
 }
 
 #[allow(unused)]
-fn test_ast_7() -> UAst {
-    UAst::app(
-        UAst::native("print_string"),
-        UAst::string("Hello, World !\n"),
-    )
+fn test_ast_7() -> Ast {
+    Ast::app(Ast::native("print_string"), Ast::string("Hello, World !\n"))
 }
 
 #[allow(unused)]
-fn test_ast_8() -> UAst {
+fn test_ast_8() -> Ast {
     let x = Var::fresh();
 
-    UAst::let_in(
+    Ast::let_in(
         x,
         AstTy::fun(AstTy::Int, AstTy::Tuple(vec![])),
-        UAst::native("print_int"),
-        UAst::app(UAst::var(x), UAst::int(420)),
+        Ast::native("print_int"),
+        Ast::app(Ast::var(x), Ast::int(420)),
     )
 }
 
 #[allow(unused)]
-fn test_ast_9() -> UAst {
+fn test_ast_9() -> Ast {
     let x = Var::fresh();
-    let print_is_zero = UAst::lambda(
+    let print_is_zero = Ast::lambda(
         x,
         AstTy::Int,
-        UAst::app(
-            UAst::native("print_string"),
-            UAst::seq(
-                UAst::app(UAst::native("print_int"), UAst::var(x)),
-                UAst::ifte(
-                    UAst::var(x),
-                    UAst::string(" is not zero\n"),
-                    UAst::string(" is zero\n"),
+        Ast::app(
+            Ast::native("print_string"),
+            Ast::seq(
+                Ast::app(Ast::native("print_int"), Ast::var(x)),
+                Ast::ifte(
+                    Ast::var(x),
+                    Ast::string(" is not zero\n"),
+                    Ast::string(" is zero\n"),
                 ),
             ),
         ),
     );
     let f = Var::fresh();
-    UAst::let_in(
+    Ast::let_in(
         f,
         AstTy::fun(AstTy::Int, AstTy::Tuple(vec![])),
         print_is_zero,
-        UAst::seq(
-            UAst::app(UAst::var(f), UAst::int(420)),
-            UAst::app(UAst::var(f), UAst::int(0)),
+        Ast::seq(
+            Ast::app(Ast::var(f), Ast::int(420)),
+            Ast::app(Ast::var(f), Ast::int(0)),
         ),
     )
 }
 
 #[allow(unused)]
-fn fact_ast() -> UAst {
+fn fact_ast() -> Ast {
     let fact = Var::fresh();
     let n = Var::fresh();
     let int = AstTy::Int;
-    UAst::let_in(
+    Ast::let_in(
         fact,
         AstTy::fun(int.clone(), int.clone()),
-        UAst::lambda(
+        Ast::lambda(
             n,
             int,
-            UAst::ifte(
-                UAst::var(n),
-                UAst::app(
-                    UAst::app(UAst::native("mul"), UAst::var(n)),
-                    UAst::app(
-                        UAst::var(fact),
-                        UAst::app(UAst::app(UAst::native("add"), UAst::int(-1)), UAst::var(n)),
+            Ast::ifte(
+                Ast::var(n),
+                Ast::app(
+                    Ast::app(Ast::native("mul"), Ast::var(n)),
+                    Ast::app(
+                        Ast::var(fact),
+                        Ast::app(Ast::app(Ast::native("add"), Ast::int(-1)), Ast::var(n)),
                     ),
                 ),
-                UAst::int(1),
+                Ast::int(1),
             ),
         ),
-        UAst::seq(
-            UAst::app(
-                UAst::native("print_int"),
-                UAst::app(UAst::var(fact), UAst::int(6)),
+        Ast::seq(
+            Ast::app(
+                Ast::native("print_int"),
+                Ast::app(Ast::var(fact), Ast::int(6)),
             ),
-            UAst::app(UAst::native("print_string"), UAst::string("\n")),
+            Ast::app(Ast::native("print_string"), Ast::string("\n")),
         ),
     )
 }
 
 #[allow(unused)]
-fn fact_bench() -> UAst {
+fn fact_bench() -> Ast {
     let fact = Var::fresh();
     let loo = Var::fresh();
     let n = Var::fresh();
     let res = Var::fresh();
-    UAst::let_in(
+    Ast::let_in(
         fact,
         AstTy::fun(AstTy::Int, AstTy::Int),
-        UAst::lambda(
+        Ast::lambda(
             n,
             AstTy::Int,
-            UAst::ifte(
-                UAst::var(n),
-                UAst::app(
-                    UAst::app(UAst::native("mul"), UAst::var(n)),
-                    UAst::app(
-                        UAst::var(fact),
-                        UAst::app(UAst::app(UAst::native("add"), UAst::int(-1)), UAst::var(n)),
+            Ast::ifte(
+                Ast::var(n),
+                Ast::app(
+                    Ast::app(Ast::native("mul"), Ast::var(n)),
+                    Ast::app(
+                        Ast::var(fact),
+                        Ast::app(Ast::app(Ast::native("add"), Ast::int(-1)), Ast::var(n)),
                     ),
                 ),
-                UAst::int(1),
+                Ast::int(1),
             ),
         ),
-        UAst::let_in(
+        Ast::let_in(
             loo,
             AstTy::fun(AstTy::Int, AstTy::Tuple(vec![])),
-            UAst::lambda(
+            Ast::lambda(
                 n,
                 AstTy::Int,
-                UAst::ifte(
-                    UAst::var(n),
-                    UAst::let_in(
+                Ast::ifte(
+                    Ast::var(n),
+                    Ast::let_in(
                         res,
                         AstTy::Int,
-                        UAst::app(
-                            UAst::var(fact),
-                            UAst::app(UAst::native("random_int"), UAst::int(10)),
+                        Ast::app(
+                            Ast::var(fact),
+                            Ast::app(Ast::native("random_int"), Ast::int(10)),
                         ),
-                        UAst::seq(
-                            UAst::seq(
-                                UAst::app(UAst::native("print_int"), UAst::var(res)),
-                                UAst::app(UAst::native("print_string"), UAst::string("\n")),
+                        Ast::seq(
+                            Ast::seq(
+                                Ast::app(Ast::native("print_int"), Ast::var(res)),
+                                Ast::app(Ast::native("print_string"), Ast::string("\n")),
                             ),
-                            UAst::app(
-                                UAst::var(loo),
-                                UAst::app(
-                                    UAst::app(UAst::native("add"), UAst::int(-1)),
-                                    UAst::var(n),
-                                ),
+                            Ast::app(
+                                Ast::var(loo),
+                                Ast::app(Ast::app(Ast::native("add"), Ast::int(-1)), Ast::var(n)),
                             ),
                         ),
                     ),
-                    UAst::app(UAst::native("print_string"), UAst::string("Done !\n")),
+                    Ast::app(Ast::native("print_string"), Ast::string("Done !\n")),
                 ),
             ),
-            UAst::app(UAst::var(loo), UAst::int(100000)),
+            Ast::app(Ast::var(loo), Ast::int(100000)),
         ),
     )
 }
 
 #[allow(unused)]
-fn list_test() -> (UAst, AstCtx) {
+fn list_test() -> (Ast, AstCtx) {
     let mut ctx = AstCtx::default();
     ctx.natives.insert(
         "print_lst".into(),
@@ -415,13 +398,13 @@ fn list_test() -> (UAst, AstCtx) {
             ],
         },
     );
-    let ast = UAst::app(UAst::native("print_lst"), UAst::cons("lst", "Nil", None));
+    let ast = Ast::app(Ast::native("print_lst"), Ast::cons("lst", "Nil", None));
 
     (ast, ctx)
 }
 
 #[allow(unused)]
-fn list_test2() -> (UAst, AstCtx) {
+fn list_test2() -> (Ast, AstCtx) {
     let mut ctx = AstCtx::default();
     ctx.natives.insert(
         "print_lst".into(),
@@ -443,19 +426,19 @@ fn list_test2() -> (UAst, AstCtx) {
             ],
         },
     );
-    let constr = |name: &str, val| UAst::cons("lst", name, val);
-    let cons = |val, old| constr("Cons", Some(UAst::tuple(vec![val, old])));
+    let constr = |name: &str, val| Ast::cons("lst", name, val);
+    let cons = |val, old| constr("Cons", Some(Ast::tuple(vec![val, old])));
     let nil = || constr("Nil", None);
-    let ast = UAst::app(
-        UAst::native("print_lst"),
-        cons(UAst::int(420), cons(UAst::int(69), nil())),
+    let ast = Ast::app(
+        Ast::native("print_lst"),
+        cons(Ast::int(420), cons(Ast::int(69), nil())),
     );
 
     (ast, ctx)
 }
 
 #[allow(unused)]
-fn list_test3() -> (UAst, AstCtx) {
+fn list_test3() -> (Ast, AstCtx) {
     let mut ctx = AstCtx::default();
     ctx.natives.insert(
         "print_lst".into(),
@@ -477,18 +460,18 @@ fn list_test3() -> (UAst, AstCtx) {
             ],
         },
     );
-    let constr = |name: &str, val| UAst::cons("lst", name, val);
-    let cons = |val, old| constr("Cons", Some(UAst::tuple(vec![val, old])));
+    let constr = |name: &str, val| Ast::cons("lst", name, val);
+    let cons = |val, old| constr("Cons", Some(Ast::tuple(vec![val, old])));
     let nil = || constr("Nil", None);
     let add_cons = Var::fresh();
     let l = Var::fresh();
-    let ast = UAst::let_in(
+    let ast = Ast::let_in(
         add_cons,
         AstTy::fun(AstTy::named("lst"), AstTy::named("lst")),
-        UAst::lambda(l, AstTy::named("lst"), cons(UAst::int(123), UAst::var(l))),
-        UAst::app(
-            UAst::native("print_lst"),
-            UAst::app(UAst::var(add_cons), UAst::app(UAst::var(add_cons), nil())),
+        Ast::lambda(l, AstTy::named("lst"), cons(Ast::int(123), Ast::var(l))),
+        Ast::app(
+            Ast::native("print_lst"),
+            Ast::app(Ast::var(add_cons), Ast::app(Ast::var(add_cons), nil())),
         ),
     );
 
@@ -496,7 +479,7 @@ fn list_test3() -> (UAst, AstCtx) {
 }
 
 #[allow(unused)]
-fn match_ast() -> (UAst, AstCtx) {
+fn match_ast() -> (Ast, AstCtx) {
     let mut ctx = AstCtx::default();
     ctx.types.insert(
         "val".into(),
@@ -526,14 +509,14 @@ fn match_ast() -> (UAst, AstCtx) {
     let v = Var::fresh();
     let int_val = Var::fresh();
     let str_val = Var::fresh();
-    let ast = UAst::let_in(
+    let ast = Ast::let_in(
         print_val,
         AstTy::fun(AstTy::named("val"), AstTy::Tuple(vec![])),
-        UAst::lambda(
+        Ast::lambda(
             v,
             AstTy::named("val"),
-            UAst::match_with(
-                UAst::var(v),
+            Ast::match_with(
+                Ast::var(v),
                 vec![
                     MatchCase {
                         pat: Pattern::Cons {
@@ -541,7 +524,7 @@ fn match_ast() -> (UAst, AstCtx) {
                             cons: "Int".into(),
                             arg: Some(Box::new(Pattern::Symbol(int_val, AstTy::Int))),
                         },
-                        expr: UAst::app(UAst::native("print_int"), UAst::var(int_val)),
+                        expr: Ast::app(Ast::native("print_int"), Ast::var(int_val)),
                     },
                     MatchCase {
                         pat: Pattern::Cons {
@@ -549,22 +532,22 @@ fn match_ast() -> (UAst, AstCtx) {
                             cons: "Str".into(),
                             arg: Some(Box::new(Pattern::Symbol(str_val, AstTy::String))),
                         },
-                        expr: UAst::app(UAst::native("print_string"), UAst::var(str_val)),
+                        expr: Ast::app(Ast::native("print_string"), Ast::var(str_val)),
                     },
                 ],
             ),
         ),
-        UAst::seq(
-            UAst::seq(
-                UAst::app(
-                    UAst::var(print_val),
-                    UAst::cons("val", "Int", Some(UAst::int(123))),
+        Ast::seq(
+            Ast::seq(
+                Ast::app(
+                    Ast::var(print_val),
+                    Ast::cons("val", "Int", Some(Ast::int(123))),
                 ),
-                UAst::app(UAst::native("print_string"), UAst::string("\n")),
+                Ast::app(Ast::native("print_string"), Ast::string("\n")),
             ),
-            UAst::app(
-                UAst::var(print_val),
-                UAst::cons("val", "Str", Some(UAst::string("Hello, World !\n"))),
+            Ast::app(
+                Ast::var(print_val),
+                Ast::cons("val", "Str", Some(Ast::string("Hello, World !\n"))),
             ),
         ),
     );
@@ -573,7 +556,7 @@ fn match_ast() -> (UAst, AstCtx) {
 }
 
 #[allow(unused)]
-fn list_test4() -> (UAst, AstCtx) {
+fn list_test4() -> (Ast, AstCtx) {
     let mut ctx = AstCtx::default();
     ctx.natives.insert(
         "print_lst".into(),
@@ -595,8 +578,8 @@ fn list_test4() -> (UAst, AstCtx) {
             ],
         },
     );
-    let constr = |name: &str, val| UAst::cons("lst", name, val);
-    let cons = |val, old| constr("Cons", Some(UAst::tuple(vec![val, old])));
+    let constr = |name: &str, val| Ast::cons("lst", name, val);
+    let cons = |val, old| constr("Cons", Some(Ast::tuple(vec![val, old])));
     let nil = || constr("Nil", None);
     let rev = Var::fresh();
     let l = Var::fresh();
@@ -605,27 +588,27 @@ fn list_test4() -> (UAst, AstCtx) {
     let acc = Var::fresh();
     let hd = Var::fresh();
     let tl = Var::fresh();
-    let ast = UAst::let_in(
+    let ast = Ast::let_in(
         rev,
         AstTy::fun(AstTy::named("lst"), AstTy::named("lst")),
-        UAst::let_in(
+        Ast::let_in(
             aux,
             AstTy::fun(
                 AstTy::named("lst"),
                 AstTy::fun(AstTy::named("lst"), AstTy::named("lst")),
             ),
-            UAst::lambda(
+            Ast::lambda(
                 acc,
                 AstTy::named("lst"),
-                UAst::lambda(
+                Ast::lambda(
                     l2,
                     AstTy::named("lst"),
-                    UAst::match_with(
-                        UAst::var(l2),
+                    Ast::match_with(
+                        Ast::var(l2),
                         vec![
                             MatchCase {
                                 pat: Pattern::cons("lst", "Nil", None),
-                                expr: UAst::var(acc),
+                                expr: Ast::var(acc),
                             },
                             MatchCase {
                                 pat: Pattern::cons(
@@ -636,22 +619,22 @@ fn list_test4() -> (UAst, AstCtx) {
                                         Pattern::symb(tl, AstTy::named("lst")),
                                     ])),
                                 ),
-                                expr: UAst::app(
-                                    UAst::app(UAst::var(aux), cons(UAst::var(hd), UAst::var(acc))),
-                                    UAst::var(tl),
+                                expr: Ast::app(
+                                    Ast::app(Ast::var(aux), cons(Ast::var(hd), Ast::var(acc))),
+                                    Ast::var(tl),
                                 ),
                             },
                         ],
                     ),
                 ),
             ),
-            UAst::app(UAst::var(aux), nil()),
+            Ast::app(Ast::var(aux), nil()),
         ),
-        UAst::app(
-            UAst::native("print_lst"),
-            UAst::app(
-                UAst::var(rev),
-                cons(UAst::int(123), cons(UAst::int(456), nil())),
+        Ast::app(
+            Ast::native("print_lst"),
+            Ast::app(
+                Ast::var(rev),
+                cons(Ast::int(123), cons(Ast::int(456), nil())),
             ),
         ),
     );
@@ -660,7 +643,7 @@ fn list_test4() -> (UAst, AstCtx) {
 }
 
 #[allow(unused)]
-fn list_test5() -> (UAst, AstCtx) {
+fn list_test5() -> (Ast, AstCtx) {
     let mut ctx = AstCtx::default();
     ctx.natives.insert(
         "print_lst".into(),
@@ -686,19 +669,19 @@ fn list_test5() -> (UAst, AstCtx) {
             ],
         },
     );
-    let constr = |name: &str, val| UAst::cons("lst", name, val);
-    let cons = |val, old| constr("Cons", Some(UAst::tuple(vec![val, old])));
+    let constr = |name: &str, val| Ast::cons("lst", name, val);
+    let cons = |val, old| constr("Cons", Some(Ast::tuple(vec![val, old])));
     let nil = || constr("Nil", None);
     let mut rng = rand::rng();
-    fn create_random_list(i: usize, rng: &mut ThreadRng) -> UAst {
+    fn create_random_list(i: usize, rng: &mut ThreadRng) -> Ast {
         if i == 0 {
-            UAst::cons("lst", "Nil", None)
+            Ast::cons("lst", "Nil", None)
         } else {
-            UAst::cons(
+            Ast::cons(
                 "lst",
                 "Cons",
-                Some(UAst::tuple(vec![
-                    UAst::int(rng.random()),
+                Some(Ast::tuple(vec![
+                    Ast::int(rng.random()),
                     create_random_list(i - 1, rng),
                 ])),
             )
@@ -715,30 +698,30 @@ fn list_test5() -> (UAst, AstCtx) {
     let hd = Var::fresh();
     let tl = Var::fresh();
     let l3 = Var::fresh();
-    let ast = UAst::let_in(
+    let ast = Ast::let_in(
         rev,
         AstTy::fun(AstTy::named("lst"), AstTy::named("lst")),
-        UAst::lambda(
+        Ast::lambda(
             l,
             AstTy::named("lst"),
-            UAst::let_in(
+            Ast::let_in(
                 aux,
                 AstTy::fun(
                     AstTy::named("lst"),
                     AstTy::fun(AstTy::named("lst"), AstTy::named("lst")),
                 ),
-                UAst::lambda(
+                Ast::lambda(
                     l2,
                     AstTy::named("lst"),
-                    UAst::lambda(
+                    Ast::lambda(
                         acc,
                         AstTy::named("lst"),
-                        UAst::match_with(
-                            UAst::var(l2),
+                        Ast::match_with(
+                            Ast::var(l2),
                             vec![
                                 MatchCase {
                                     pat: Pattern::cons("lst", "Nil", None),
-                                    expr: UAst::var(acc),
+                                    expr: Ast::var(acc),
                                 },
                                 MatchCase {
                                     pat: Pattern::cons(
@@ -749,30 +732,30 @@ fn list_test5() -> (UAst, AstCtx) {
                                             Pattern::symb(tl, AstTy::named("lst")),
                                         ])),
                                     ),
-                                    expr: UAst::app(
-                                        UAst::app(UAst::var(aux), UAst::var(tl)),
-                                        cons(UAst::var(hd), UAst::var(acc)),
+                                    expr: Ast::app(
+                                        Ast::app(Ast::var(aux), Ast::var(tl)),
+                                        cons(Ast::var(hd), Ast::var(acc)),
                                     ),
                                 },
                             ],
                         ),
                     ),
                 ),
-                UAst::app(UAst::app(UAst::var(aux), UAst::var(l)), nil()),
+                Ast::app(Ast::app(Ast::var(aux), Ast::var(l)), nil()),
             ),
         ),
-        UAst::let_in(
+        Ast::let_in(
             l3,
             AstTy::named("lst"),
             create_random_list(150),
-            UAst::seq(
-                UAst::seq(
-                    UAst::app(UAst::native("print_lst"), UAst::var(l3)),
-                    UAst::app(UAst::native("print_string"), UAst::string("\n")),
+            Ast::seq(
+                Ast::seq(
+                    Ast::app(Ast::native("print_lst"), Ast::var(l3)),
+                    Ast::app(Ast::native("print_string"), Ast::string("\n")),
                 ),
-                UAst::app(
-                    UAst::native("print_lst"),
-                    UAst::app(UAst::var(rev), UAst::var(l3)),
+                Ast::app(
+                    Ast::native("print_lst"),
+                    Ast::app(Ast::var(rev), Ast::var(l3)),
                 ),
             ),
         ),
@@ -781,14 +764,14 @@ fn list_test5() -> (UAst, AstCtx) {
     (ast, ctx)
 }
 
-fn get_loo<F>(body: F) -> UAst
+fn get_loo<F>(body: F) -> Ast
 where
-    F: FnOnce(Var) -> UAst,
+    F: FnOnce(Var) -> Ast,
 {
     let loo = Var::fresh();
     let n = Var::fresh();
     let f = Var::fresh();
-    UAst::let_in(
+    Ast::let_in(
         loo,
         AstTy::fun(
             AstTy::Int,
@@ -797,28 +780,25 @@ where
                 AstTy::Tuple(vec![]),
             ),
         ),
-        UAst::lambda(
+        Ast::lambda(
             n,
             AstTy::Int,
-            UAst::lambda(
+            Ast::lambda(
                 f,
                 AstTy::fun(AstTy::Tuple(vec![]), AstTy::Tuple(vec![])),
-                UAst::ifte(
-                    UAst::var(n),
-                    UAst::seq(
-                        UAst::app(UAst::var(f), UAst::tuple(vec![])),
-                        UAst::app(
-                            UAst::app(
-                                UAst::var(loo),
-                                UAst::app(
-                                    UAst::app(UAst::native("add"), UAst::int(-1)),
-                                    UAst::var(n),
-                                ),
+                Ast::ifte(
+                    Ast::var(n),
+                    Ast::seq(
+                        Ast::app(Ast::var(f), Ast::tuple(vec![])),
+                        Ast::app(
+                            Ast::app(
+                                Ast::var(loo),
+                                Ast::app(Ast::app(Ast::native("add"), Ast::int(-1)), Ast::var(n)),
                             ),
-                            UAst::var(f),
+                            Ast::var(f),
                         ),
                     ),
-                    UAst::tuple(vec![]),
+                    Ast::tuple(vec![]),
                 ),
             ),
         ),
@@ -826,7 +806,7 @@ where
     )
 }
 
-fn make_random_list_generator() -> UAst {
+fn make_random_list_generator() -> Ast {
     let g = Var::fresh();
     let n = Var::fresh();
     let aux = Var::fresh();
@@ -834,59 +814,59 @@ fn make_random_list_generator() -> UAst {
     let acc = Var::fresh();
 
     // Define aux at the OUTER level
-    UAst::let_in(
+    Ast::let_in(
         aux,
         AstTy::fun(
             AstTy::Int,
             AstTy::fun(AstTy::named("lst"), AstTy::named("lst")),
         ),
-        UAst::lambda(
+        Ast::lambda(
             n2,
             AstTy::Int,
-            UAst::lambda(
+            Ast::lambda(
                 acc,
                 AstTy::named("lst"),
-                UAst::ifte(
-                    UAst::var(n2),
-                    UAst::app(
-                        UAst::app(
-                            UAst::var(aux),
-                            UAst::app(UAst::app(UAst::native("add"), UAst::int(-1)), UAst::var(n2)),
+                Ast::ifte(
+                    Ast::var(n2),
+                    Ast::app(
+                        Ast::app(
+                            Ast::var(aux),
+                            Ast::app(Ast::app(Ast::native("add"), Ast::int(-1)), Ast::var(n2)),
                         ),
-                        UAst::cons(
+                        Ast::cons(
                             "lst",
                             "Cons",
-                            Some(UAst::tuple(vec![
-                                UAst::app(
-                                    UAst::app(UAst::native("add"), UAst::int(100)),
-                                    UAst::app(UAst::native("random_int"), UAst::int(899)),
+                            Some(Ast::tuple(vec![
+                                Ast::app(
+                                    Ast::app(Ast::native("add"), Ast::int(100)),
+                                    Ast::app(Ast::native("random_int"), Ast::int(899)),
                                 ),
-                                UAst::var(acc),
+                                Ast::var(acc),
                             ])),
                         ),
                     ),
-                    UAst::var(acc),
+                    Ast::var(acc),
                 ),
             ),
         ),
         // Now define g, using aux
-        UAst::let_in(
+        Ast::let_in(
             g,
             AstTy::fun(AstTy::Int, AstTy::named("lst")),
-            UAst::lambda(
+            Ast::lambda(
                 n,
                 AstTy::Int,
-                UAst::app(
-                    UAst::app(UAst::var(aux), UAst::var(n)),
-                    UAst::cons("lst", "Nil", None),
+                Ast::app(
+                    Ast::app(Ast::var(aux), Ast::var(n)),
+                    Ast::cons("lst", "Nil", None),
                 ),
             ),
-            UAst::var(g),
+            Ast::var(g),
         ),
     )
 }
 
-pub fn rev_bench(list_size: i32, loop_n: i32) -> (UAst, AstCtx) {
+pub fn rev_bench(list_size: i32, loop_n: i32) -> (Ast, AstCtx) {
     let mut ctx = AstCtx::new();
     ctx.types.insert(
         "lst".into(),
@@ -905,8 +885,8 @@ pub fn rev_bench(list_size: i32, loop_n: i32) -> (UAst, AstCtx) {
         },
     );
 
-    let constr = |name: &str, val| UAst::cons("lst", name, val);
-    let cons = |val, old| constr("Cons", Some(UAst::tuple(vec![val, old])));
+    let constr = |name: &str, val| Ast::cons("lst", name, val);
+    let cons = |val, old| constr("Cons", Some(Ast::tuple(vec![val, old])));
     let nil = || constr("Nil", None);
     let l = Var::fresh();
     let aux = Var::fresh();
@@ -919,50 +899,50 @@ pub fn rev_bench(list_size: i32, loop_n: i32) -> (UAst, AstCtx) {
     let l4 = Var::fresh();
     let rev = Var::fresh();
 
-    let generate_list = UAst::lambda(
+    let generate_list = Ast::lambda(
         void_arg,
         AstTy::Tuple(vec![]),
-        UAst::let_in(
+        Ast::let_in(
             l4,
             AstTy::named("lst"),
-            UAst::app(make_random_list_generator(), UAst::int(list_size)),
-            UAst::seq(
-                UAst::seq(
-                    UAst::app(UAst::native("print_lst"), UAst::var(l4)),
-                    UAst::app(
-                        UAst::native("print_lst"),
-                        UAst::app(UAst::var(rev), UAst::var(l4)),
+            Ast::app(make_random_list_generator(), Ast::int(list_size)),
+            Ast::seq(
+                Ast::seq(
+                    Ast::app(Ast::native("print_lst"), Ast::var(l4)),
+                    Ast::app(
+                        Ast::native("print_lst"),
+                        Ast::app(Ast::var(rev), Ast::var(l4)),
                     ),
                 ),
-                UAst::tuple(vec![]),
+                Ast::tuple(vec![]),
             ),
         ),
     );
 
-    let ast = UAst::let_in(
+    let ast = Ast::let_in(
         rev,
         AstTy::fun(AstTy::named("lst"), AstTy::named("lst")),
-        UAst::lambda(
+        Ast::lambda(
             l,
             AstTy::named("lst"),
-            UAst::let_in(
+            Ast::let_in(
                 aux,
                 AstTy::fun(
                     AstTy::named("lst"),
                     AstTy::fun(AstTy::named("lst"), AstTy::named("lst")),
                 ),
-                UAst::lambda(
+                Ast::lambda(
                     l2,
                     AstTy::named("lst"),
-                    UAst::lambda(
+                    Ast::lambda(
                         acc,
                         AstTy::named("lst"),
-                        UAst::match_with(
-                            UAst::var(l2),
+                        Ast::match_with(
+                            Ast::var(l2),
                             vec![
                                 MatchCase {
                                     pat: Pattern::cons("lst", "Nil", None),
-                                    expr: UAst::var(acc),
+                                    expr: Ast::var(acc),
                                 },
                                 MatchCase {
                                     pat: Pattern::cons(
@@ -973,19 +953,19 @@ pub fn rev_bench(list_size: i32, loop_n: i32) -> (UAst, AstCtx) {
                                             Pattern::symb(tl, AstTy::named("lst")),
                                         ])),
                                     ),
-                                    expr: UAst::app(
-                                        UAst::app(UAst::var(aux), UAst::var(tl)),
-                                        cons(UAst::var(hd), UAst::var(acc)),
+                                    expr: Ast::app(
+                                        Ast::app(Ast::var(aux), Ast::var(tl)),
+                                        cons(Ast::var(hd), Ast::var(acc)),
                                     ),
                                 },
                             ],
                         ),
                     ),
                 ),
-                UAst::app(UAst::app(UAst::var(aux), UAst::var(l)), nil()),
+                Ast::app(Ast::app(Ast::var(aux), Ast::var(l)), nil()),
             ),
         ),
-        get_loo(|loo| UAst::app(UAst::app(UAst::var(loo), UAst::int(loop_n)), generate_list)),
+        get_loo(|loo| Ast::app(Ast::app(Ast::var(loo), Ast::int(loop_n)), generate_list)),
     );
     (ast, ctx)
 }
