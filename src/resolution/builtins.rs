@@ -14,6 +14,9 @@ impl Resolver {
         let _int_ty = self.add_builtin_type("int", 0);
         let _bool_ty = self.add_builtin_type("bool", 0);
         let _string_ty = self.add_builtin_type("string", 0);
+        let _unit_ty = self.add_builtin_type("unit", 0);
+        let _arrow_ty = self.add_builtin_type("->", 2);
+        let _tuple_ty = self.add_builtin_type("*", 0); // arity is not relevant here
 
         let list_ty = self.add_builtin_type("list", 1);
         self.add_builtin_constructor("[]", list_ty, 0);

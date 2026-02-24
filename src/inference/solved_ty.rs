@@ -1,6 +1,9 @@
 use std::collections::HashSet;
 
-use crate::{inference::InferVarId, intern_symbol, lexer::interner::Symbol, poly_ir::id::Id};
+use crate::{
+    inference::{InferVarId, InferenceCtx},
+    poly_ir::{TypeId, id::Id},
+};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum SolvedTy {
@@ -10,56 +13,56 @@ pub enum SolvedTy {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct SolvedCon {
-    pub name: Symbol,
+    pub id: TypeId,
     pub args: Vec<SolvedTy>,
 }
 
 impl SolvedTy {
-    pub fn int_ty() -> Self {
+    pub fn int_ty(ctx: &InferenceCtx) -> Self {
         Self::Con(SolvedCon {
-            name: intern_symbol("int"),
+            id: Id::from_name("int", ctx).unwrap(),
             args: vec![],
         })
     }
 
-    pub fn bool_ty() -> Self {
+    pub fn bool_ty(ctx: &InferenceCtx) -> Self {
         Self::Con(SolvedCon {
-            name: intern_symbol("bool"),
+            id: Id::from_name("bool", ctx).unwrap(),
             args: vec![],
         })
     }
 
-    pub fn unit_ty() -> Self {
+    pub fn unit_ty(ctx: &InferenceCtx) -> Self {
         Self::Con(SolvedCon {
-            name: intern_symbol("unit"),
+            id: Id::from_name("unit", ctx).unwrap(),
             args: vec![],
         })
     }
 
-    pub fn string_ty() -> Self {
+    pub fn string_ty(ctx: &InferenceCtx) -> Self {
         Self::Con(SolvedCon {
-            name: intern_symbol("string"),
+            id: Id::from_name("string", ctx).unwrap(),
             args: vec![],
         })
     }
 
-    pub fn list_ty(ty: SolvedTy) -> Self {
+    pub fn list_ty(ty: SolvedTy, ctx: &InferenceCtx) -> Self {
         Self::Con(SolvedCon {
-            name: intern_symbol("list"),
+            id: Id::from_name("list", ctx).unwrap(),
             args: vec![ty],
         })
     }
 
-    pub fn tuple_ty(tys: Vec<SolvedTy>) -> Self {
+    pub fn tuple_ty(tys: Vec<SolvedTy>, ctx: &InferenceCtx) -> Self {
         Self::Con(SolvedCon {
-            name: intern_symbol("*"),
+            id: Id::from_name("*", ctx).unwrap(),
             args: tys,
         })
     }
 
-    pub fn func_ty(arg: SolvedTy, ret: SolvedTy) -> Self {
+    pub fn func_ty(arg: SolvedTy, ret: SolvedTy, ctx: &InferenceCtx) -> Self {
         Self::Con(SolvedCon {
-            name: intern_symbol("->"),
+            id: Id::from_name("->", ctx).unwrap(),
             args: vec![arg, ret],
         })
     }
@@ -98,7 +101,7 @@ pub struct TyVar {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct TyCon {
-    pub name: Symbol,
+    pub id: TypeId,
     pub args: Vec<Id<MonoTy>>,
 }
 
@@ -139,83 +142,83 @@ impl MonoTy {
         }
     }
 
-    pub fn tuple_ty(args: Vec<Id<Self>>) -> Self {
+    pub fn tuple_ty(args: Vec<Id<Self>>, ctx: &InferenceCtx) -> Self {
         if args.is_empty() {
-            Self::unit_ty()
+            Self::unit_ty(ctx)
         } else {
             MonoTy::Con(TyCon {
-                name: intern_symbol("*"),
+                id: Id::from_name("*", ctx).unwrap(),
                 args,
             })
         }
     }
 
-    pub fn list_ty(ty: Id<Self>) -> Self {
+    pub fn list_ty(ty: Id<Self>, ctx: &InferenceCtx) -> Self {
         MonoTy::Con(TyCon {
-            name: intern_symbol("list"),
+            id: Id::from_name("list", ctx).unwrap(),
             args: vec![ty],
         })
     }
 
-    pub fn func_ty(arg: Id<Self>, ret: Id<Self>) -> Self {
+    pub fn func_ty(arg: Id<Self>, ret: Id<Self>, ctx: &InferenceCtx) -> Self {
         MonoTy::Con(TyCon {
-            name: intern_symbol("->"),
+            id: Id::from_name("->", ctx).unwrap(),
             args: vec![arg, ret],
         })
     }
 
-    pub fn option_ty(ty: Id<Self>) -> Self {
+    pub fn option_ty(ty: Id<Self>, ctx: &InferenceCtx) -> Self {
         MonoTy::Con(TyCon {
-            name: intern_symbol("option"),
+            id: Id::from_name("option", ctx).unwrap(),
             args: vec![ty],
         })
     }
 
-    pub fn result_ty(ok: Id<Self>, err: Id<Self>) -> Self {
+    pub fn result_ty(ok: Id<Self>, err: Id<Self>, ctx: &InferenceCtx) -> Self {
         MonoTy::Con(TyCon {
-            name: intern_symbol("result"),
+            id: Id::from_name("result", ctx).unwrap(),
             args: vec![ok, err],
         })
     }
 
-    pub fn unit_ty() -> Self {
+    pub fn unit_ty(ctx: &InferenceCtx) -> Self {
         MonoTy::Con(TyCon {
-            name: intern_symbol("unit"),
+            id: Id::from_name("unit", ctx).unwrap(),
             args: vec![],
         })
     }
 
-    pub fn int_ty() -> Self {
+    pub fn int_ty(ctx: &InferenceCtx) -> Self {
         MonoTy::Con(TyCon {
-            name: intern_symbol("int"),
+            id: Id::from_name("int", ctx).unwrap(),
             args: vec![],
         })
     }
 
-    pub fn char_ty() -> Self {
+    pub fn char_ty(ctx: &InferenceCtx) -> Self {
         MonoTy::Con(TyCon {
-            name: intern_symbol("char"),
+            id: Id::from_name("char", ctx).unwrap(),
             args: vec![],
         })
     }
 
-    pub fn string_ty() -> Self {
+    pub fn string_ty(ctx: &InferenceCtx) -> Self {
         MonoTy::Con(TyCon {
-            name: intern_symbol("string"),
+            id: Id::from_name("string", ctx).unwrap(),
             args: vec![],
         })
     }
 
-    pub fn float_ty() -> Self {
+    pub fn float_ty(ctx: &InferenceCtx) -> Self {
         MonoTy::Con(TyCon {
-            name: intern_symbol("float"),
+            id: Id::from_name("float", ctx).unwrap(),
             args: vec![],
         })
     }
 
-    pub fn bool_ty() -> Self {
+    pub fn bool_ty(ctx: &InferenceCtx) -> Self {
         MonoTy::Con(TyCon {
-            name: intern_symbol("bool"),
+            id: Id::from_name("bool", ctx).unwrap(),
             args: vec![],
         })
     }
@@ -253,13 +256,7 @@ impl TyForall {
 }
 
 impl TyCon {
-    pub fn new(name: Symbol, args: Vec<Id<MonoTy>>) -> Self {
-        Self { name, args }
-    }
-
-    pub fn from_name(name: impl Into<String>, args: Vec<Id<MonoTy>>) -> Self {
-        let name = name.into();
-        let symb = intern_symbol(name.as_str());
-        Self::new(symb, args)
+    pub fn new(id: TypeId, args: Vec<Id<MonoTy>>) -> Self {
+        Self { id, args }
     }
 }

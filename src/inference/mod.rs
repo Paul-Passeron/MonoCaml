@@ -8,7 +8,7 @@ use crate::{
     lexer::interner::Symbol,
     parse_tree::expression::{BinaryOp, Constant},
     poly_ir::{
-        ValueRef, VarId,
+        TypeId, ValueRef, VarId,
         expr::{Expr, ExprNode, ValueBinding},
         id::{Arena, Id},
         item::{Item, ItemNode, TypeDeclInfo},
@@ -126,13 +126,13 @@ impl<'a> InferenceCtx<'a> {
         }
         match (mono1, mono2) {
             (MonoTy::Con(con1), MonoTy::Con(con2)) => {
-                if con1.name != con2.name {
-                    return Err(format!("Con type mismatch: {} != {}", con1.name, con2.name));
+                if con1.id != con2.id {
+                    return Err(format!("Con type mismatch: {:?} != {:?}", con1.id, con2.id));
                 }
                 if con1.args.len() != con2.args.len() {
                     return Err(format!(
-                        "Con type {} arg len mismatch : {} != {}",
-                        con1.name,
+                        "Con type {:?} arg len mismatch : {} != {}",
+                        con1.id,
                         con1.args.len(),
                         con2.args.len()
                     ));
@@ -174,16 +174,15 @@ impl<'a> InferenceCtx<'a> {
             Type::Arrow { param, result } => {
                 let mono_arg = self.type_to_mono(param);
                 let mono_ret = self.type_to_mono(result);
-                self.get_ty(MonoTy::func_ty(mono_arg, mono_ret))
+                self.get_ty(MonoTy::func_ty(mono_arg, mono_ret, self))
             }
             Type::Tuple(items) => {
                 let tys = items.iter().map(|x| self.type_to_mono(x)).collect();
-                self.get_ty(MonoTy::tuple_ty(tys))
+                self.get_ty(MonoTy::tuple_ty(tys, self))
             }
             Type::Constr { id, args } => {
-                let name = self.decls[*id].name;
                 let tys = args.iter().map(|x| self.type_to_mono(x)).collect();
-                let mono = MonoTy::Con(TyCon { name, args: tys });
+                let mono = MonoTy::Con(TyCon { id: *id, args: tys });
                 self.get_ty(mono)
             }
             _ => todo!(),
@@ -192,10 +191,10 @@ impl<'a> InferenceCtx<'a> {
 
     pub fn get_ty_of_const(&mut self, constant: &Constant) -> Id<MonoTy> {
         let mono = match constant {
-            Constant::Int(_) => MonoTy::int_ty(),
-            Constant::Char(_) => MonoTy::char_ty(),
-            Constant::String(_) => MonoTy::string_ty(),
-            Constant::Float(_) => MonoTy::float_ty(),
+            Constant::Int(_) => MonoTy::int_ty(self),
+            Constant::Char(_) => MonoTy::char_ty(self),
+            Constant::String(_) => MonoTy::string_ty(self),
+            Constant::Float(_) => MonoTy::float_ty(self),
         };
         self.get_ty(mono)
     }
@@ -246,7 +245,7 @@ impl<'a> InferenceCtx<'a> {
                 let iarg = self.infer_expr(arg)?;
                 let arg_ty = self.fresh_ty();
                 let res_ty = self.fresh_ty();
-                let func_ty = self.get_ty(MonoTy::func_ty(arg_ty, res_ty));
+                let func_ty = self.get_ty(MonoTy::func_ty(arg_ty, res_ty, self));
                 self.unify_j(ifunc.ty, func_ty)?;
                 self.unify_j(iarg.ty, arg_ty)?;
                 Ok(Expr::new(
@@ -264,7 +263,7 @@ impl<'a> InferenceCtx<'a> {
                     .iter()
                     .map(|e| self.infer_expr(e))
                     .collect::<Res<_>>()?;
-                let t = self.get_ty(MonoTy::tuple_ty(inf.iter().map(|x| x.ty).collect()));
+                let t = self.get_ty(MonoTy::tuple_ty(inf.iter().map(|x| x.ty).collect(), self));
                 Ok(Expr::new(ExprNode::Tuple(inf), span, t))
             }
             ExprNode::Construct { .. } => todo!(),
@@ -290,7 +289,7 @@ impl<'a> InferenceCtx<'a> {
             ExprNode::Unit => Ok(Expr::new(
                 ExprNode::Unit,
                 span,
-                self.get_ty(MonoTy::unit_ty()),
+                self.get_ty(MonoTy::unit_ty(self)),
             )),
             ExprNode::IfThenElse {
                 cond,
@@ -300,7 +299,7 @@ impl<'a> InferenceCtx<'a> {
                 let i_cond = self.infer_expr(cond)?;
                 let i_then_expr = self.infer_expr(then_expr)?;
                 let i_else_expr = self.infer_expr(else_expr)?;
-                let bool_ty = self.get_ty(MonoTy::bool_ty());
+                let bool_ty = self.get_ty(MonoTy::bool_ty(self));
                 self.unify_j(i_cond.ty, bool_ty)?;
                 let arms_ty = self.fresh_ty();
                 self.unify_j(i_then_expr.ty, arms_ty)?;
@@ -320,7 +319,7 @@ impl<'a> InferenceCtx<'a> {
                 let i_body = self.infer_expr(body)?;
                 let arg_ty = self.fresh_ty();
                 let body_ty = self.fresh_ty();
-                let func_ty = self.get_ty(MonoTy::func_ty(arg_ty, body_ty));
+                let func_ty = self.get_ty(MonoTy::func_ty(arg_ty, body_ty, self));
                 self.unify_j(i_arg.ty, arg_ty)?;
                 self.unify_j(i_body.ty, body_ty)?;
                 Ok(Expr::new(
@@ -346,11 +345,14 @@ impl<'a> InferenceCtx<'a> {
                         .map(|node| self.infer_pattern(node))
                         .collect::<Res<Vec<_>>>()?;
 
-                    let mono = MonoTy::tuple_ty(nodes.iter().map(|x| x.ty).collect());
+                    let mono = MonoTy::tuple_ty(nodes.iter().map(|x| x.ty).collect(), self);
                     let ty = self.get_ty(mono);
                     (PatternNode::Tuple(nodes), ty)
                 } else {
-                    (PatternNode::Tuple(vec![]), self.get_ty(MonoTy::unit_ty()))
+                    (
+                        PatternNode::Tuple(vec![]),
+                        self.get_ty(MonoTy::unit_ty(self)),
+                    )
                 }
             }
         };
@@ -389,7 +391,7 @@ impl<'a> InferenceCtx<'a> {
             let opt_body_ty = if rec {
                 let body = self.fresh_ty();
                 let full_ty = params.iter().rev().fold(body, |acc, param_ty| {
-                    self.get_ty(MonoTy::func_ty(param_ty.ty, acc))
+                    self.get_ty(MonoTy::func_ty(param_ty.ty, acc, self))
                 });
                 let scheme = TyForall {
                     tyvars: vec![],
@@ -413,7 +415,7 @@ impl<'a> InferenceCtx<'a> {
 
             let body = self.infer_expr(expr)?;
             let full_ty = params.iter().rev().fold(body.ty, |acc, param_ty| {
-                self.get_ty(MonoTy::func_ty(param_ty.ty, acc))
+                self.get_ty(MonoTy::func_ty(param_ty.ty, acc, self))
             });
             if let Some(body_ty) = opt_body_ty {
                 self.unify_j(body.ty, body_ty)?;
@@ -483,8 +485,8 @@ impl<'a> InferenceCtx<'a> {
                     ty_var.id
                 },
             }),
-            MonoTy::Con(TyCon { name, args }) => MonoTy::Con(TyCon {
-                name: *name,
+            MonoTy::Con(TyCon { id, args }) => MonoTy::Con(TyCon {
+                id: *id,
                 args: args
                     .iter()
                     .map(|t| t.get(self).clone())
@@ -521,7 +523,7 @@ impl<'a> InferenceCtx<'a> {
             PatternNode::Tuple(pats) => {
                 if !pats.is_empty() {
                     match &*scheme.ty {
-                        MonoTy::Con(TyCon { name, args }) if &name.to_string() == "*" => {
+                        MonoTy::Con(TyCon { id, args }) if &id.to_string(self) == "*" => {
                             if args.len() != pats.len() {
                                 return Err("Tuple pattern length mismatch".to_string());
                             }
@@ -538,7 +540,7 @@ impl<'a> InferenceCtx<'a> {
                         _ => return Err("Expected tuple type".to_string()),
                     }
                 } else if let Some(ty_con) = scheme.ty.as_con()
-                    && &ty_con.name.to_string() == "unit"
+                    && &ty_con.id.to_string(self) == "unit"
                 {
                     // pass
                 } else {
@@ -558,8 +560,8 @@ impl<'a> InferenceCtx<'a> {
         let end = ty.find(self);
         match end.get(self).clone() {
             MonoTy::Var(ty_var) => SolvedTy::Var(ty_var),
-            MonoTy::Con(TyCon { name, args }) => SolvedTy::Con(SolvedCon {
-                name,
+            MonoTy::Con(TyCon { id, args }) => SolvedTy::Con(SolvedCon {
+                id,
                 args: args.iter().map(|x| self.into_solved(*x)).collect(),
             }),
         }
@@ -582,8 +584,8 @@ impl<'a> InferenceCtx<'a> {
                     };
                     SolvedTy::Var(TyVar { id })
                 }
-                SolvedTy::Con(SolvedCon { name, args }) => SolvedTy::Con(SolvedCon {
-                    name: *name,
+                SolvedTy::Con(SolvedCon { id, args }) => SolvedTy::Con(SolvedCon {
+                    id: *id,
                     args: args.iter().map(|x| replace_infer(x, ctx)).collect(),
                 }),
             }
@@ -626,7 +628,7 @@ impl<'a> InferenceCtx<'a> {
             BinaryOp::Plus | BinaryOp::Minus | BinaryOp::Star | BinaryOp::Div => {
                 let left = self.infer_expr(left)?;
                 let right = self.infer_expr(right)?;
-                let int_ty = self.get_ty(MonoTy::int_ty());
+                let int_ty = self.get_ty(MonoTy::int_ty(self));
                 self.unify_j(left.ty, int_ty)?;
                 self.unify_j(right.ty, int_ty)?;
                 Ok((
@@ -641,8 +643,8 @@ impl<'a> InferenceCtx<'a> {
             BinaryOp::GEq | BinaryOp::GT | BinaryOp::LEq | BinaryOp::LT => {
                 let left = self.infer_expr(left)?;
                 let right = self.infer_expr(right)?;
-                let bool_ty = self.get_ty(MonoTy::bool_ty());
-                let int_ty = self.get_ty(MonoTy::int_ty());
+                let bool_ty = self.get_ty(MonoTy::bool_ty(self));
+                let int_ty = self.get_ty(MonoTy::int_ty(self));
                 self.unify_j(left.ty, int_ty)?;
                 self.unify_j(right.ty, int_ty)?;
                 Ok((
@@ -666,7 +668,7 @@ impl Id<MonoTy> {
         match mono {
             MonoTy::Var(ty_var) => format!("{{TyVar({})}}", ty_var.id.raw()),
             MonoTy::Con(ty_con) => {
-                let s = ty_con.name.to_string();
+                let s = ty_con.id.to_string(ctx);
                 if &s == "*" || &s == "->" {
                     format!(
                         "({})",
@@ -687,10 +689,25 @@ impl Id<MonoTy> {
                             .collect::<Vec<_>>()
                             .join(" "),
                         if ty_con.args.is_empty() { "" } else { " " },
-                        ty_con.name
+                        ty_con.id.to_string(ctx)
                     )
                 }
             }
         }
+    }
+}
+
+impl TypeId {
+    pub fn to_string(self, ctx: &InferenceCtx) -> String {
+        ctx.decls[self].name.to_string()
+    }
+
+    pub fn from_name(s: &str, ctx: &InferenceCtx) -> Option<Self> {
+        for (id, TypeDeclInfo { name, .. }) in ctx.decls.iter() {
+            if &name.to_string() == s {
+                return Some(id);
+            }
+        }
+        None
     }
 }
