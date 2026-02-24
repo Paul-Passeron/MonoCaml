@@ -354,6 +354,10 @@ impl<'a> InferenceCtx<'a> {
                 }
             }
         };
+        if !pattern.ty.is_infer() {
+            let constr = self.type_to_mono(&pattern.ty);
+            self.unify_j(constr, ty)?;
+        }
         Ok(Pattern::new(node, pattern.span, ty))
     }
 
@@ -377,10 +381,11 @@ impl<'a> InferenceCtx<'a> {
                     .collect::<Res<Vec<_>>>()
             })
             .collect::<Res<Vec<_>>>()?;
-        for ((pat, params), expr) in pats
+        for (((pat, params), expr), constr) in pats
             .into_iter()
             .zip(params)
             .zip(bindings.iter().map(|b| &b.body))
+            .zip(bindings.iter().map(|b| &b.ty))
         {
             let opt_body_ty = if rec {
                 let body = self.fresh_ty();
@@ -413,6 +418,10 @@ impl<'a> InferenceCtx<'a> {
             });
             if let Some(body_ty) = opt_body_ty {
                 self.unify_j(body.ty, body_ty)?;
+            }
+            if !constr.is_infer() {
+                let mono = self.type_to_mono(constr);
+                self.unify_j(body.ty, mono)?;
             }
             self.unify_j(pat.ty, full_ty)?;
             let scheme = self.generalize(full_ty);
