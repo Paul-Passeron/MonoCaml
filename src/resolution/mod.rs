@@ -299,6 +299,28 @@ impl Resolver {
                     else_expr: Box::new(r_else_expr),
                 }
             }
+            ExpressionDesc::Let {
+                rec,
+                bindings,
+                expression,
+            } => {
+                let recursive = rec.is_rec();
+                let bindings = self.resolve_value_bindings(recursive, bindings)?;
+                let expr = self.resolve_expression(expression)?;
+                ExprNode::Let {
+                    recursive,
+                    bindings,
+                    body: Box::new(expr),
+                }
+            }
+            ExpressionDesc::Fun { arg, body } => {
+                let r_arg = self.resolve_pattern(arg)?;
+                let r_body = self.resolve_expression(body)?;
+                ExprNode::Fun {
+                    arg: r_arg,
+                    body: Box::new(r_body),
+                }
+            }
             x => todo!("{x:?}"),
         };
         Ok(Expr::new(node, span, Type::default()))
@@ -335,12 +357,11 @@ impl Resolver {
         })
     }
 
-    fn resolve_value(
+    fn resolve_value_bindings(
         &mut self,
         rec: bool,
         bindings: &[parse_tree::expression::ValueBinding],
-        span: Span,
-    ) -> Res<ResItem> {
+    ) -> Res<Vec<ResValueBinding>> {
         let bindings = if rec {
             let mut v = vec![];
             for binding in bindings {
@@ -382,6 +403,16 @@ impl Resolver {
             }
             res
         };
+        Ok(bindings)
+    }
+
+    fn resolve_value(
+        &mut self,
+        rec: bool,
+        bindings: &[parse_tree::expression::ValueBinding],
+        span: Span,
+    ) -> Res<ResItem> {
+        let bindings = self.resolve_value_bindings(rec, bindings)?;
         let node = ItemNode::Value {
             recursive: rec,
             bindings,

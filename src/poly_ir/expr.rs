@@ -54,6 +54,10 @@ pub enum ExprNode<T> {
         then_expr: Box<Expr<T>>,
         else_expr: Box<Expr<T>>,
     },
+    Fun {
+        arg: Pattern<T>,
+        body: Box<Expr<T>>,
+    },
 }
 
 #[derive(Debug)]

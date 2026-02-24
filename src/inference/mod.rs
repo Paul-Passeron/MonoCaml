@@ -222,7 +222,24 @@ impl<'a> InferenceCtx<'a> {
                 let ty = self.get_ty_of_const(constant);
                 Ok(Expr::new(node, span, ty))
             }
-            ExprNode::Let { .. } => todo!(),
+            ExprNode::Let {
+                recursive,
+                bindings,
+                body,
+            } => {
+                let bindings = self.infer_bindings(*recursive, bindings)?;
+                let body = self.infer_expr(body)?;
+                let ty = body.ty;
+                Ok(Expr::new(
+                    ExprNode::Let {
+                        recursive: *recursive,
+                        bindings,
+                        body: Box::new(body),
+                    },
+                    span,
+                    ty,
+                ))
+            }
             ExprNode::Function { .. } => todo!(),
             ExprNode::Apply { func, arg } => {
                 let ifunc = self.infer_expr(func)?;
@@ -298,6 +315,23 @@ impl<'a> InferenceCtx<'a> {
                     arms_ty,
                 ))
             }
+            ExprNode::Fun { arg, body } => {
+                let i_arg = self.infer_pattern(arg)?;
+                let i_body = self.infer_expr(body)?;
+                let arg_ty = self.fresh_ty();
+                let body_ty = self.fresh_ty();
+                let func_ty = self.get_ty(MonoTy::func_ty(arg_ty, body_ty));
+                self.unify_j(i_arg.ty, arg_ty)?;
+                self.unify_j(i_body.ty, body_ty)?;
+                Ok(Expr::new(
+                    ExprNode::Fun {
+                        arg: i_arg,
+                        body: Box::new(i_body),
+                    },
+                    span,
+                    func_ty,
+                ))
+            }
         }
     }
 
@@ -323,6 +357,77 @@ impl<'a> InferenceCtx<'a> {
         Ok(Pattern::new(node, pattern.span, ty))
     }
 
+    pub fn infer_bindings(
+        &mut self,
+        rec: bool,
+        bindings: &[ValueBinding<Type>],
+    ) -> Res<Vec<ValueBinding<Id<MonoTy>>>> {
+        let mut new_bindings = vec![];
+        let pats: Vec<_> = bindings
+            .iter()
+            .map(|binding| self.infer_pattern(&binding.pat))
+            .collect::<Res<_>>()?;
+        let params = bindings
+            .iter()
+            .map(|binding| {
+                binding
+                    .params
+                    .iter()
+                    .map(|param| self.infer_pattern(param))
+                    .collect::<Res<Vec<_>>>()
+            })
+            .collect::<Res<Vec<_>>>()?;
+        for ((pat, params), expr) in pats
+            .into_iter()
+            .zip(params)
+            .zip(bindings.iter().map(|b| &b.body))
+        {
+            let opt_body_ty = if rec {
+                let body = self.fresh_ty();
+                let full_ty = params.iter().rev().fold(body, |acc, param_ty| {
+                    self.get_ty(MonoTy::func_ty(param_ty.ty, acc))
+                });
+                let scheme = TyForall {
+                    tyvars: vec![],
+                    ty: Box::new(full_ty.get(self).clone()),
+                };
+                self.bind_pattern_to_context(&pat, scheme)?;
+                Some(body)
+            } else {
+                None
+            };
+
+            for param in params.iter() {
+                self.bind_pattern_to_context(
+                    param,
+                    TyForall {
+                        tyvars: vec![],
+                        ty: Box::new(param.ty.get(self).clone()),
+                    },
+                )?;
+            }
+
+            let body = self.infer_expr(expr)?;
+            let full_ty = params.iter().rev().fold(body.ty, |acc, param_ty| {
+                self.get_ty(MonoTy::func_ty(param_ty.ty, acc))
+            });
+            if let Some(body_ty) = opt_body_ty {
+                self.unify_j(body.ty, body_ty)?;
+            }
+            self.unify_j(pat.ty, full_ty)?;
+            let scheme = self.generalize(full_ty);
+            self.bind_pattern_to_context(&pat, scheme)?;
+
+            new_bindings.push(ValueBinding {
+                pat,
+                params,
+                ty: full_ty,
+                body,
+            })
+        }
+        Ok(new_bindings)
+    }
+
     pub fn infer_item(&mut self, item: &Item<Type>) -> Res<Item<Id<MonoTy>>> {
         let node = item.as_ref().node;
         let span = item.span;
@@ -332,69 +437,7 @@ impl<'a> InferenceCtx<'a> {
                 bindings,
                 recursive,
             } => {
-                let mut new_bindings = vec![];
-                let pats: Vec<_> = bindings
-                    .iter()
-                    .map(|binding| self.infer_pattern(&binding.pat))
-                    .collect::<Res<_>>()?;
-                let params = bindings
-                    .iter()
-                    .map(|binding| {
-                        binding
-                            .params
-                            .iter()
-                            .map(|param| self.infer_pattern(param))
-                            .collect::<Res<Vec<_>>>()
-                    })
-                    .collect::<Res<Vec<_>>>()?;
-                for ((pat, params), expr) in pats
-                    .into_iter()
-                    .zip(params)
-                    .zip(bindings.iter().map(|b| &b.body))
-                {
-                    let opt_body_ty = if *recursive {
-                        let body = self.fresh_ty();
-                        let full_ty = params.iter().rev().fold(body, |acc, param_ty| {
-                            self.get_ty(MonoTy::func_ty(param_ty.ty, acc))
-                        });
-                        let scheme = TyForall {
-                            tyvars: vec![],
-                            ty: Box::new(full_ty.get(self).clone()),
-                        };
-                        self.bind_pattern_to_context(&pat, scheme)?;
-                        Some(body)
-                    } else {
-                        None
-                    };
-
-                    for param in params.iter() {
-                        self.bind_pattern_to_context(
-                            param,
-                            TyForall {
-                                tyvars: vec![],
-                                ty: Box::new(param.ty.get(self).clone()),
-                            },
-                        )?;
-                    }
-
-                    let body = self.infer_expr(expr)?;
-                    let full_ty = params.iter().rev().fold(body.ty, |acc, param_ty| {
-                        self.get_ty(MonoTy::func_ty(param_ty.ty, acc))
-                    });
-                    if let Some(body_ty) = opt_body_ty {
-                        self.unify_j(body.ty, body_ty)?;
-                    }
-                    self.unify_j(pat.ty, full_ty)?;
-                    let scheme = self.generalize(full_ty);
-                    self.bind_pattern_to_context(&pat, scheme)?;
-
-                    new_bindings.push(ValueBinding {
-                        pat,
-                        params,
-                        ty: full_ty,
-                        body,
-                    })
-                }
+                let new_bindings = self.infer_bindings(*recursive, bindings)?;
                 Ok(Item::new(
                     ItemNode::Value {
                         recursive: *recursive,
