@@ -2,10 +2,7 @@ use std::collections::HashSet;
 
 use crate::{
     inference::{InferVarId, solved_ty::SolvedTy},
-    poly_ir::{
-        expr::ValueBinding,
-        item::{GenItem, ItemNode},
-    },
+    poly_ir::item::{GenItem, ItemNode},
 };
 
 impl<T> GenItem<SolvedTy, T> {
@@ -27,15 +24,6 @@ impl<T> GenItem<SolvedTy, T> {
             ty: self.collect_free_vars(),
             node: self.node,
             span: self.span,
-        }
-    }
-}
-
-impl<T> ItemNode<T> {
-    pub(super) fn get_bindings(&self) -> &[ValueBinding<T>] {
-        match self {
-            ItemNode::Value { bindings, .. } => bindings,
-            _ => &[],
         }
     }
 }

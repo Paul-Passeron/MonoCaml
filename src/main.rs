@@ -142,7 +142,6 @@ fn main() {
     let Resolver {
         types,
         mut vars,
-        vbs,
         builtins,
         ..
     } = resolver;
