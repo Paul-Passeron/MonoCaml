@@ -548,7 +548,10 @@ impl<'a> InferenceCtx<'a> {
         }
     }
 
-    pub fn infer_program(&mut self, items: &[Item<Type>]) -> Res<Vec<Item<SolvedTy>>> {
+    pub fn infer_program(
+        &mut self,
+        items: &[Item<Type>],
+    ) -> Res<(Vec<Item<SolvedTy>>, HashMap<VarId, SolvedTy>)> {
         fn replace_infer(
             ty: &SolvedTy,
             ctx: &mut (HashMap<InferVarId, InferVarId>, Arena<InfMarker>),
@@ -580,16 +583,26 @@ impl<'a> InferenceCtx<'a> {
         // Cleaning up the free variables
         let replace_ctx = &mut (HashMap::new(), Arena::new());
 
-        Ok(inferred
-            .into_iter()
-            .map(|id| {
-                id
-                    // From MonoTy to SolvedTy
-                    .map(self, &mut |id, ctx| ctx.into_solved(*id))
-                    // Cleaning up the unnused `InferVarId`s
-                    .map_mut(replace_ctx, &mut |ty, ctx| replace_infer(ty, ctx))
-            })
-            .collect())
+        Ok((
+            inferred
+                .into_iter()
+                .map(|id| {
+                    id
+                        // From MonoTy to SolvedTy
+                        .map(self, &mut |id, ctx| ctx.into_solved(*id))
+                        // Cleaning up the unnused `InferVarId`s
+                        .map_mut(replace_ctx, &mut |ty, ctx| replace_infer(ty, ctx))
+                })
+                .collect(),
+            self.builtins
+                .iter()
+                .map(|(_, id)| {
+                    let instantiated = self.instantiate(&self.map[&id].clone());
+                    let solved_ty = self.into_solved(instantiated);
+                    (*id, replace_infer(&solved_ty, replace_ctx))
+                })
+                .collect(),
+        ))
     }
 
     pub fn fresh_ty(&mut self) -> Id<MonoTy> {

@@ -75,6 +75,10 @@ fn intern_symbol(s: &str) -> Symbol {
     SESSION.lock().unwrap().intern_symbol(s)
 }
 
+fn fresh_symbol() -> Symbol {
+    SESSION.lock().unwrap().fresh_symbol()
+}
+
 #[allow(unused)]
 fn intern_strlit(s: &str) -> StrLit {
     SESSION.lock().unwrap().intern_strlit(s)
@@ -110,9 +114,9 @@ fn main() {
         }
     }
 
-    for t in &tokens {
-        println!("{t}");
-    }
+    // for t in &tokens {
+    //     println!("{t}");
+    // }
 
     if let Some(error) = error {
         eprintln!("Lexing error: {}", error)
@@ -127,9 +131,9 @@ fn main() {
         }
     };
 
-    for item in &prog {
-        println!("{}", item.desc.display(0));
-    }
+    // for item in &prog {
+    //     println!("{}", item.desc.display(0));
+    // }
 
     let mut resolver = Resolver::new();
 
@@ -137,7 +141,7 @@ fn main() {
 
     let mut infer_ctx = InferenceCtx::new(&resolver.types, &resolver.vars, &resolver.builtins);
 
-    let inferred = infer_ctx.infer_program(&poly).unwrap();
+    let (inferred, builtins) = infer_ctx.infer_program(&poly).unwrap();
 
     // for item in &inferred {
     //     println!(
@@ -146,7 +150,7 @@ fn main() {
     //     )
     // }
 
-    let mut mono_ctx = MonoCtx::new(&inferred);
+    let mut mono_ctx = MonoCtx::new(&inferred, &resolver.vars, builtins);
 
     let specialized = mono_ctx.mono_program().unwrap();
     for item in &specialized {
