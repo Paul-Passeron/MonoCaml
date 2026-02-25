@@ -139,6 +139,8 @@ impl Lexer {
         let s = &self.contents[l.offset..self.loc().offset];
         match s {
             // Keywords
+            "true" => Ok(Token::new(TokenKind::True, l.span(&self.loc()))),
+            "false" => Ok(Token::new(TokenKind::False, l.span(&self.loc()))),
             "if" => Ok(Token::new(TokenKind::If, l.span(&self.loc()))),
             "when" => Ok(Token::new(TokenKind::When, l.span(&self.loc()))),
             "then" => Ok(Token::new(TokenKind::Then, l.span(&self.loc()))),

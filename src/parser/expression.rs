@@ -134,6 +134,20 @@ impl<'a> Parser<'a> {
                     start.span(&self.loc()),
                 ))
             }
+            Some(TokenKind::True) => {
+                self.advance();
+                Ok(Expression::new(
+                    ExpressionDesc::Constant(Constant::Bool(true)),
+                    start.span(&self.loc()),
+                ))
+            }
+            Some(TokenKind::False) => {
+                self.advance();
+                Ok(Expression::new(
+                    ExpressionDesc::Constant(Constant::Bool(false)),
+                    start.span(&self.loc()),
+                ))
+            }
             Some(TokenKind::LSqr) => {
                 let start = self.loc();
                 self.advance();
@@ -146,6 +160,7 @@ impl<'a> Parser<'a> {
                         self.advance();
                     }
                 }
+
                 self.expect(TokenKind::RSqr)?;
                 let end = self.span().split().1;
                 let span = start.span(&end);

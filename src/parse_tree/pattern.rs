@@ -83,6 +83,7 @@ impl fmt::Display for PatternDescDisplay<'_> {
                     write!(f, "\"{}\"", resolve_strlit(*s))
                 }
                 Constant::Float(fl) => write!(f, "{}", fl),
+                Constant::Bool(b) => write!(f, "{b}"),
             },
             PatternDesc::Interval { start, end } => {
                 match start {

@@ -16,6 +16,7 @@ pub enum Constant {
     Char(char),
     String(StrLit),
     Float(f64),
+    Bool(bool),
 }
 
 pub type Expression = Located<ExpressionDesc>;
@@ -313,6 +314,7 @@ impl fmt::Display for ExpressionDescDisplay<'_> {
                         write!(f, "\"{}\"", resolve_strlit(*s))
                     }
                     Constant::Float(fl) => write!(f, "{}", fl),
+                    Constant::Bool(b) => write!(f, "{b}"),
                 }
             }
             ExpressionDesc::Let {

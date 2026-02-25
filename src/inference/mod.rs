@@ -200,6 +200,7 @@ impl<'a> InferenceCtx<'a> {
             Constant::Char(_) => MonoTy::char_ty(self),
             Constant::String(_) => MonoTy::string_ty(self),
             Constant::Float(_) => MonoTy::float_ty(self),
+            Constant::Bool(_) => MonoTy::bool_ty(self),
         };
         self.get_ty(mono)
     }
