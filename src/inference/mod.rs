@@ -207,7 +207,6 @@ impl<'a> InferenceCtx<'a> {
 
                 let ty = match id {
                     ValueRef::Local(id) => {
-                        println!("Looking for the scheme of {}", self.names[*id].name);
                         let scheme = self.map[id].clone();
                         self.instantiate(&scheme)
                     }
@@ -239,7 +238,6 @@ impl<'a> InferenceCtx<'a> {
                     ty,
                 ))
             }
-            ExprNode::Function { .. } => todo!(),
             ExprNode::Apply { func, arg } => {
                 let ifunc = self.infer_expr(func)?;
                 let iarg = self.infer_expr(arg)?;
@@ -312,23 +310,6 @@ impl<'a> InferenceCtx<'a> {
                     },
                     span,
                     arms_ty,
-                ))
-            }
-            ExprNode::Fun { arg, body } => {
-                let i_arg = self.infer_pattern(arg)?;
-                let i_body = self.infer_expr(body)?;
-                let arg_ty = self.fresh_ty();
-                let body_ty = self.fresh_ty();
-                let func_ty = self.get_ty(MonoTy::func_ty(arg_ty, body_ty, self));
-                self.unify_j(i_arg.ty, arg_ty)?;
-                self.unify_j(i_body.ty, body_ty)?;
-                Ok(Expr::new(
-                    ExprNode::Fun {
-                        arg: i_arg,
-                        body: Box::new(i_body),
-                    },
-                    span,
-                    func_ty,
                 ))
             }
         }
@@ -578,7 +559,6 @@ impl<'a> InferenceCtx<'a> {
                         *id
                     } else {
                         let id = ctx.1.alloc(InfMarker);
-                        println!("ALLOCATING {id:?}");
                         ctx.0.insert(ty_var.id, id);
                         id
                     };

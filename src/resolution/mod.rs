@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{
-    SESSION,
+    SESSION, fresh_symbol,
     lexer::interner::Symbol,
     parse_tree::{
         self, LongIdent,
@@ -319,9 +319,34 @@ impl Resolver {
             ExpressionDesc::Fun { arg, body } => {
                 let r_arg = self.resolve_pattern(arg)?;
                 let r_body = self.resolve_expression(body)?;
-                ExprNode::Fun {
-                    arg: r_arg,
-                    body: Box::new(r_body),
+
+                let self_name = fresh_symbol();
+                let self_var = self.vars.alloc(VarInfo { name: self_name });
+                let l = r_arg.span.split().0;
+                let span = l.span(&l);
+
+                let pat = Pattern::new(PatternNode::Var(self_var), span, Default::default());
+
+                self.scope.bind_value(self_name, ValueRef::Local(self_var));
+
+                let l = r_body.span.split().1;
+                let span = l.span(&l);
+                let self_expr = Expr::new(
+                    ExprNode::Var(ValueRef::Local(self_var)),
+                    span,
+                    Default::default(),
+                );
+
+                ExprNode::Let {
+                    recursive: false,
+                    bindings: vec![ValueBinding {
+                        id: self.vbs.alloc(VBMarker),
+                        pat,
+                        params: vec![r_arg],
+                        ty: Default::default(),
+                        body: r_body,
+                    }],
+                    body: Box::new(self_expr),
                 }
             }
             x => todo!("{x:?}"),

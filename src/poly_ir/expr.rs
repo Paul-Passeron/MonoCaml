@@ -15,9 +15,9 @@ pub enum ExprNode<T> {
         body: Box<Expr<T>>,
     },
 
-    Function {
-        cases: Vec<MatchCase<T>>,
-    },
+    // Function {
+    //     cases: Vec<MatchCase<T>>,
+    // },
     Apply {
         func: Box<Expr<T>>,
         arg: Box<Expr<T>>,
@@ -54,11 +54,12 @@ pub enum ExprNode<T> {
         then_expr: Box<Expr<T>>,
         else_expr: Box<Expr<T>>,
     },
-    Fun {
-        arg: Pattern<T>,
-        body: Box<Expr<T>>,
-    },
+    // Fun {
+    //     arg: Pattern<T>,
+    //     body: Box<Expr<T>>,
+    // },
 }
+#[derive(Debug, Default, Clone, Copy)]
 pub struct VBMarker;
 pub type ValueBindingId = Id<VBMarker>;
 

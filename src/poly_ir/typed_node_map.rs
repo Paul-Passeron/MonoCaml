@@ -125,9 +125,9 @@ impl<T> Expr<T> {
                     body: Box::new(body),
                 }
             }
-            ExprNode::Function { cases } => ExprNode::Function {
-                cases: cases.iter().map(|x| x.map(ctx, f)).collect(),
-            },
+            // ExprNode::Function { cases } => ExprNode::Function {
+            //     cases: cases.iter().map(|x| x.map(ctx, f)).collect(),
+            // },
             ExprNode::Apply { func, arg } => ExprNode::Apply {
                 func: Box::new(func.map(ctx, f)),
                 arg: Box::new(arg.map(ctx, f)),
@@ -170,10 +170,10 @@ impl<T> Expr<T> {
                 then_expr: Box::new(then_expr.map(ctx, f)),
                 else_expr: Box::new(else_expr.map(ctx, f)),
             },
-            ExprNode::Fun { arg, body } => ExprNode::Fun {
-                arg: arg.map(ctx, f),
-                body: Box::new(body.map(ctx, f)),
-            },
+            // ExprNode::Fun { arg, body } => ExprNode::Fun {
+            //     arg: arg.map(ctx, f),
+            //     body: Box::new(body.map(ctx, f)),
+            // },
         };
         Expr::new(node, span, t)
     }
@@ -197,9 +197,9 @@ impl<T> Expr<T> {
                     body: Box::new(body),
                 }
             }
-            ExprNode::Function { cases } => ExprNode::Function {
-                cases: cases.iter().map(|x| x.map_mut(ctx, f)).collect(),
-            },
+            // ExprNode::Function { cases } => ExprNode::Function {
+            //     cases: cases.iter().map(|x| x.map_mut(ctx, f)).collect(),
+            // },
             ExprNode::Apply { func, arg } => ExprNode::Apply {
                 func: Box::new(func.map_mut(ctx, f)),
                 arg: Box::new(arg.map_mut(ctx, f)),
@@ -242,10 +242,10 @@ impl<T> Expr<T> {
                 then_expr: Box::new(then_expr.map_mut(ctx, f)),
                 else_expr: Box::new(else_expr.map_mut(ctx, f)),
             },
-            ExprNode::Fun { arg, body } => ExprNode::Fun {
-                arg: arg.map_mut(ctx, f),
-                body: Box::new(body.map_mut(ctx, f)),
-            },
+            // ExprNode::Fun { arg, body } => ExprNode::Fun {
+            //     arg: arg.map_mut(ctx, f),
+            //     body: Box::new(body.map_mut(ctx, f)),
+            // },
         };
         Expr::new(node, span, t)
     }
