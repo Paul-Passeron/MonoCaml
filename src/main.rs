@@ -15,6 +15,7 @@ use crate::{
     },
     lower::mono_to_cfg::MonoToCfg,
     mono_ir::{Ast, Var, types::AstCtx},
+    monomorph::MonoCtx,
     parser::Parser,
     resolution::Resolver,
     session::Session,
@@ -29,6 +30,7 @@ pub mod inference;
 pub mod lexer;
 pub mod lower;
 pub mod mono_ir;
+pub mod monomorph;
 pub mod parse_tree;
 pub mod parser;
 pub mod poly_ir;
@@ -137,7 +139,17 @@ fn main() {
 
     let inferred = infer_ctx.infer_program(&poly).unwrap();
 
-    for item in &inferred {
+    // for item in &inferred {
+    //     println!(
+    //         "{:#?}",
+    //         item.map(&infer_ctx, &mut |x, _| format!("{:?}", x))
+    //     )
+    // }
+
+    let mut mono_ctx = MonoCtx::new(&inferred);
+
+    let specialized = mono_ctx.mono_program().unwrap();
+    for item in &specialized {
         println!(
             "{:#?}",
             item.map(&infer_ctx, &mut |x, _| format!("{:?}", x))
