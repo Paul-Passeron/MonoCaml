@@ -66,6 +66,11 @@ impl Id<MonoTy> {
     }
 }
 
+pub struct InferenceResult {
+    pub items: Vec<Item<SolvedTy>>,
+    pub builtins: HashMap<VarId, SolvedTy>,
+}
+
 impl MonoTy {
     pub fn occurs_in(&self, host: &Self, ctx: &InferenceCtx) -> bool {
         self == host
@@ -548,10 +553,7 @@ impl<'a> InferenceCtx<'a> {
         }
     }
 
-    pub fn infer_program(
-        &mut self,
-        items: &[Item<Type>],
-    ) -> Res<(Vec<Item<SolvedTy>>, HashMap<VarId, SolvedTy>)> {
+    pub fn infer_program(&mut self, items: &[Item<Type>]) -> Res<InferenceResult> {
         fn replace_infer(
             ty: &SolvedTy,
             ctx: &mut (HashMap<InferVarId, InferVarId>, Arena<InfMarker>),
@@ -583,8 +585,8 @@ impl<'a> InferenceCtx<'a> {
         // Cleaning up the free variables
         let replace_ctx = &mut (HashMap::new(), Arena::new());
 
-        Ok((
-            inferred
+        Ok(InferenceResult {
+            items: inferred
                 .into_iter()
                 .map(|id| {
                     id
@@ -594,15 +596,16 @@ impl<'a> InferenceCtx<'a> {
                         .map_mut(replace_ctx, &mut |ty, ctx| replace_infer(ty, ctx))
                 })
                 .collect(),
-            self.builtins
-                .iter()
-                .map(|(_, id)| {
-                    let instantiated = self.instantiate(&self.map[&id].clone());
+            builtins: self
+                .builtins
+                .values()
+                .map(|id| {
+                    let instantiated = self.instantiate(&self.map[id].clone());
                     let solved_ty = self.into_solved(instantiated);
                     (*id, replace_infer(&solved_ty, replace_ctx))
                 })
                 .collect(),
-        ))
+        })
     }
 
     pub fn fresh_ty(&mut self) -> Id<MonoTy> {
@@ -697,7 +700,7 @@ impl TypeId {
 
     pub fn from_name(s: &str, ctx: &InferenceCtx) -> Option<Self> {
         for (id, TypeDeclInfo { name, .. }) in ctx.decls.iter() {
-            if &name.to_string() == s {
+            if name.to_string() == s {
                 return Some(id);
             }
         }

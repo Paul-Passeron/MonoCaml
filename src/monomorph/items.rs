@@ -8,13 +8,10 @@ use crate::{
 impl<T> GenItem<SolvedTy, T> {
     pub fn collect_free_vars(&self) -> HashSet<InferVarId> {
         let mut s = HashSet::new();
-        match &self.node {
-            ItemNode::Value { bindings, .. } => {
-                for binding in bindings {
-                    binding.map_mut(&mut s, &mut |ty, s| s.extend(ty.free_vars()));
-                }
+        if let ItemNode::Value { bindings, .. } = &self.node {
+            for binding in bindings {
+                binding.map_mut(&mut s, &mut |ty, s| s.extend(ty.free_vars()));
             }
-            _ => (),
         }
         s
     }

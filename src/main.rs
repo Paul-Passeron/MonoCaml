@@ -7,7 +7,7 @@ use lazy_static::lazy_static;
 use crate::{
     backend::llvm_backend::LLVMBackend,
     cfg::{FunName, Label, var::CfgVar},
-    inference::InferenceCtx,
+    inference::{InferenceCtx, InferenceResult},
     lexer::{
         Lexer,
         error::LexingError,
@@ -145,11 +145,14 @@ fn main() {
         builtins,
         ..
     } = resolver;
-    let (inferred, new_builtins) = {
+    let InferenceResult {
+        items: inferred,
+        builtins,
+    } = {
         let mut infer_ctx = InferenceCtx::new(&types, &vars, &builtins);
         infer_ctx.infer_program(&poly).unwrap()
     };
-    let mut mono_ctx = MonoCtx::new(&inferred, &mut vars, new_builtins);
+    let mut mono_ctx = MonoCtx::new(&inferred, &mut vars, builtins);
 
     let specialized = mono_ctx.mono_program().unwrap();
     for item in &specialized {

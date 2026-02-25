@@ -173,28 +173,25 @@ fn walk_expr_vars<'a>(
 impl<'a> MonoCtx<'a> {
     fn init(&mut self) {
         for item in &self.items {
-            match item.as_ref().node {
-                ItemNode::Value { bindings, .. } => {
-                    for b in bindings {
-                        let mut s = HashSet::new();
-                        Self::extract_pattern_vars(&b.pat, &mut s);
-                        for p in &b.params {
-                            Self::extract_pattern_vars(p, &mut s);
-                        }
-                        self.id_to_bindings.insert(b.id, b);
-                        for id in dbg!(s) {
-                            self.og_var_to_og_vb.insert(id, b.id);
-                        }
-                        walk_expr_vars(
-                            &b.body,
-                            b.id,
-                            &mut self.og_var_to_og_vb,
-                            &mut self.vb_forwards,
-                            &mut self.id_to_bindings,
-                        );
+            if let ItemNode::Value { bindings, .. } = &item.node {
+                for b in bindings {
+                    let mut s = HashSet::new();
+                    Self::extract_pattern_vars(&b.pat, &mut s);
+                    for p in &b.params {
+                        Self::extract_pattern_vars(p, &mut s);
                     }
+                    self.id_to_bindings.insert(b.id, b);
+                    for id in dbg!(s) {
+                        self.og_var_to_og_vb.insert(id, b.id);
+                    }
+                    walk_expr_vars(
+                        &b.body,
+                        b.id,
+                        &mut self.og_var_to_og_vb,
+                        &mut self.vb_forwards,
+                        &mut self.id_to_bindings,
+                    );
                 }
-                _ => (),
             }
         }
     }
@@ -293,7 +290,7 @@ impl<'a> MonoCtx<'a> {
                     // reference to other top level binding !
                     if let Some(vb_id) = self.og_var_to_og_vb.get(id) {
                         todo!()
-                    } else if self.builtins.get(id).is_some() {
+                    } else if self.builtins.contains_key(id) {
                         // Builtin
                         ExprNode::Var(ValueRef::Local(*id))
                     } else {
@@ -331,13 +328,12 @@ impl<'a> MonoCtx<'a> {
     }
 
     fn find_original_binding(&self, id: Id<VBMarker>) -> &ValueBinding<SolvedTy> {
-        &self.id_to_bindings[&id]
+        self.id_to_bindings[&id]
     }
 
     fn new_var_of_id(&mut self, id: VarId) -> VarId {
         let name = self.vars[id].name;
-        let id = self.vars.alloc(VarInfo { name });
-        id
+        self.vars.alloc(VarInfo { name })
     }
 
     fn build_fresh_rename(&mut self, og_binding: &ValueBinding<SolvedTy>) -> HashMap<VarId, VarId> {
@@ -384,24 +380,21 @@ impl<'a> MonoCtx<'a> {
         // collect all bindings that are already specialized
         let mut ids = vec![];
         for item in &self.items {
-            match item.as_ref().node {
-                ItemNode::Value { bindings, .. } => {
-                    for b in bindings {
-                        let mut s = HashSet::new();
-                        b.map_mut(&mut s, &mut |ty, s| match ty {
-                            SolvedTy::Var(ty_var) => {
-                                s.insert(ty_var.id);
-                            }
-                            SolvedTy::Con(SolvedCon { args, .. }) => {
-                                args.iter().for_each(|x| s.extend(x.free_vars()))
-                            }
-                        });
-                        if s.is_empty() {
-                            ids.push(b.id);
+            if let ItemNode::Value { bindings, .. } = &item.node {
+                for b in bindings {
+                    let mut s = HashSet::new();
+                    b.map_mut(&mut s, &mut |ty, s| match ty {
+                        SolvedTy::Var(ty_var) => {
+                            s.insert(ty_var.id);
                         }
+                        SolvedTy::Con(SolvedCon { args, .. }) => {
+                            args.iter().for_each(|x| s.extend(x.free_vars()))
+                        }
+                    });
+                    if s.is_empty() {
+                        ids.push(b.id);
                     }
                 }
-                _ => (),
             }
         }
 
