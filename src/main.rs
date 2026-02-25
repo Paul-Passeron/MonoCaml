@@ -85,7 +85,7 @@ fn intern_strlit(s: &str) -> StrLit {
 }
 
 fn main() {
-    let file_name = "examples/hello_world.ml";
+    let file_name = "examples/simple_poly.ml";
     let contents = {
         let mut s = String::new();
         let mut f = File::open(file_name).unwrap();

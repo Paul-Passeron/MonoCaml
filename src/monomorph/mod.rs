@@ -1,4 +1,7 @@
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    iter::once,
+};
 
 use crate::{
     inference::{
@@ -93,7 +96,8 @@ pub struct MonoCtx<'a> {
     pub vb_forwards: HashMap<Id<VBMarker>, Id<VBMarker>>,
     pub og_var_to_og_vb: HashMap<VarId, Id<VBMarker>>,
     pub specs: HashMap<(Id<VBMarker>, Subst), Id<VBMarker>>,
-    pub bindings: Vec<ValueBinding<ConcrTy>>,
+    pub bindings: HashMap<Id<VBMarker>, ValueBinding<ConcrTy>>,
+    pub instantiated_vars: HashMap<VarId, VarId>, // new to old
 }
 
 // fn extract_expr_vars_decl<T>(expr: Expr<T>)
@@ -218,9 +222,10 @@ impl<'a> MonoCtx<'a> {
             vbs: Arena::new(),
             og_var_to_og_vb: HashMap::new(),
             specs: HashMap::new(),
-            bindings: Vec::new(),
+            bindings: HashMap::new(),
             vb_forwards: HashMap::new(),
             id_to_bindings: HashMap::new(),
+            instantiated_vars: HashMap::new(),
             builtins,
         };
         res.init();
@@ -241,7 +246,7 @@ impl<'a> MonoCtx<'a> {
         let bindings = std::mem::take(&mut self.bindings);
         let mut mbs: HashMap<Id<_>, Vec<_>> = HashMap::new();
 
-        for binding in bindings {
+        for (_, binding) in bindings {
             let new_id = binding.id;
             let og_id = rev[&new_id];
             mbs.entry(og_id).or_default().push(binding)
@@ -274,9 +279,48 @@ impl<'a> MonoCtx<'a> {
         res
     }
 
-    #[allow(unused)]
+    fn match_types(ty: &SolvedTy, concr: ConcrTy) -> Subst {
+        fn aux(ty: &SolvedTy, concr: ConcrTy, m: &mut HashMap<InferVarId, ConcrTy>) {
+            match ty {
+                SolvedTy::Var(TyVar { id }) => {
+                    m.insert(*id, concr);
+                }
+                SolvedTy::Con(SolvedCon { args, .. }) => concr
+                    .args
+                    .into_iter()
+                    .zip(args)
+                    .for_each(|(concr, ty)| aux(ty, concr, m)),
+            }
+        }
+        let mut m = HashMap::new();
+        aux(ty, concr, &mut m);
+        Subst {
+            map: m.into_iter().collect(),
+        }
+    }
+
+    fn find_var_in_pattern(&self, og_id: VarId, pats: &[Pattern<ConcrTy>]) -> VarId {
+        fn aux(og_id: VarId, pat: &Pattern<ConcrTy>, ctx: &MonoCtx<'_>) -> Option<VarId> {
+            match &pat.node {
+                PatternNode::Wildcard => None,
+                PatternNode::Var(id) => {
+                    if ctx.instantiated_vars[id] == og_id {
+                        Some(*id)
+                    } else {
+                        None
+                    }
+                }
+                PatternNode::Tuple(typed_nodes) => {
+                    typed_nodes.iter().find_map(|x| aux(og_id, x, ctx))
+                }
+            }
+        }
+
+        pats.iter().find_map(|pat| aux(og_id, pat, self)).unwrap()
+    }
+
     fn instantiate_expr(
-        &self,
+        &mut self,
         expr: &Expr<SolvedTy>,
         subst: &Subst,
         var_rename: &HashMap<VarId, VarId>,
@@ -286,16 +330,22 @@ impl<'a> MonoCtx<'a> {
             ExprNode::Var(ValueRef::Local(id)) => {
                 if let Some(v) = var_rename.get(id) {
                     ExprNode::Var(ValueRef::Local(*v))
-                } else {
+                } else if let Some(vb_id) = self.og_var_to_og_vb.get(id) {
                     // reference to other top level binding !
-                    if let Some(vb_id) = self.og_var_to_og_vb.get(id) {
-                        todo!()
-                    } else if self.builtins.contains_key(id) {
-                        // Builtin
-                        ExprNode::Var(ValueRef::Local(*id))
-                    } else {
-                        unreachable!()
-                    }
+                    let v_ty = &self.id_to_bindings[vb_id].ty;
+                    let callee_subst = Self::match_types(v_ty, expr.ty.subst(subst));
+                    let new_vb = self.specialize_binding(*vb_id, callee_subst);
+
+                    let new_binding = &self.bindings[&new_vb];
+                    let (pat, params) = (new_binding.pat.clone(), new_binding.params.clone());
+                    let new_var = self
+                        .find_var_in_pattern(*id, &once(pat).chain(params).collect::<Box<[_]>>());
+                    ExprNode::Var(ValueRef::Local(new_var))
+                } else if self.builtins.contains_key(id) {
+                    // Builtin
+                    ExprNode::Var(ValueRef::Local(*id))
+                } else {
+                    unreachable!()
                 }
             }
             ExprNode::Var(_) => todo!(),
@@ -321,16 +371,7 @@ impl<'a> MonoCtx<'a> {
                     else_expr: Box::new(i_else_expr),
                 }
             }
-            ExprNode::Let {
-                recursive,
-                bindings,
-                body,
-            } => todo!(),
-            ExprNode::Match { scrutinee, cases } => todo!(),
-            ExprNode::Tuple(typed_nodes) => todo!(),
-            ExprNode::Construct { path, arg } => todo!(),
-            ExprNode::Sequence { first, second } => todo!(),
-            ExprNode::Constraint { expr, ty } => todo!(),
+
             ExprNode::BinaryOp { op, left, right } => {
                 let i_left = self.instantiate_expr(left, subst, var_rename);
                 let i_right = self.instantiate_expr(right, subst, var_rename);
@@ -340,8 +381,8 @@ impl<'a> MonoCtx<'a> {
                     right: Box::new(i_right),
                 }
             }
-            ExprNode::UnaryOp { op, expr } => todo!(),
-            ExprNode::Unit => todo!(),
+            ExprNode::Unit => ExprNode::Unit,
+            _ => todo!(),
         };
         let ty = expr.ty.subst(subst);
         Expr::new(node, expr.span, ty)
@@ -385,9 +426,13 @@ impl<'a> MonoCtx<'a> {
             .params
             .iter()
             .for_each(|pat| Self::extract_pattern_vars(pat, &mut ids));
-        ids.into_iter()
+        let res: HashMap<_, _> = ids
+            .into_iter()
             .map(|id| (id, self.new_var_of_id(id)))
-            .collect()
+            .collect();
+        self.instantiated_vars
+            .extend(res.iter().map(|(a, b)| (*b, *a)));
+        res
     }
 
     fn specialize_binding(&mut self, og_id: Id<VBMarker>, subst: Subst) -> Id<VBMarker> {
@@ -413,7 +458,7 @@ impl<'a> MonoCtx<'a> {
             body: self.instantiate_expr(&og_binding.body, &subst, &var_rename),
         };
 
-        self.bindings.push(new_binding);
+        self.bindings.insert(new_id, new_binding);
 
         new_id
     }
