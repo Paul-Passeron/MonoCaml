@@ -139,24 +139,21 @@ fn main() {
 
     let poly = resolver.resolve_structure(&prog).unwrap();
 
-    let mut infer_ctx = InferenceCtx::new(&resolver.types, &resolver.vars, &resolver.builtins);
-
-    let (inferred, builtins) = infer_ctx.infer_program(&poly).unwrap();
-
-    // for item in &inferred {
-    //     println!(
-    //         "{:#?}",
-    //         item.map(&infer_ctx, &mut |x, _| format!("{:?}", x))
-    //     )
-    // }
-
-    let mut mono_ctx = MonoCtx::new(&inferred, &resolver.vars, builtins);
+    let Resolver {
+        types,
+        mut vars,
+        vbs,
+        builtins,
+        ..
+    } = resolver;
+    let (inferred, new_builtins) = {
+        let mut infer_ctx = InferenceCtx::new(&types, &vars, &builtins);
+        infer_ctx.infer_program(&poly).unwrap()
+    };
+    let mut mono_ctx = MonoCtx::new(&inferred, &mut vars, new_builtins);
 
     let specialized = mono_ctx.mono_program().unwrap();
     for item in &specialized {
-        println!(
-            "{:#?}",
-            item.map(&infer_ctx, &mut |x, _| format!("{:?}", x))
-        )
+        println!("{:#?}", item)
     }
 }

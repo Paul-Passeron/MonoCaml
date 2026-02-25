@@ -83,13 +83,12 @@ impl Default for Subst {
 #[derive(Debug)]
 pub struct MonoCtx<'a> {
     pub items: Vec<&'a Item<SolvedTy>>,
-    pub og_vars: &'a Arena<VarInfo>, // og vars
+    pub vars: &'a mut Arena<VarInfo>, // og vars
     pub id_to_bindings: HashMap<Id<VBMarker>, &'a ValueBinding<SolvedTy>>,
 
     pub builtins: HashMap<VarId, SolvedTy>,
 
     pub vbs: Arena<VBMarker>,
-    pub vars: Arena<VarInfo>,
 
     pub vb_forwards: HashMap<Id<VBMarker>, Id<VBMarker>>,
     pub og_var_to_og_vb: HashMap<VarId, Id<VBMarker>>,
@@ -212,14 +211,13 @@ impl<'a> MonoCtx<'a> {
 
     pub fn new(
         program: &'a [Item<SolvedTy>],
-        og_vars: &'a Arena<VarInfo>,
+        vars: &'a mut Arena<VarInfo>,
         builtins: HashMap<VarId, SolvedTy>,
     ) -> Self {
         let mut res = Self {
             items: Vec::from_iter(program),
-            og_vars,
             // vb_to_items: HashMap::new(),
-            vars: Arena::new(),
+            vars,
             vbs: Arena::new(),
             og_var_to_og_vb: HashMap::new(),
             specs: HashMap::new(),
@@ -295,9 +293,9 @@ impl<'a> MonoCtx<'a> {
                     // reference to other top level binding !
                     if let Some(vb_id) = self.og_var_to_og_vb.get(id) {
                         todo!()
-                    } else if let Some(builtin_id) = self.builtins.get(id) {
+                    } else if self.builtins.get(id).is_some() {
                         // Builtin
-                        todo!()
+                        ExprNode::Var(ValueRef::Local(*id))
                     } else {
                         unreachable!()
                     }
@@ -337,7 +335,7 @@ impl<'a> MonoCtx<'a> {
     }
 
     fn new_var_of_id(&mut self, id: VarId) -> VarId {
-        let name = self.og_vars[id].name;
+        let name = self.vars[id].name;
         let id = self.vars.alloc(VarInfo { name });
         id
     }
