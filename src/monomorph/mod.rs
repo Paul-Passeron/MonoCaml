@@ -281,7 +281,7 @@ impl<'a> MonoCtx<'a> {
         subst: &Subst,
         var_rename: &HashMap<VarId, VarId>,
     ) -> Expr<ConcrTy> {
-        let node = match expr.as_ref().node {
+        let node = match &expr.node {
             ExprNode::Const(constant) => ExprNode::Const(*constant),
             ExprNode::Var(ValueRef::Local(id)) => {
                 if let Some(v) = var_rename.get(id) {
@@ -298,6 +298,7 @@ impl<'a> MonoCtx<'a> {
                     }
                 }
             }
+            ExprNode::Var(_) => todo!(),
             ExprNode::Apply { func, arg } => {
                 let i_func = self.instantiate_expr(func, subst, var_rename);
                 let i_arg = self.instantiate_expr(arg, subst, var_rename);
@@ -306,7 +307,41 @@ impl<'a> MonoCtx<'a> {
                     arg: Box::new(i_arg),
                 }
             }
-            x => todo!("{:?}", x),
+            ExprNode::IfThenElse {
+                cond,
+                then_expr,
+                else_expr,
+            } => {
+                let i_cond = self.instantiate_expr(cond, subst, var_rename);
+                let i_then_expr = self.instantiate_expr(then_expr, subst, var_rename);
+                let i_else_expr = self.instantiate_expr(else_expr, subst, var_rename);
+                ExprNode::IfThenElse {
+                    cond: Box::new(i_cond),
+                    then_expr: Box::new(i_then_expr),
+                    else_expr: Box::new(i_else_expr),
+                }
+            }
+            ExprNode::Let {
+                recursive,
+                bindings,
+                body,
+            } => todo!(),
+            ExprNode::Match { scrutinee, cases } => todo!(),
+            ExprNode::Tuple(typed_nodes) => todo!(),
+            ExprNode::Construct { path, arg } => todo!(),
+            ExprNode::Sequence { first, second } => todo!(),
+            ExprNode::Constraint { expr, ty } => todo!(),
+            ExprNode::BinaryOp { op, left, right } => {
+                let i_left = self.instantiate_expr(left, subst, var_rename);
+                let i_right = self.instantiate_expr(right, subst, var_rename);
+                ExprNode::BinaryOp {
+                    op: *op,
+                    left: Box::new(i_left),
+                    right: Box::new(i_right),
+                }
+            }
+            ExprNode::UnaryOp { op, expr } => todo!(),
+            ExprNode::Unit => todo!(),
         };
         let ty = expr.ty.subst(subst);
         Expr::new(node, expr.span, ty)
@@ -321,6 +356,13 @@ impl<'a> MonoCtx<'a> {
     ) -> Pattern<ConcrTy> {
         let node = match pattern.as_ref().node {
             PatternNode::Wildcard => PatternNode::Wildcard,
+            PatternNode::Var(id) => {
+                if var_rename.contains_key(&id) {
+                    PatternNode::Var(*var_rename.get(&id).unwrap())
+                } else {
+                    todo!()
+                }
+            }
             _ => todo!(),
         };
         let ty = pattern.ty.subst(subst);
