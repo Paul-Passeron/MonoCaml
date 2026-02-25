@@ -4,7 +4,7 @@
 
 ## ⚠️ THIS IS A WORK IN PROGRESS
 
-MonoCaml is an experimental compiler for a subset of OCaml, targeting LLVM IR through a series of typed intermediate representations.
+ MonoCaml is an experimental compiler for a subset of OCaml, targeting LLVM IR with the goal of leveraging aggressive type specialization for performance gains. 
 
 ## Overview
 
