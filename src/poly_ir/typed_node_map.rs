@@ -14,12 +14,17 @@ pub trait Displayable {
 impl<T> Pattern<T> {
     pub fn map<Ctx, R>(&self, ctx: &Ctx, f: &mut impl FnMut(&T, &Ctx) -> R) -> Pattern<R> {
         let span = self.span;
-        let node = match self.as_ref().node {
+        let node = match &self.node {
             PatternNode::Wildcard => PatternNode::Wildcard,
             PatternNode::Var(id) => PatternNode::Var(*id),
             PatternNode::Tuple(pats) => {
                 PatternNode::Tuple(pats.iter().map(|p| p.map(ctx, f)).collect())
             }
+            PatternNode::Cons { ty, idx, arg } => PatternNode::Cons {
+                ty: *ty,
+                idx: *idx,
+                arg: arg.as_ref().map(|p| Box::new(p.map(ctx, f))),
+            },
         };
         let t = f(&self.ty, ctx);
         Pattern::new(node, span, t)
@@ -31,12 +36,17 @@ impl<T> Pattern<T> {
         f: &mut impl FnMut(&T, &mut Ctx) -> R,
     ) -> Pattern<R> {
         let span = self.span;
-        let node = match self.as_ref().node {
+        let node = match &self.node {
             PatternNode::Wildcard => PatternNode::Wildcard,
             PatternNode::Var(id) => PatternNode::Var(*id),
             PatternNode::Tuple(pats) => {
                 PatternNode::Tuple(pats.iter().map(|p| p.map_mut(ctx, f)).collect())
             }
+            PatternNode::Cons { ty, idx, arg } => PatternNode::Cons {
+                ty: *ty,
+                idx: *idx,
+                arg: arg.as_ref().map(|p| Box::new(p.map_mut(ctx, f))),
+            },
         };
         let t = f(&self.ty, ctx);
         Pattern::new(node, span, t)
@@ -139,8 +149,9 @@ impl<T> Expr<T> {
             ExprNode::Tuple(pats) => {
                 ExprNode::Tuple(pats.iter().map(|pat| pat.map(ctx, f)).collect())
             }
-            ExprNode::Construct { path, arg } => ExprNode::Construct {
-                path: *path,
+            ExprNode::Construct { ty, idx, arg } => ExprNode::Construct {
+                ty: *ty,
+                idx: *idx,
                 arg: arg.as_ref().map(|x| Box::new(x.map(ctx, f))),
             },
             ExprNode::Sequence { first, second } => ExprNode::Sequence {
@@ -211,8 +222,9 @@ impl<T> Expr<T> {
             ExprNode::Tuple(pats) => {
                 ExprNode::Tuple(pats.iter().map(|pat| pat.map_mut(ctx, f)).collect())
             }
-            ExprNode::Construct { path, arg } => ExprNode::Construct {
-                path: *path,
+            ExprNode::Construct { arg, ty, idx } => ExprNode::Construct {
+                ty: *ty,
+                idx: *idx,
                 arg: arg.as_ref().map(|x| Box::new(x.map_mut(ctx, f))),
             },
             ExprNode::Sequence { first, second } => ExprNode::Sequence {

@@ -1,4 +1,4 @@
-use crate::poly_ir::{VarId, spanned::TypedNode};
+use crate::poly_ir::{TypeId, VarId, spanned::TypedNode};
 
 pub type Pattern<T> = TypedNode<PatternNode<T>, T>;
 
@@ -7,4 +7,9 @@ pub enum PatternNode<T> {
     Wildcard,
     Var(VarId),
     Tuple(Vec<Pattern<T>>),
+    Cons {
+        ty: TypeId,
+        idx: usize,
+        arg: Option<Box<Pattern<T>>>,
+    },
 }

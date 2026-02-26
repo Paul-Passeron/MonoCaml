@@ -1,4 +1,7 @@
-use std::collections::{HashMap, HashSet};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::Debug,
+};
 
 use crate::{
     inference::{
@@ -8,10 +11,10 @@ use crate::{
     lexer::interner::Symbol,
     parse_tree::expression::{BinaryOp, Constant},
     poly_ir::{
-        TypeId, ValueRef, VarId,
-        expr::{Expr, ExprNode, ValueBinding},
+        TypeId, TypeParamId, ValueRef, VarId,
+        expr::{Expr, ExprNode, MatchCase, ValueBinding},
         id::{Arena, Id},
-        item::{Item, ItemNode, TypeDeclInfo},
+        item::{Item, ItemNode, TypeDecl, TypeDeclInfo},
         pattern::{Pattern, PatternNode},
         type_expr::Type,
     },
@@ -38,6 +41,9 @@ pub struct InferenceCtx<'a> {
     pub decls: &'a Arena<TypeDeclInfo>,
     pub names: &'a Arena<VarInfo>,
     pub builtins: &'a HashMap<Symbol, VarId>,
+    pub type_decls: HashMap<TypeId, TypeDecl>,
+    pub constructors: &'a HashMap<TypeId, Vec<Option<Type>>>,
+    pub type_params: HashMap<TypeParamId, Id<MonoTy>>,
 }
 
 impl Id<MonoTy> {
@@ -90,24 +96,32 @@ impl<'a> InferenceCtx<'a> {
         decls: &'a Arena<TypeDeclInfo>,
         names: &'a Arena<VarInfo>,
         builtins: &'a HashMap<Symbol, VarId>,
+        constructors: &'a HashMap<TypeId, Vec<Option<Type>>>,
     ) -> Self {
         let mut res = Self {
             map: HashMap::new(),
             tys: Arena::new(),
             forwards: HashMap::new(),
             inf: Arena::new(),
+            type_decls: HashMap::new(),
+            type_params: HashMap::new(),
             decls,
             names,
             builtins,
+            constructors,
         };
         res.init_builtins();
         res
     }
 
     pub fn occurence_unify(&mut self, ty1: Id<MonoTy>, ty2: Id<MonoTy>) -> Res<()> {
+        if ty1 == ty2 {
+            return Ok(());
+        }
         let mono1 = ty1.get(self);
         let mono2 = ty2.get(self);
         if mono1.occurs_in(mono2, self) {
+            println!("{} vs {}", ty1.display(self), ty2.display(self));
             Err("Occurs check failed".into())
         } else {
             ty1.make_equal_to(ty2, self);
@@ -132,7 +146,20 @@ impl<'a> InferenceCtx<'a> {
         match (mono1, mono2) {
             (MonoTy::Con(con1), MonoTy::Con(con2)) => {
                 if con1.id != con2.id {
-                    return Err(format!("Con type mismatch: {:?} != {:?}", con1.id, con2.id));
+                    let s1 = con1.id.to_string(self);
+                    let s2 = con2.id.to_string(self);
+                    if ((s1 == "*" && s2 == "unit") || (s2 == "*" && s1 == "unit"))
+                        && con1.args.is_empty()
+                        && con2.args.is_empty()
+                    {
+                        // no op
+                    } else {
+                        return Err(format!(
+                            "Con type mismatch: {} != {}",
+                            ty1.display(self),
+                            ty2.display(self)
+                        ));
+                    }
                 }
                 if con1.args.len() != con2.args.len() {
                     return Err(format!(
@@ -190,6 +217,7 @@ impl<'a> InferenceCtx<'a> {
                 let mono = MonoTy::Con(TyCon { id: *id, args: tys });
                 self.get_ty(mono)
             }
+            Type::Param(i) => self.type_params[i],
             _ => todo!(),
         }
     }
@@ -261,7 +289,45 @@ impl<'a> InferenceCtx<'a> {
                     res_ty,
                 ))
             }
-            ExprNode::Match { .. } => todo!(),
+            ExprNode::Match { scrutinee, cases } => {
+                assert!(!cases.is_empty());
+                let i_scrutinee = self.infer_expr(scrutinee)?;
+                let body_ty = self.fresh_ty();
+                let mut new_cases = vec![];
+                for case in cases {
+                    let i_pat = self.infer_pattern(&case.pattern)?;
+                    self.bind_pattern_to_context(
+                        &i_pat,
+                        TyForall::mono(i_pat.ty.get(self).clone()),
+                    )?;
+                    self.unify_j(i_scrutinee.ty, i_pat.ty)?;
+                    let i_guard = case
+                        .guard
+                        .as_ref()
+                        .map(|x| self.infer_expr(x))
+                        .transpose()?;
+                    if let Some(g) = &i_guard {
+                        let bool_ty = MonoTy::bool_ty(self);
+                        let bool_ty = self.get_ty(bool_ty);
+                        self.unify_j(g.ty, bool_ty)?;
+                    }
+                    let i_body = self.infer_expr(&case.body)?;
+                    self.unify_j(i_body.ty, body_ty)?;
+                    new_cases.push(MatchCase {
+                        pattern: i_pat,
+                        guard: i_guard.map(Box::new),
+                        body: i_body,
+                    });
+                }
+                Ok(Expr::new(
+                    ExprNode::Match {
+                        scrutinee: Box::new(i_scrutinee),
+                        cases: new_cases,
+                    },
+                    span,
+                    body_ty,
+                ))
+            }
             ExprNode::Tuple(exprs) => {
                 let inf: Vec<_> = exprs
                     .iter()
@@ -270,7 +336,49 @@ impl<'a> InferenceCtx<'a> {
                 let t = self.get_ty(MonoTy::tuple_ty(inf.iter().map(|x| x.ty).collect(), self));
                 Ok(Expr::new(ExprNode::Tuple(inf), span, t))
             }
-            ExprNode::Construct { .. } => todo!(),
+            ExprNode::Construct { ty, idx, arg } => {
+                let args: HashMap<_, _> = self.decls[*ty]
+                    .params
+                    .iter()
+                    .map(|p| (*p, self.fresh_ty()))
+                    .collect();
+
+                let res_args = args.values().copied().collect::<Vec<_>>();
+                let current_map = self.type_params.clone();
+                self.type_params.extend(args);
+
+                let current_cons = self.constructors[ty][*idx].as_ref();
+                let arg_ty = current_cons.map(|t| self.type_to_mono(t));
+
+                assert!(
+                    arg_ty.is_some() == arg.is_some(),
+                    "idx = {idx}\n{:?}\n\n***************\n\n{:?}",
+                    arg_ty,
+                    arg
+                );
+
+                let i_arg = arg.as_ref().map(|a| self.infer_expr(a)).transpose()?;
+
+                for (p, ty) in i_arg.iter().zip(arg_ty) {
+                    self.unify_j(p.ty, ty)?;
+                }
+
+                let res_ty = MonoTy::Con(TyCon {
+                    id: *ty,
+                    args: res_args,
+                });
+
+                self.type_params = current_map;
+                Ok(Expr::new(
+                    ExprNode::Construct {
+                        ty: *ty,
+                        idx: *idx,
+                        arg: i_arg.map(Box::new),
+                    },
+                    span,
+                    self.get_ty(res_ty),
+                ))
+            }
             ExprNode::Sequence { first, second } => {
                 let inferred_first = self.infer_expr(first)?;
                 let inferred_second = self.infer_expr(second)?;
@@ -322,11 +430,11 @@ impl<'a> InferenceCtx<'a> {
     }
 
     pub fn infer_pattern(&mut self, pattern: &Pattern<Type>) -> Res<Pattern<Id<MonoTy>>> {
-        let (node, ty) = match pattern.as_ref().node {
+        let (node, ty) = match &pattern.node {
             PatternNode::Wildcard => (PatternNode::Wildcard, self.fresh_ty()),
             PatternNode::Var(id) => (PatternNode::Var(*id), self.fresh_ty()),
             PatternNode::Tuple(typed_nodes) => {
-                if typed_nodes.is_empty() {
+                if !typed_nodes.is_empty() {
                     let nodes = typed_nodes
                         .iter()
                         .map(|node| self.infer_pattern(node))
@@ -341,6 +449,44 @@ impl<'a> InferenceCtx<'a> {
                         self.get_ty(MonoTy::unit_ty(self)),
                     )
                 }
+            }
+            PatternNode::Cons { ty, idx, arg } => {
+                let args: HashMap<_, _> = self.decls[*ty]
+                    .params
+                    .iter()
+                    .map(|p| (*p, self.fresh_ty()))
+                    .collect();
+
+                let res_args = args.values().copied().collect::<Vec<_>>();
+                let current_map = self.type_params.clone();
+                self.type_params.extend(args);
+
+                let current_cons = self.constructors[ty][*idx].as_ref();
+
+                let arg_ty = current_cons.map(|t| self.type_to_mono(t));
+
+                assert!(arg_ty.iter().len() == arg.iter().len());
+
+                let i_arg = arg.as_ref().map(|a| self.infer_pattern(a)).transpose()?;
+
+                for (p, ty) in i_arg.iter().zip(arg_ty) {
+                    self.unify_j(p.ty, ty)?;
+                }
+
+                let res_ty = MonoTy::Con(TyCon {
+                    id: *ty,
+                    args: res_args,
+                });
+
+                self.type_params = current_map;
+                (
+                    PatternNode::Cons {
+                        ty: *ty,
+                        idx: *idx,
+                        arg: i_arg.map(Box::new),
+                    },
+                    self.get_ty(res_ty),
+                )
             }
         };
         if !pattern.ty.is_infer() {
@@ -465,7 +611,9 @@ impl<'a> InferenceCtx<'a> {
         v
     }
 
-    fn subst(&mut self, ty: &MonoTy, vars: &HashMap<InferVarId, InferVarId>) -> Id<MonoTy> {
+    fn subst(&mut self, ty: Id<MonoTy>, vars: &HashMap<InferVarId, InferVarId>) -> Id<MonoTy> {
+        let ty = ty.find(self);
+        let ty = ty.get(self);
         let t = match ty {
             MonoTy::Var(ty_var) => MonoTy::Var(TyVar {
                 id: if let Some(id) = vars.get(&ty_var.id) {
@@ -478,9 +626,9 @@ impl<'a> InferenceCtx<'a> {
                 id: *id,
                 args: args
                     .iter()
-                    .map(|t| t.get(self).clone())
-                    .collect::<Vec<_>>()
-                    .iter()
+                    .copied()
+                    .collect::<Box<[_]>>()
+                    .into_iter()
                     .map(|t| self.subst(t, vars))
                     .collect(),
             }),
@@ -495,7 +643,7 @@ impl<'a> InferenceCtx<'a> {
         let vars: HashMap<InferVarId, InferVarId> =
             HashMap::from_iter(vars.into_iter().zip(new_vars.iter().copied()));
 
-        let res = self.subst(&ty.get(self).clone(), &vars);
+        let res = self.subst(ty, &vars);
 
         TyForall {
             tyvars: new_vars.into_iter().map(|x| TyVar { id: x }).collect(),
@@ -504,7 +652,7 @@ impl<'a> InferenceCtx<'a> {
     }
 
     pub fn bind_pattern_to_context<T>(&mut self, pat: &Pattern<T>, scheme: TyForall) -> Res<()> {
-        match pat.as_ref().node {
+        match &pat.node {
             PatternNode::Wildcard => (),
             PatternNode::Var(id) => {
                 self.map.insert(*id, scheme);
@@ -519,10 +667,7 @@ impl<'a> InferenceCtx<'a> {
                             for (arg, pat) in args.iter().zip(pats.iter()) {
                                 self.bind_pattern_to_context(
                                     pat,
-                                    TyForall {
-                                        tyvars: vec![],
-                                        ty: Box::new(arg.get(self).clone()),
-                                    },
+                                    TyForall::mono(arg.get(self).clone()),
                                 )?;
                             }
                         }
@@ -536,13 +681,37 @@ impl<'a> InferenceCtx<'a> {
                     return Err("Expected unit type.".to_string());
                 }
             }
+            PatternNode::Cons { ty, idx, arg } => {
+                let infos = &self.decls[*ty];
+
+                let current_map = self.type_params.clone();
+                self.type_params.extend(
+                    infos
+                        .params
+                        .iter()
+                        .copied()
+                        .zip(scheme.ty.as_con().unwrap().args.iter().copied()),
+                );
+
+                let cons_ty = self.constructors[ty][*idx].as_ref();
+                let arg_ty = cons_ty.map(|t| self.type_to_mono(t));
+                assert!(arg_ty.is_some() == arg.is_some());
+
+                for (arg_pat, arg_ty) in arg.iter().zip(arg_ty) {
+                    let forall = TyForall::mono(arg_ty.get(self).clone());
+                    self.bind_pattern_to_context(arg_pat, forall)?;
+                }
+
+                self.type_params = current_map;
+            }
         }
         Ok(())
     }
 
     pub fn instantiate(&mut self, forall: &TyForall) -> Id<MonoTy> {
         let replacement = HashMap::from_iter(forall.tyvars.iter().map(|id| (id.id, self.fresh())));
-        self.subst(&forall.ty, &replacement)
+        let id = self.get_ty(forall.ty.as_ref().clone());
+        self.subst(id, &replacement)
     }
 
     pub fn into_solved(&self, ty: Id<MonoTy>) -> SolvedTy {

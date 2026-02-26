@@ -1,7 +1,4 @@
-use crate::poly_ir::{TypeId, TypeParamId};
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct TypeVarId(pub u32);
+use crate::poly_ir::{TypeId, TypeParamId, TypeVarId};
 
 #[derive(Default, Debug, Clone)]
 pub enum Type {

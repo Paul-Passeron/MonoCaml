@@ -13,11 +13,11 @@ pub mod typed_node_map;
 pub type TypeId = Id<item::TypeDeclInfo>;
 pub type VarId = Id<VarInfo>;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct TypeParamId {
-    pub depth: u32,
-    pub index: u32,
-}
+pub struct TPMarker;
+pub type TypeParamId = Id<TPMarker>;
+
+pub struct TVMarker;
+pub type TypeVarId = Id<TVMarker>;
 
 #[derive(Debug, Clone, Copy)]
 pub enum ValueRef {

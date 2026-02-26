@@ -1,7 +1,10 @@
 use std::{
     collections::{HashMap, HashSet},
+    hash::Hash,
     iter::once,
 };
+
+use itertools::Itertools;
 
 use crate::{
     inference::{
@@ -10,7 +13,7 @@ use crate::{
     },
     poly_ir::{
         TypeId, ValueRef, VarId,
-        expr::{Expr, ExprNode, VBMarker, ValueBinding},
+        expr::{Expr, ExprNode, MatchCase, VBMarker, ValueBinding},
         id::{Arena, Id},
         item::{Item, ItemNode},
         pattern::{Pattern, PatternNode},
@@ -69,7 +72,8 @@ pub struct Subst {
 
 impl Subst {
     pub fn get(&self, id: InferVarId) -> &ConcrTy {
-        &self.map[self.map.binary_search_by_key(&id, |x| x.0).unwrap()].1
+        let index = self.map.iter().find_position(|x| x.0 == id).unwrap().0;
+        &self.map[index].1
     }
 
     pub fn new() -> Self {
@@ -143,7 +147,7 @@ fn walk_expr_vars<'a>(
                 walk_expr_vars(&case.body, id, id_m, forwards, id_to_bindings);
             })
         }
-        ExprNode::Construct { path, arg } => {
+        ExprNode::Construct { ty, idx, arg } => {
             arg.iter()
                 .for_each(|e| walk_expr_vars(e, id, id_m, forwards, id_to_bindings));
         }
@@ -170,7 +174,9 @@ fn walk_expr_vars<'a>(
             walk_expr_vars(then_expr, id, id_m, forwards, id_to_bindings);
             walk_expr_vars(else_expr, id, id_m, forwards, id_to_bindings);
         }
-        ExprNode::Tuple(typed_nodes) => todo!(),
+        ExprNode::Tuple(typed_nodes) => typed_nodes
+            .iter()
+            .for_each(|expr| walk_expr_vars(expr, id, id_m, forwards, id_to_bindings)),
     }
 }
 
@@ -185,7 +191,7 @@ impl<'a> MonoCtx<'a> {
                         Self::extract_pattern_vars(p, &mut s);
                     }
                     self.id_to_bindings.insert(b.id, b);
-                    for id in dbg!(s) {
+                    for id in s {
                         self.og_var_to_og_vb.insert(id, b.id);
                     }
                     walk_expr_vars(
@@ -201,12 +207,15 @@ impl<'a> MonoCtx<'a> {
     }
 
     fn extract_pattern_vars<T>(pat: &Pattern<T>, s: &mut HashSet<VarId>) {
-        match pat.as_ref().node {
+        match &pat.node {
             PatternNode::Wildcard => (),
             PatternNode::Var(id) => {
                 s.insert(*id);
             }
             PatternNode::Tuple(pats) => pats.iter().for_each(|p| Self::extract_pattern_vars(p, s)),
+            PatternNode::Cons { arg, .. } => arg
+                .iter()
+                .for_each(|arg| Self::extract_pattern_vars(arg, s)),
         }
     }
 
@@ -265,6 +274,9 @@ impl<'a> MonoCtx<'a> {
                         let new_ids = mbs.remove(&og_id).unwrap_or_default();
                         res_bindings.extend(new_ids);
                     }
+                    if res_bindings.len() == 0 {
+                        continue;
+                    }
                     ItemNode::Value {
                         recursive: *recursive,
                         bindings: res_bindings,
@@ -274,6 +286,7 @@ impl<'a> MonoCtx<'a> {
                     decls: decls.clone(),
                 },
             };
+
             res.push(Item::new(node, item.span, ()))
         }
         res
@@ -313,6 +326,7 @@ impl<'a> MonoCtx<'a> {
                 PatternNode::Tuple(typed_nodes) => {
                     typed_nodes.iter().find_map(|x| aux(og_id, x, ctx))
                 }
+                PatternNode::Cons { ty, idx, arg } => todo!(),
             }
         }
 
@@ -326,6 +340,7 @@ impl<'a> MonoCtx<'a> {
         var_rename: &HashMap<VarId, VarId>,
     ) -> Expr<ConcrTy> {
         let node = match &expr.node {
+            ExprNode::Unit => ExprNode::Unit,
             ExprNode::Const(constant) => ExprNode::Const(*constant),
             ExprNode::Var(ValueRef::Local(id)) => {
                 if let Some(v) = var_rename.get(id) {
@@ -381,8 +396,86 @@ impl<'a> MonoCtx<'a> {
                     right: Box::new(i_right),
                 }
             }
-            ExprNode::Unit => ExprNode::Unit,
-            _ => todo!(),
+            ExprNode::Let {
+                recursive,
+                bindings,
+                body,
+            } => {
+                let mut new_bindings = vec![];
+
+                for binding in bindings {
+                    let local_subst = Self::match_types(&binding.ty, binding.ty.subst(subst));
+                    let id = self.specialize_binding(binding.id, local_subst);
+                    let specialized = self.bindings.remove(&id).unwrap();
+                    let mut key = None;
+                    // remove it from specs as well
+                    for (k, spec_id) in &self.specs {
+                        if &id == spec_id {
+                            key = Some(k.clone());
+                        }
+                    }
+                    if let Some(k) = key {
+                        self.specs.remove(&k).unwrap();
+                    }
+                    new_bindings.push(specialized);
+                }
+
+                let i_body = self.instantiate_expr(body, subst, var_rename);
+                ExprNode::Let {
+                    recursive: *recursive,
+                    bindings: new_bindings,
+                    body: Box::new(i_body),
+                }
+            }
+
+            ExprNode::Match { scrutinee, cases } => {
+                let i_scrutinee = self.instantiate_expr(scrutinee, subst, var_rename);
+
+                let i_cases = cases
+                    .iter()
+                    .map(|case| {
+                        let mut new_rename = var_rename.clone();
+                        let mut s = HashSet::new();
+                        Self::extract_pattern_vars(&case.pattern, &mut s);
+                        new_rename.extend(s.into_iter().map(|var| {
+                            let var_name = self.vars[var].name;
+                            (var, self.vars.alloc(VarInfo { name: var_name }))
+                        }));
+                        let i_pat = self.instantiate_pattern(&case.pattern, subst, &new_rename);
+                        let i_guard = case
+                            .guard
+                            .as_ref()
+                            .map(|expr| self.instantiate_expr(expr, subst, &new_rename));
+                        let i_body = self.instantiate_expr(&case.body, subst, &new_rename);
+
+                        MatchCase {
+                            pattern: i_pat,
+                            guard: i_guard.map(Box::new),
+                            body: i_body,
+                        }
+                    })
+                    .collect::<Vec<_>>();
+                ExprNode::Match {
+                    scrutinee: Box::new(i_scrutinee),
+                    cases: i_cases,
+                }
+            }
+            ExprNode::Construct { ty, idx, arg } => ExprNode::Construct {
+                ty: *ty,
+                idx: *idx,
+                arg: arg
+                    .as_ref()
+                    .map(|arg| Box::new(self.instantiate_expr(arg, subst, var_rename))),
+            },
+
+            ExprNode::Tuple(nodes) => ExprNode::Tuple(
+                nodes
+                    .iter()
+                    .map(|expr| self.instantiate_expr(expr, subst, var_rename))
+                    .collect(),
+            ),
+
+            x => todo!("{x:?}"),
         };
         let ty = expr.ty.subst(subst);
         Expr::new(node, expr.span, ty)
@@ -395,7 +488,7 @@ impl<'a> MonoCtx<'a> {
         subst: &Subst,
         var_rename: &HashMap<VarId, VarId>,
     ) -> Pattern<ConcrTy> {
-        let node = match pattern.as_ref().node {
+        let node = match &pattern.node {
             PatternNode::Wildcard => PatternNode::Wildcard,
             PatternNode::Var(id) => {
                 if var_rename.contains_key(&id) {
@@ -404,7 +497,18 @@ impl<'a> MonoCtx<'a> {
                     todo!()
                 }
             }
-            _ => todo!(),
+            PatternNode::Tuple(pats) => PatternNode::Tuple(
+                pats.iter()
+                    .map(|p| self.instantiate_pattern(p, subst, var_rename))
+                    .collect(),
+            ),
+            PatternNode::Cons { ty, idx, arg } => PatternNode::Cons {
+                ty: *ty,
+                idx: *idx,
+                arg: arg
+                    .as_ref()
+                    .map(|arg| Box::new(self.instantiate_pattern(&arg, subst, var_rename))),
+            },
         };
         let ty = pattern.ty.subst(subst);
         Pattern::new(node, pattern.span, ty)
@@ -437,6 +541,9 @@ impl<'a> MonoCtx<'a> {
 
     fn specialize_binding(&mut self, og_id: Id<VBMarker>, subst: Subst) -> Id<VBMarker> {
         if let Some(new_id) = self.specs.get(&(og_id, subst.clone())) {
+            if !self.bindings.contains_key(new_id) {
+                panic!("The problem is here, it's in specs but not in bindings")
+            }
             return *new_id;
         }
         let new_id = self.vbs.alloc(VBMarker);

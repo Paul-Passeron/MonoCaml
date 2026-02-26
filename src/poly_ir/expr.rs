@@ -1,6 +1,6 @@
 use crate::{
     parse_tree::expression::{BinaryOp, Constant, UnaryOp},
-    poly_ir::{ValueRef, id::Id, pattern::Pattern, spanned::TypedNode},
+    poly_ir::{TypeId, ValueRef, id::Id, pattern::Pattern, spanned::TypedNode},
 };
 
 pub type Expr<T> = TypedNode<ExprNode<T>, T>;
@@ -28,7 +28,8 @@ pub enum ExprNode<T> {
     },
     Tuple(Vec<Expr<T>>),
     Construct {
-        path: ValueRef,
+        ty: TypeId,
+        idx: usize,
         arg: Option<Box<Expr<T>>>,
     },
     Sequence {

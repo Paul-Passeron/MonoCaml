@@ -132,7 +132,7 @@ fn main() {
     };
 
     // for item in &prog {
-    //     println!("{}", item.desc.display(0));
+    //     println!("{:#?}", item.desc);
     // }
 
     let mut resolver = Resolver::new();
@@ -143,15 +143,21 @@ fn main() {
         types,
         mut vars,
         builtins,
+        constructors,
         ..
     } = resolver;
     let InferenceResult {
         items: inferred,
         builtins,
     } = {
-        let mut infer_ctx = InferenceCtx::new(&types, &vars, &builtins);
+        let mut infer_ctx = InferenceCtx::new(&types, &vars, &builtins, &constructors);
         infer_ctx.infer_program(&poly).unwrap()
     };
+
+    // for item in &inferred {
+    //     println!("{:#?}", item)
+    // }
+
     let mut mono_ctx = MonoCtx::new(&inferred, &mut vars, builtins);
 
     let specialized = mono_ctx.mono_program().unwrap();

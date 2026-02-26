@@ -1,6 +1,6 @@
 use crate::{
     lexer::interner::Symbol,
-    poly_ir::{TypeId, expr::ValueBinding, spanned::TypedNode, type_expr::Type},
+    poly_ir::{TypeId, TypeParamId, expr::ValueBinding, spanned::TypedNode, type_expr::Type},
 };
 
 pub type GenItem<Ty, M> = TypedNode<ItemNode<Ty>, M>;
@@ -26,14 +26,14 @@ pub struct ItemInfo {
 pub struct TypeDecl {
     pub id: TypeId,
     pub name: Symbol,
-    pub params: Vec<Symbol>,
+    pub params: Vec<TypeParamId>,
     pub kind: TypeDeclKind,
 }
 
 #[derive(Debug)]
 pub struct TypeDeclInfo {
     pub name: Symbol,
-    pub arity: usize,
+    pub params: Vec<TypeParamId>,
 }
 
 #[derive(Debug, Clone)]

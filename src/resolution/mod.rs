@@ -5,7 +5,7 @@ use crate::{
     lexer::interner::Symbol,
     parse_tree::{
         self, LongIdent,
-        expression::{Expression, ExpressionDesc},
+        expression::{BinaryOp, Expression, ExpressionDesc},
         pattern::{self, PatternDesc},
         structure::{Structure, StructureItem, StructureItemDesc},
         type_declaration::{
@@ -14,14 +14,18 @@ use crate::{
         type_expr::{TypeExpr, TypeExprDesc},
     },
     poly_ir::{
-        TypeId, TypeParamId, ValueRef, VarId,
+        TPMarker, TVMarker, TypeId, ValueRef, VarId,
         expr::{Expr, ExprNode, MatchCase, VBMarker, ValueBinding},
         id::Arena,
         item::{Constructor, ConstructorArg, Item, ItemNode, TypeDecl, TypeDeclInfo, TypeDeclKind},
         pattern::{Pattern, PatternNode},
-        type_expr::{Type, TypeVarId},
+        type_expr::Type,
     },
-    resolution::{error::Res, scope::Scope},
+    resolution::{
+        builtins::{CONS_IDX, NIL_IDX},
+        error::Res,
+        scope::Scope,
+    },
     source_manager::loc::Span,
 };
 
@@ -44,18 +48,18 @@ pub struct Resolver {
     pub types: Arena<TypeDeclInfo>,
     pub vars: Arena<VarInfo>,
     pub vbs: Arena<VBMarker>,
+    pub tps: Arena<TPMarker>,
+    pub tvs: Arena<TVMarker>,
     pub builtins: HashMap<Symbol, VarId>,
+    pub builtin_types: HashMap<String, TypeId>, // For easy lookup on our part, not that needed
+    pub constructors: HashMap<TypeId, Vec<Option<Type>>>,
     scope: Scope,
-    binder_depth: u32,
-    type_vars: u32,
 }
 
 fn flatten_product(expr: &Expression) -> Vec<&Expression> {
     fn aux<'a>(e: &'a Expression, v: &mut Vec<&'a Expression>) {
         match &e.desc {
             ExpressionDesc::Product(x1, x2) => {
-                // v.push(x1);
-                // aux(x2, v);
                 aux(x1, v);
                 v.push(x2);
             }
@@ -88,20 +92,22 @@ impl Resolver {
             types: Arena::new(),
             vars: Arena::new(),
             vbs: Arena::new(),
+            tps: Arena::new(),
+            tvs: Arena::new(),
             scope: Scope::new(),
             builtins: HashMap::new(),
-            binder_depth: 0,
-            type_vars: 0,
+            builtin_types: HashMap::new(),
+            constructors: HashMap::new(),
         };
         res.add_builtins();
         res
     }
 
-    fn fresh_type_var(&mut self) -> TypeVarId {
-        let id = TypeVarId(self.type_vars);
-        self.type_vars += 1;
-        id
-    }
+    // fn fresh_type_var(&mut self) -> TypeVarId {
+    //     let id = TypeVarId(self.type_vars);
+    //     self.type_vars += 1;
+    //     id
+    // }
 
     fn with_scope<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
         let parent = std::mem::take(&mut self.scope);
@@ -111,22 +117,19 @@ impl Resolver {
         res
     }
 
-    fn new_type_param(&self, index: u32) -> TypeParamId {
-        TypeParamId {
-            depth: self.binder_depth,
-            index,
-        }
-    }
+    // fn new_type_param(&self, index: u32) -> TypeParamId {
+    //     TypeParamId {
+    //         depth: self.binder_depth,
+    //         index,
+    //     }
+    // }
 
     fn with_type_params<T>(&mut self, params: &[Symbol], f: impl FnOnce(&mut Self) -> T) -> T {
         self.with_scope(|this| {
-            params.iter().copied().enumerate().for_each(|(i, symb)| {
-                this.scope
-                    .bind_type_param(symb, this.new_type_param(i as u32))
-            });
-            this.binder_depth += 1;
+            params
+                .iter()
+                .for_each(|symb| this.scope.bind_type_param(*symb, this.tps.alloc(TPMarker)));
             let res = f(this);
-            this.binder_depth -= 1;
             res
         })
     }
@@ -206,10 +209,63 @@ impl Resolver {
             }
             PatternDesc::Unit => PatternNode::Tuple(vec![]),
             PatternDesc::Paren(inner) => return self.resolve_pattern(inner),
-            PatternDesc::BinaryOp(_op, _lhs, _rhs) => todo!(),
-            PatternDesc::List(_locateds) => todo!(),
+            PatternDesc::BinaryOp(op, lhs, rhs) => {
+                let r_lhs = self.resolve_pattern(lhs)?;
+                let r_rhs = self.resolve_pattern(rhs)?;
+                match op {
+                    BinaryOp::Cons => {
+                        let list_ty = self.builtin_types["list"];
+                        let span = r_lhs.span.split().0.span(&r_rhs.span.split().1);
+                        let tuple = Pattern::new(
+                            PatternNode::Tuple(vec![r_lhs, r_rhs]),
+                            span,
+                            Default::default(),
+                        );
+                        PatternNode::Cons {
+                            ty: list_ty,
+                            idx: CONS_IDX,
+                            arg: Some(Box::new(tuple)),
+                        }
+                    }
+                    _ => todo!(),
+                }
+            }
+            PatternDesc::List(items) => {
+                let resolved = items
+                    .iter()
+                    .map(|x| self.resolve_pattern(x))
+                    .collect::<Res<Vec<_>>>()?;
+
+                let list_ty = self.builtin_types["list"];
+
+                resolved.into_iter().fold(
+                    PatternNode::Cons {
+                        ty: list_ty,
+                        idx: NIL_IDX,
+                        arg: None,
+                    },
+                    |acc, pat| {
+                        let span = pat.span; // TODO: fix that maybe
+                        let typed = Pattern::new(acc, span, Default::default());
+
+                        let tuple = Pattern::new(
+                            PatternNode::Tuple(vec![pat, typed]),
+                            span,
+                            Default::default(),
+                        );
+
+                        PatternNode::Cons {
+                            ty: list_ty,
+                            idx: CONS_IDX,
+                            arg: Some(Box::new(tuple)),
+                        }
+                    },
+                )
+            }
         };
-        Ok(Pattern::new(node, pat.span, opt_ty.unwrap_or_default()))
+        let pat = Pattern::new(node, pat.span, opt_ty.unwrap_or_default());
+
+        Ok(pat)
     }
 
     fn declare_value_binding(
@@ -257,10 +313,23 @@ impl Resolver {
             ExpressionDesc::BinaryOp(op, lhs, rhs) => {
                 let left = self.resolve_expression(lhs)?;
                 let right = self.resolve_expression(rhs)?;
-                ExprNode::BinaryOp {
-                    op: *op,
-                    left: Box::new(left),
-                    right: Box::new(right),
+                match op {
+                    BinaryOp::Cons => {
+                        let list_ty = self.builtin_types["list"];
+                        let span = left.span.split().0.span(&right.span.split().1);
+                        let tuple =
+                            Expr::new(ExprNode::Tuple(vec![left, right]), span, Default::default());
+                        ExprNode::Construct {
+                            ty: list_ty,
+                            idx: CONS_IDX,
+                            arg: Some(Box::new(tuple)),
+                        }
+                    }
+                    _ => ExprNode::BinaryOp {
+                        op: *op,
+                        left: Box::new(left),
+                        right: Box::new(right),
+                    },
                 }
             }
             ExpressionDesc::Constant(x) => ExprNode::Const(*x),
@@ -348,6 +417,39 @@ impl Resolver {
                     }],
                     body: Box::new(self_expr),
                 }
+            }
+            ExpressionDesc::Sequence(fst, snd) => ExprNode::Sequence {
+                first: Box::new(self.resolve_expression(fst)?),
+                second: Box::new(self.resolve_expression(snd)?),
+            },
+            ExpressionDesc::List(exprs) => {
+                let resolved = exprs
+                    .iter()
+                    .map(|x| self.resolve_expression(x))
+                    .collect::<Res<Vec<_>>>()?;
+
+                let list_ty = self.builtin_types["list"];
+
+                resolved.into_iter().fold(
+                    ExprNode::Construct {
+                        ty: list_ty,
+                        idx: NIL_IDX,
+                        arg: None,
+                    },
+                    |acc, e| {
+                        let span = e.span; // TODO: fix that maybe
+                        let typed = Expr::new(acc, span, Default::default());
+
+                        let tuple =
+                            Expr::new(ExprNode::Tuple(vec![e, typed]), span, Default::default());
+
+                        ExprNode::Construct {
+                            ty: list_ty,
+                            idx: CONS_IDX,
+                            arg: Some(Box::new(tuple)),
+                        }
+                    },
+                )
             }
             x => todo!("{x:?}"),
         };
@@ -467,7 +569,11 @@ impl Resolver {
         for ty in tys {
             let id = self.types.alloc(TypeDeclInfo {
                 name: ty.name.desc,
-                arity: ty.params.len(),
+                params: ty
+                    .params
+                    .iter()
+                    .map(|x| self.scope.resolve_type_param(*x, ty.name.span))
+                    .collect::<Res<_>>()?,
             });
             ids.push(id);
             self.scope.bind_type(ty.name.desc, id);
@@ -518,7 +624,11 @@ impl Resolver {
             Ok(TypeDecl {
                 id,
                 name: ty.name.desc,
-                params: ty.params.clone(),
+                params: ty
+                    .params
+                    .iter()
+                    .map(|x| this.scope.resolve_type_param(*x, ty.name.span))
+                    .collect::<Res<_>>()?,
                 kind: match &ty.kind {
                     TypeKind::Variant(conss) => TypeDeclKind::Variant(
                         conss
@@ -544,7 +654,7 @@ impl Resolver {
                 let id = self
                     .scope
                     .resolve_type_var(*name)
-                    .unwrap_or_else(|| self.fresh_type_var());
+                    .unwrap_or_else(|| self.tvs.alloc(TVMarker));
                 Type::Var(id)
             }
             TypeExprDesc::Arrow(_, ty1, ty2) => {

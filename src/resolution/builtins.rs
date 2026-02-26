@@ -1,8 +1,11 @@
 use crate::{
     intern_symbol,
-    poly_ir::{TypeId, ValueRef, item::TypeDeclInfo},
+    poly_ir::{TPMarker, TypeId, TypeParamId, ValueRef, item::TypeDeclInfo, type_expr::Type},
     resolution::{Resolver, VarInfo},
 };
+
+pub const NIL_IDX: usize = 0;
+pub const CONS_IDX: usize = 1;
 
 impl Resolver {
     pub(super) fn add_builtins(&mut self) {
@@ -11,20 +14,30 @@ impl Resolver {
     }
 
     fn add_builtin_types(&mut self) {
-        let _int_ty = self.add_builtin_type("int", 0);
-        let _bool_ty = self.add_builtin_type("bool", 0);
-        let _string_ty = self.add_builtin_type("string", 0);
-        let _unit_ty = self.add_builtin_type("unit", 0);
-        let _arrow_ty = self.add_builtin_type("->", 2);
-        let _tuple_ty = self.add_builtin_type("*", 0); // arity is not relevant here
+        let _int_ty = self.add_builtin_type("int", vec![]);
+        let _bool_ty = self.add_builtin_type("bool", vec![]);
+        let _string_ty = self.add_builtin_type("string", vec![]);
+        let _unit_ty = self.add_builtin_type("unit", vec![]);
 
-        let list_ty = self.add_builtin_type("list", 1);
-        self.add_builtin_constructor("[]", list_ty, 0);
-        self.add_builtin_constructor("::", list_ty, 1);
+        let arrow_args = (0..2).map(|_| self.tps.alloc(TPMarker)).collect();
+        let _arrow_ty = self.add_builtin_type("->", arrow_args);
 
-        let option_ty = self.add_builtin_type("option", 1);
-        self.add_builtin_constructor("None", option_ty, 0);
-        self.add_builtin_constructor("Some", option_ty, 1);
+        let _tuple_ty = self.add_builtin_type("*", vec![]); // arity is not relevant here
+
+        let list_param = self.tps.alloc(TPMarker);
+        let list_ty = self.add_builtin_type("list", vec![list_param]);
+        self.add_builtin_constructor("[]", list_ty, None);
+        self.add_builtin_constructor(
+            "::",
+            list_ty,
+            Some(Type::Tuple(vec![
+                Type::Param(list_param),
+                Type::Constr {
+                    id: list_ty,
+                    args: vec![Type::Param(list_param)],
+                },
+            ])),
+        );
     }
 
     fn add_builtin_value(&mut self, name: &str) {
@@ -41,16 +54,26 @@ impl Resolver {
         self.add_builtin_value("failwith");
     }
 
-    fn add_builtin_type(&mut self, name: &str, arity: usize) -> TypeId {
+    fn add_builtin_type(&mut self, name: &str, params: Vec<TypeParamId>) -> TypeId {
         let sym = intern_symbol(name);
-        let id = self.types.alloc(TypeDeclInfo { name: sym, arity });
+        let id = self.types.alloc(TypeDeclInfo { name: sym, params });
         self.scope.bind_type(sym, id);
+        self.builtin_types.insert(name.to_string(), id);
         id
     }
 
-    fn add_builtin_constructor(&mut self, name: &str, type_id: TypeId, index: u32) {
+    fn add_builtin_constructor(&mut self, name: &str, type_id: TypeId, arg_ty: Option<Type>) {
+        assert!(!arg_ty.iter().any(Type::is_infer));
         let sym = intern_symbol(name);
-        self.scope
-            .bind_value(sym, ValueRef::Constructor { type_id, index });
+
+        self.constructors.entry(type_id).or_default().push(arg_ty);
+        let index = self.constructors[&type_id].len() - 1;
+        self.scope.bind_value(
+            sym,
+            ValueRef::Constructor {
+                type_id,
+                index: index as u32,
+            },
+        );
     }
 }

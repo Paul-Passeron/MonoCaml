@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::{
     lexer::interner::Symbol,
-    poly_ir::{TypeId, TypeParamId, ValueRef, VarId, type_expr::TypeVarId},
+    poly_ir::{TypeId, TypeParamId, TypeVarId, ValueRef, VarId},
     resolution::error::{Res, ResolutionError},
     source_manager::loc::Span,
 };
