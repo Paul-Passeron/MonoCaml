@@ -448,16 +448,18 @@ impl<'a> InferenceCtx<'a> {
     }
 
     fn collect_vars(&mut self, ty: Id<MonoTy>) -> Vec<InferVarId> {
-        fn aux(ty: &MonoTy, ctx: &InferenceCtx, set: &mut HashSet<InferVarId>) {
+        fn aux(ty: Id<MonoTy>, ctx: &InferenceCtx, set: &mut HashSet<InferVarId>) {
+            let ty = ty.find(ctx);
+            let ty = ty.get(ctx);
             match ty {
                 MonoTy::Var(ty_var) => {
                     set.insert(ty_var.id);
                 }
-                MonoTy::Con(ty_con) => ty_con.args.iter().for_each(|x| aux(x.get(ctx), ctx, set)),
+                MonoTy::Con(ty_con) => ty_con.args.iter().for_each(|x| aux(*x, ctx, set)),
             }
         }
         let mut s = HashSet::new();
-        aux(ty.get(self), self, &mut s);
+        aux(ty, self, &mut s);
         let mut v: Vec<_> = s.into_iter().collect();
         v.sort();
         v
