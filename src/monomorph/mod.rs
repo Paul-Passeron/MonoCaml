@@ -326,7 +326,7 @@ impl<'a> MonoCtx<'a> {
                 PatternNode::Tuple(typed_nodes) => {
                     typed_nodes.iter().find_map(|x| aux(og_id, x, ctx))
                 }
-                PatternNode::Cons { ty, idx, arg } => todo!(),
+                PatternNode::Cons { arg, .. } => arg.iter().find_map(|x| aux(og_id, x, ctx)),
             }
         }
 
