@@ -824,6 +824,20 @@ impl<'a> InferenceCtx<'a> {
                     bool_ty,
                 ))
             }
+            BinaryOp::Eq | BinaryOp::NEq => {
+                let left = self.infer_expr(left)?;
+                let right = self.infer_expr(right)?;
+                let bool_ty = self.get_ty(MonoTy::bool_ty(self));
+                self.unify_j(left.ty, right.ty)?;
+                Ok((
+                    ExprNode::BinaryOp {
+                        op,
+                        left: Box::new(left),
+                        right: Box::new(right),
+                    },
+                    bool_ty,
+                ))
+            }
             x => todo!("{x:#?}"),
         }
     }
