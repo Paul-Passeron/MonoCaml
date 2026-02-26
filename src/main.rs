@@ -5,16 +5,12 @@ use std::{fs::File, io::Read, path::PathBuf, sync::Mutex};
 use lazy_static::lazy_static;
 
 use crate::{
-    backend::llvm_backend::LLVMBackend,
-    cfg::{FunName, Label, var::CfgVar},
     inference::{InferenceCtx, InferenceResult},
     lexer::{
         Lexer,
         error::LexingError,
         interner::{StrLit, Symbol},
     },
-    lower::mono_to_cfg::MonoToCfg,
-    mono_ir::{Ast, Var, types::AstCtx},
     monomorph::MonoCtx,
     parser::Parser,
     resolution::Resolver,
@@ -37,27 +33,6 @@ pub mod poly_ir;
 pub mod resolution;
 pub mod session;
 pub mod source_manager;
-
-#[allow(unused)]
-fn compile_ast<S: ToString>(ast: Ast, prog_name: S) {
-    compile_ast_with_ctx(ast, prog_name, AstCtx::default())
-}
-
-fn compile_ast_with_ctx<S: ToString>(ast: Ast, prog_name: S, ctx: AstCtx) {
-    let prog_name = prog_name.to_string();
-    println!("{}", ast.display());
-    let prog = MonoToCfg::compile(ast, ctx);
-    // println!("{prog}");
-
-    let _ = prog
-        .compile(LLVMBackend::new(PathBuf::from(format!("./{prog_name}"))))
-        .unwrap();
-
-    Var::reset();
-    CfgVar::reset();
-    Label::reset();
-    FunName::reset();
-}
 
 lazy_static! {
     static ref SESSION: Mutex<Session> = Mutex::new(Session::new(SourceManager::new()));
@@ -114,10 +89,6 @@ fn main() {
         }
     }
 
-    // for t in &tokens {
-    //     println!("{t}");
-    // }
-
     if let Some(error) = error {
         eprintln!("Lexing error: {}", error)
     }
@@ -130,10 +101,6 @@ fn main() {
             return;
         }
     };
-
-    // for item in &prog {
-    //     println!("{:#?}", item.desc);
-    // }
 
     let mut resolver = Resolver::new();
 
@@ -154,14 +121,9 @@ fn main() {
         infer_ctx.infer_program(&poly).unwrap()
     };
 
-    // for item in &inferred {
-    //     println!("{:#?}", item)
-    // }
-
     let mut mono_ctx = MonoCtx::new(&inferred, &mut vars, builtins);
-
     let specialized = mono_ctx.mono_program().unwrap();
     for item in &specialized {
-        println!("{:#?}", item)
+        println!("{:?}\n", item)
     }
 }

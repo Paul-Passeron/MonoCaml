@@ -103,12 +103,6 @@ impl Resolver {
         res
     }
 
-    // fn fresh_type_var(&mut self) -> TypeVarId {
-    //     let id = TypeVarId(self.type_vars);
-    //     self.type_vars += 1;
-    //     id
-    // }
-
     fn with_scope<T>(&mut self, f: impl FnOnce(&mut Self) -> T) -> T {
         let parent = std::mem::take(&mut self.scope);
         self.scope.parent = Some(Box::new(parent));
@@ -116,13 +110,6 @@ impl Resolver {
         self.scope = *self.scope.parent.take().unwrap_or_default();
         res
     }
-
-    // fn new_type_param(&self, index: u32) -> TypeParamId {
-    //     TypeParamId {
-    //         depth: self.binder_depth,
-    //         index,
-    //     }
-    // }
 
     fn with_type_params<T>(&mut self, params: &[Symbol], f: impl FnOnce(&mut Self) -> T) -> T {
         self.with_scope(|this| {

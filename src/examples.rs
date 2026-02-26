@@ -9,13 +9,36 @@ use std::{
 use rand::{Rng, rngs::ThreadRng};
 
 use crate::{
-    compile_ast_with_ctx,
+    backend::llvm_backend::LLVMBackend,
+    cfg::{FunName, Label, var::CfgVar},
+    lower::mono_to_cfg::MonoToCfg,
     mono_ir::{
         Ast, MatchCase, Var,
         pattern::Pattern,
         types::{AstCtx, AstTy, EnumCase, EnumDef},
     },
 };
+
+#[allow(unused)]
+fn compile_ast<S: ToString>(ast: Ast, prog_name: S) {
+    compile_ast_with_ctx(ast, prog_name, AstCtx::default())
+}
+
+fn compile_ast_with_ctx<S: ToString>(ast: Ast, prog_name: S, ctx: AstCtx) {
+    let prog_name = prog_name.to_string();
+    println!("{}", ast.display());
+    let prog = MonoToCfg::compile(ast, ctx);
+    // println!("{prog}");
+
+    let _ = prog
+        .compile(LLVMBackend::new(PathBuf::from(format!("./{prog_name}"))))
+        .unwrap();
+
+    Var::reset();
+    CfgVar::reset();
+    Label::reset();
+    FunName::reset();
+}
 
 fn run_and_check_output(program: &str, args: &[&str], expected: &str) -> std::io::Result<bool> {
     let mut child = Command::new(program)
