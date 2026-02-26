@@ -11,7 +11,7 @@ use rand::{Rng, rngs::ThreadRng};
 use crate::{
     backend::llvm_backend::LLVMBackend,
     cfg::{FunName, Label, var::CfgVar},
-    lower::mono_to_cfg::MonoToCfg,
+    lower::mono_to_cfg_old::MonoToCfg,
     mono_ir::{
         Ast, MatchCase, Var,
         pattern::Pattern,
