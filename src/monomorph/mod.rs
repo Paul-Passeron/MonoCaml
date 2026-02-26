@@ -474,6 +474,10 @@ impl<'a> MonoCtx<'a> {
                     .map(|expr| self.instantiate_expr(expr, subst, var_rename))
                     .collect(),
             ),
+            ExprNode::Sequence { first, second } => ExprNode::Sequence {
+                first: Box::new(self.instantiate_expr(first, subst, var_rename)),
+                second: Box::new(self.instantiate_expr(second, subst, var_rename)),
+            },
 
             x => todo!("{x:?}"),
         };
