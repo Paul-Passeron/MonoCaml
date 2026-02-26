@@ -153,7 +153,7 @@ impl<'a> Parser<'a> {
                 self.advance();
                 let mut elems = vec![];
                 while !self.is_done() && !self.at(TokenKind::RSqr) {
-                    elems.push(self.parse_expression()?);
+                    elems.push(self.parse_atom()?);
                     if !self.at(TokenKind::Semi) {
                         break;
                     } else {
