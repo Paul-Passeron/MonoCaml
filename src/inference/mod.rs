@@ -884,8 +884,8 @@ impl TypeId {
         ctx.decls[self].name.to_string()
     }
 
-    pub fn from_name(s: &str, ctx: &InferenceCtx) -> Option<Self> {
-        for (id, TypeDeclInfo { name, .. }) in ctx.decls.iter() {
+    pub fn from_name(s: &str, decls: &Arena<TypeDeclInfo>) -> Option<Self> {
+        for (id, TypeDeclInfo { name, .. }) in decls.iter() {
             if name.to_string() == s {
                 return Some(id);
             }

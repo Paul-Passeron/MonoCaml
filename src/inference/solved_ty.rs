@@ -20,49 +20,49 @@ pub struct SolvedCon {
 impl SolvedTy {
     pub fn int_ty(ctx: &InferenceCtx) -> Self {
         Self::Con(SolvedCon {
-            id: Id::from_name("int", ctx).unwrap(),
+            id: Id::from_name("int", ctx.decls).unwrap(),
             args: vec![],
         })
     }
 
     pub fn bool_ty(ctx: &InferenceCtx) -> Self {
         Self::Con(SolvedCon {
-            id: Id::from_name("bool", ctx).unwrap(),
+            id: Id::from_name("bool", ctx.decls).unwrap(),
             args: vec![],
         })
     }
 
     pub fn unit_ty(ctx: &InferenceCtx) -> Self {
         Self::Con(SolvedCon {
-            id: Id::from_name("unit", ctx).unwrap(),
+            id: Id::from_name("unit", ctx.decls).unwrap(),
             args: vec![],
         })
     }
 
     pub fn string_ty(ctx: &InferenceCtx) -> Self {
         Self::Con(SolvedCon {
-            id: Id::from_name("string", ctx).unwrap(),
+            id: Id::from_name("string", ctx.decls).unwrap(),
             args: vec![],
         })
     }
 
     pub fn list_ty(ty: SolvedTy, ctx: &InferenceCtx) -> Self {
         Self::Con(SolvedCon {
-            id: Id::from_name("list", ctx).unwrap(),
+            id: Id::from_name("list", ctx.decls).unwrap(),
             args: vec![ty],
         })
     }
 
     pub fn tuple_ty(tys: Vec<SolvedTy>, ctx: &InferenceCtx) -> Self {
         Self::Con(SolvedCon {
-            id: Id::from_name("*", ctx).unwrap(),
+            id: Id::from_name("*", ctx.decls).unwrap(),
             args: tys,
         })
     }
 
     pub fn func_ty(arg: SolvedTy, ret: SolvedTy, ctx: &InferenceCtx) -> Self {
         Self::Con(SolvedCon {
-            id: Id::from_name("->", ctx).unwrap(),
+            id: Id::from_name("->", ctx.decls).unwrap(),
             args: vec![arg, ret],
         })
     }
@@ -147,7 +147,7 @@ impl MonoTy {
             Self::unit_ty(ctx)
         } else {
             MonoTy::Con(TyCon {
-                id: Id::from_name("*", ctx).unwrap(),
+                id: Id::from_name("*", ctx.decls).unwrap(),
                 args,
             })
         }
@@ -155,70 +155,70 @@ impl MonoTy {
 
     pub fn list_ty(ty: Id<Self>, ctx: &InferenceCtx) -> Self {
         MonoTy::Con(TyCon {
-            id: Id::from_name("list", ctx).unwrap(),
+            id: Id::from_name("list", ctx.decls).unwrap(),
             args: vec![ty],
         })
     }
 
     pub fn func_ty(arg: Id<Self>, ret: Id<Self>, ctx: &InferenceCtx) -> Self {
         MonoTy::Con(TyCon {
-            id: Id::from_name("->", ctx).unwrap(),
+            id: Id::from_name("->", ctx.decls).unwrap(),
             args: vec![arg, ret],
         })
     }
 
     pub fn option_ty(ty: Id<Self>, ctx: &InferenceCtx) -> Self {
         MonoTy::Con(TyCon {
-            id: Id::from_name("option", ctx).unwrap(),
+            id: Id::from_name("option", ctx.decls).unwrap(),
             args: vec![ty],
         })
     }
 
     pub fn result_ty(ok: Id<Self>, err: Id<Self>, ctx: &InferenceCtx) -> Self {
         MonoTy::Con(TyCon {
-            id: Id::from_name("result", ctx).unwrap(),
+            id: Id::from_name("result", ctx.decls).unwrap(),
             args: vec![ok, err],
         })
     }
 
     pub fn unit_ty(ctx: &InferenceCtx) -> Self {
         MonoTy::Con(TyCon {
-            id: Id::from_name("unit", ctx).unwrap(),
+            id: Id::from_name("unit", ctx.decls).unwrap(),
             args: vec![],
         })
     }
 
     pub fn int_ty(ctx: &InferenceCtx) -> Self {
         MonoTy::Con(TyCon {
-            id: Id::from_name("int", ctx).unwrap(),
+            id: Id::from_name("int", ctx.decls).unwrap(),
             args: vec![],
         })
     }
 
     pub fn char_ty(ctx: &InferenceCtx) -> Self {
         MonoTy::Con(TyCon {
-            id: Id::from_name("char", ctx).unwrap(),
+            id: Id::from_name("char", ctx.decls).unwrap(),
             args: vec![],
         })
     }
 
     pub fn string_ty(ctx: &InferenceCtx) -> Self {
         MonoTy::Con(TyCon {
-            id: Id::from_name("string", ctx).unwrap(),
+            id: Id::from_name("string", ctx.decls).unwrap(),
             args: vec![],
         })
     }
 
     pub fn float_ty(ctx: &InferenceCtx) -> Self {
         MonoTy::Con(TyCon {
-            id: Id::from_name("float", ctx).unwrap(),
+            id: Id::from_name("float", ctx.decls).unwrap(),
             args: vec![],
         })
     }
 
     pub fn bool_ty(ctx: &InferenceCtx) -> Self {
         MonoTy::Con(TyCon {
-            id: Id::from_name("bool", ctx).unwrap(),
+            id: Id::from_name("bool", ctx.decls).unwrap(),
             args: vec![],
         })
     }
