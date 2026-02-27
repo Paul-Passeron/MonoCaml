@@ -15,7 +15,7 @@ use crate::{
         TypeId, ValueRef, VarId,
         expr::{Expr, ExprNode, MatchCase, VBMarker, ValueBinding},
         id::{Arena, Id},
-        item::{Item, ItemNode},
+        item::{Item, ItemNode, TypeDeclInfo},
         pattern::{Pattern, PatternNode},
     },
     resolution::VarInfo,
@@ -92,7 +92,7 @@ pub struct MonoCtx<'a> {
     pub items: Vec<&'a Item<SolvedTy>>,
     pub vars: &'a mut Arena<VarInfo>, // og vars
     pub id_to_bindings: HashMap<Id<VBMarker>, &'a ValueBinding<SolvedTy>>,
-
+    pub decls: &'a Arena<TypeDeclInfo>,
     pub builtins: HashMap<VarId, SolvedTy>,
 
     pub vbs: Arena<VBMarker>,
@@ -223,6 +223,7 @@ impl<'a> MonoCtx<'a> {
         program: &'a [Item<SolvedTy>],
         vars: &'a mut Arena<VarInfo>,
         builtins: HashMap<VarId, SolvedTy>,
+        decls: &'a Arena<TypeDeclInfo>,
     ) -> Self {
         let mut res = Self {
             items: Vec::from_iter(program),
@@ -236,6 +237,7 @@ impl<'a> MonoCtx<'a> {
             id_to_bindings: HashMap::new(),
             instantiated_vars: HashMap::new(),
             builtins,
+            decls,
         };
         res.init();
         res
@@ -599,6 +601,26 @@ impl<'a> MonoCtx<'a> {
         ids.into_iter().for_each(|id| {
             self.specialize_binding(id, Subst::new());
         });
+    }
+
+    pub fn get_final_builtins(&self) -> HashMap<VarId, ConcrTy> {
+        fn aux(ctx: &MonoCtx, ty: &SolvedTy) -> ConcrTy {
+            match ty {
+                SolvedTy::Var(_) => ConcrTy {
+                    id: TypeId::from_name("int", ctx.decls).unwrap(),
+                    args: vec![],
+                },
+                SolvedTy::Con(SolvedCon { id, args }) => ConcrTy {
+                    id: *id,
+                    args: args.iter().map(|arg| aux(ctx, arg)).collect(),
+                },
+            }
+        }
+
+        self.builtins
+            .iter()
+            .map(|(id, ty)| (*id, aux(self, ty)))
+            .collect()
     }
 
     pub fn mono_program(&mut self) -> Res<Vec<Item<ConcrTy>>> {

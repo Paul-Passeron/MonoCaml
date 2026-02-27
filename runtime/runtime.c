@@ -133,7 +133,6 @@ void __cleanup_pools(void)
   free(__pools_to_clean.items);
 }
 
-void print_int(int x) { printf("%d", x); }
 
 typedef enum {
   MY_LST_NIL,
@@ -192,7 +191,5 @@ int main() {
   cleanup();
   return 0;
 }
-
-void print_string(const char *const str) { printf("%s", str); }
 
 int random_int(int max) { return rand() % max; }

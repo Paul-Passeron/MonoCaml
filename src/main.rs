@@ -5,12 +5,14 @@ use std::{fs::File, io::Read, path::PathBuf, sync::Mutex};
 use lazy_static::lazy_static;
 
 use crate::{
+    backend::{Backend, llvm_backend::LLVMBackend},
     inference::{InferenceCtx, InferenceResult},
     lexer::{
         Lexer,
         error::LexingError,
         interner::{StrLit, Symbol},
     },
+    lower::mono_to_cfg::MonoToCfg,
     monomorph::MonoCtx,
     parser::Parser,
     resolution::Resolver,
@@ -60,7 +62,7 @@ fn intern_strlit(s: &str) -> StrLit {
 }
 
 fn main() {
-    let file_name = "examples/simple_poly.ml";
+    let file_name = "examples/hello_world.ml";
     let contents = {
         let mut s = String::new();
         let mut f = File::open(file_name).unwrap();
@@ -121,9 +123,12 @@ fn main() {
         infer_ctx.infer_program(&poly).unwrap()
     };
 
-    let mut mono_ctx = MonoCtx::new(&inferred, &mut vars, builtins);
+    let mut mono_ctx = MonoCtx::new(&inferred, &mut vars, builtins, &types);
     let specialized = mono_ctx.mono_program().unwrap();
-    for item in &specialized {
-        println!("{:?}\n", item)
-    }
+    let builtins = mono_ctx.get_final_builtins();
+    let compiled = MonoToCfg::compile(&specialized, &builtins, &vars, &types);
+
+    LLVMBackend::new(PathBuf::from("out.bin"))
+        .compile(&compiled)
+        .unwrap();
 }

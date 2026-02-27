@@ -10,8 +10,6 @@
 #include <string.h>
 #include "std/std.h"
 void print_lst(void *lst);
-void print_int(int x);
-void print_string(const char *const str);
 int random_int(int max);
 
 void start(void);
