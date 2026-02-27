@@ -35,10 +35,6 @@ impl Backend for LLVMBackend {
 
             for function in backend.module.get_functions() {
                 backend.fpm.run_on(&function);
-
-                if function.get_name().to_str().unwrap() == "main" {
-                    println!("Found main !")
-                }
             }
 
             let triple = TargetMachine::get_default_triple();
@@ -93,4 +89,3 @@ impl LLVMBackend {
         }
     }
 }
-
