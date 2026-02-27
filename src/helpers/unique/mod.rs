@@ -74,7 +74,7 @@ pub trait Extractable<T = usize> {
     fn extract(&self) -> T;
 }
 
-#[derive(Debug, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Use<T: Extractable<S>, S = usize>(S, PhantomData<T>);
 
 impl<T, S> Extractable<S> for Use<T, S>
@@ -95,6 +95,13 @@ where
     fn clone(&self) -> Self {
         Self(self.0.clone(), PhantomData)
     }
+}
+
+impl<T, S> Copy for Use<T, S>
+where
+    T: Extractable<S>,
+    S: Copy,
+{
 }
 
 impl<T, S> From<&T> for Use<T, S>
